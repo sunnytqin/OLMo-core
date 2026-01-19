@@ -1264,6 +1264,7 @@ class NumpyPackedFSLDataset(NumpyFSLDatasetBase):
             *source_paths,
             max_sequence_length=self.sequence_length,
             eos_token_id=self.eos_token_id,
+            bos_token_id=self.bos_token_id,
             dtype=self.dtype,
             indices_dtype=self.indices_dtype,
             long_doc_strategy=self._long_doc_strategy,
@@ -1380,8 +1381,8 @@ class NumpyInterleavedFSLDataset(NumpyPaddedFSLDataset):
         self._chunks_per_doc = chunks_per_doc
         self._seed = seed
         self._interleaving_exempt_paths = interleaving_exempt_paths
-        self._num_interleaving_exempt_instances = None
-        self._num_interleavable_instances = None
+        self._num_interleaving_exempt_instances: Optional[int] = None
+        self._num_interleavable_instances: Optional[int] = None
 
     @property
     def fingerprint_fields(self) -> Tuple[str, ...]:
@@ -2354,6 +2355,11 @@ class NumpyDatasetConfig(Config, ABC):
         You can save a lot of time and disk space by setting this to a common directory across
         all of you runs.
     """
+    ignore_fingerprint_mismatch: bool = False
+    """
+    If True, ignore dataset fingerprint mismatches when loading from a checkpoint.
+    This is used when intentionally switching to a different dataset mix.
+    """
 
     @abstractmethod
     def build(self) -> NumpyDatasetBase:
@@ -2386,7 +2392,17 @@ class NumpyDatasetConfig(Config, ABC):
             log.info(f"Expanding '{pattern}'...")
             matches = sorted(glob_directory(pattern))
             if not matches:
-                raise FileNotFoundError(pattern)
+                error_msg = f"Pattern '{pattern}' did not match any files"
+                # Add helpful hint for mix-0625 which has unavailable files
+                if "0625" in pattern:
+                    error_msg += (
+                        "\n\nNOTE: Some files in OLMo-mix-0625 are not available. "
+                        "If you are resuming training from a checkpoint that used mix-0625, you will need to "
+                        "switch to a newer mix such as OLMo-mix-0925. To continue training with a different "
+                        "dataset mix, set 'ignore_fingerprint_mismatch=True' in your NumpyDataLoaderConfig "
+                        "to bypass the fingerprint mismatch error. This will probably result in a different data order!"
+                    )
+                raise FileNotFoundError(error_msg)
             for match in matches:
                 log.info(f" - '{match}'")
             expanded.extend(matches)

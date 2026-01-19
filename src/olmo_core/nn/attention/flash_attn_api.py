@@ -285,7 +285,7 @@ def dispatch_ring_flash_attn(
     v: torch.Tensor,
     *,
     group: dist.ProcessGroup,
-    strategy: "RingAttentionLoadBalancerType",
+    strategy: RingAttentionLoadBalancerType,
     cu_seqlens: Optional[torch.Tensor] = None,
     cu_seqlens_q: Optional[torch.Tensor] = None,
     cu_seqlens_k: Optional[torch.Tensor] = None,
@@ -344,7 +344,7 @@ def dispatch_ring_flash_attn(
     elif strategy == RingAttentionLoadBalancerType.llama3:
         if any(x is not None for x in (cu_seqlens, max_seqlen)):
             raise RuntimeError(
-                f"{strategy} load balancing strategy requires seperate QK doc lengths"
+                f"{strategy} load balancing strategy requires separate QK doc lengths"
             )
 
         if (

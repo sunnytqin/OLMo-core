@@ -1,9 +1,12 @@
 import logging
+import os
 
 import pytest
 import torch
 
 log = logging.getLogger(__name__)
+
+HF_TOKEN = os.environ.get("HF_TOKEN")
 
 has_cuda = torch.cuda.is_available()
 has_multiple_gpus = has_cuda and torch.cuda.device_count() > 1
@@ -14,6 +17,7 @@ has_flash_attn_3 = False
 has_torchao = False
 has_grouped_gemm = False
 has_te = False
+has_dion = False
 
 try:
     import flash_attn  # type: ignore
@@ -54,6 +58,14 @@ try:
 
     has_te = True
     del transformer_engine
+except ImportError:
+    pass
+
+try:
+    import dion  # type: ignore
+
+    has_dion = True
+    del dion
 except ImportError:
     pass
 
@@ -137,6 +149,18 @@ def requires_te(func):
     return func
 
 
+DION_MARKS = (
+    pytest.mark.gpu,
+    pytest.mark.skipif(not has_dion, reason="Requires Dion"),
+)
+
+
+def requires_dion(func):
+    for mark in DION_MARKS:
+        func = mark(func)
+    return func
+
+
 MPS_MARKS = (pytest.mark.skipif(not has_mps, reason="Requires MPS"),)
 
 
@@ -144,6 +168,12 @@ def requires_mps(func):
     for mark in MPS_MARKS:
         func = mark(func)
     return func
+
+
+requires_hf_token = pytest.mark.skipif(
+    HF_TOKEN is None,
+    reason="HF_TOKEN environment variable not set - required for accessing gated models",
+)
 
 
 INIT_DEVICES = [

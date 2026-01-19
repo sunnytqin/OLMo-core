@@ -15,6 +15,7 @@ from typing import (
     Dict,
     Generator,
     Iterable,
+    List,
     Optional,
     Tuple,
     Type,
@@ -33,13 +34,13 @@ from ..distributed.utils import (
     all_reduce_value,
     backend_supports_cpu,
     barrier,
+    broadcast_object,
     get_fs_local_rank,
     get_global_rank,
     get_local_tensor,
     get_rank,
     get_world_size,
     is_distributed,
-    scatter_object,
 )
 from ..exceptions import OLMoConfigurationError
 from ..io import copy_file, file_exists, is_url, join_path, normalize_path
@@ -61,6 +62,7 @@ from .common import (
     LoadStrategy,
     MetricMergeStrategy,
     ReduceType,
+    StepSkipRange,
     TrainingProgress,
 )
 from .train_module import TrainModule
@@ -75,7 +77,8 @@ T = TypeVar("T")
 class TrainerStateDict(TypedDict):
     global_step: int
     global_train_tokens_seen: int
-    max_steps: int
+    global_train_petaflops: float
+    max_steps: Optional[int]
     data_loader: Dict[str, Any]
     epoch: int
     world_size: int
@@ -221,6 +224,11 @@ class Trainer:
     The total number of training tokens seen.
     """
 
+    global_train_petaflops: float = 0.0
+    """
+    The total number of training petaflops computed.
+    """
+
     epoch: int = 1
     """
     The current epoch (1-based).
@@ -264,6 +272,11 @@ class Trainer:
     """
     Set this to ``True`` to disable evaluator callbacks.
     This is useful for benchmarking.
+    """
+
+    steps_to_skip: Optional[List[StepSkipRange]] = None
+    """
+    Ranges of steps to completely skip training on.
     """
 
     # Internal bookkeeping
@@ -440,14 +453,14 @@ class Trainer:
             return None
 
     @property
-    def max_steps(self) -> int:
+    def max_steps(self) -> Optional[int]:
         """
         The maximum number of steps to train for, as determined by :data:`max_duration`.
         """
         return self._get_max_steps(self.max_duration)
 
     @property
-    def max_tokens(self) -> int:
+    def max_tokens(self) -> Optional[int]:
         """
         The maximum number of tokens to train for, as determined by :data:`max_duration`.
         """
@@ -469,17 +482,13 @@ class Trainer:
         else:
             raise NotImplementedError(f"Unsupported duration unit: {duration.unit}")
 
-    def _get_max_steps(self, duration: Duration) -> int:
+    def _get_max_steps(self, duration: Duration) -> Optional[int]:
         if duration.unit == DurationUnit.steps:
             return duration.value
         elif duration.unit == DurationUnit.epochs:
             if self.data_loader.total_batches is None:
-                raise RuntimeError(
-                    "the number of steps cannot be determined from an 'epochs' duration since "
-                    "the data loader's number of batches is unknown"
-                )
+                return None
             max_epochs = duration.value
-            complete_epochs_remaining = max(max_epochs - self.epoch, 0)
             # NOTE: need to cover the case where the last epoch has just ended and we've incremented
             # self.epoch.
             steps_remaining_this_epoch = (
@@ -487,10 +496,12 @@ class Trainer:
                 if self.epoch > max_epochs
                 else max(self.data_loader.total_batches - self.data_loader.batches_processed, 0)
             )
-            steps_remaining = (
-                complete_epochs_remaining * self.data_loader.total_batches
-                + steps_remaining_this_epoch
-            )
+            steps_remaining = steps_remaining_this_epoch
+            for e in range(self.epoch + 1, duration.value + 1):
+                if (b := self.data_loader.batches_in_epoch(e)) is not None:
+                    steps_remaining += b
+                else:
+                    return None
             return self.global_step + steps_remaining
         elif duration.unit == DurationUnit.tokens:
             # Need to account for a change in batch size.
@@ -501,11 +512,13 @@ class Trainer:
         else:
             raise NotImplementedError
 
-    def _get_max_tokens(self, duration: Duration) -> int:
+    def _get_max_tokens(self, duration: Duration) -> Optional[int]:
         if duration.unit == DurationUnit.tokens:
             return duration.value
         else:
             max_steps = self._get_max_steps(duration)
+            if max_steps is None:
+                return None
             steps_remaining = max(max_steps - self.global_step, 0)
             tokens_remaining = steps_remaining * self.tokens_per_batch
             return self.global_train_tokens_seen + tokens_remaining
@@ -564,10 +577,11 @@ class Trainer:
     @property
     def training_progress(self) -> TrainingProgress:
         # Calculate total steps.
-        total_steps = max(
-            self._get_max_steps(self.hard_stop) if self.hard_stop is not None else self.max_steps,
-            self.global_step,
+        total_steps = (
+            self._get_max_steps(self.hard_stop) if self.hard_stop is not None else self.max_steps
         )
+        if total_steps is not None:
+            total_steps = max(total_steps, self.global_step)
 
         # Get current speed in batches per second.
         bps: Optional[float] = None
@@ -578,7 +592,11 @@ class Trainer:
 
         # Estimate the remaining time.
         time_remaining: Optional[timedelta] = None
-        if bps is not None and (steps_remaining := (total_steps - self.global_step)) > 0:
+        if (
+            bps is not None
+            and total_steps is not None
+            and (steps_remaining := (total_steps - self.global_step)) > 0
+        ):
             seconds_remaining = steps_remaining / bps
             # Round to nearest minute.
             minutes_remaining = 1 + (seconds_remaining // 60)
@@ -663,17 +681,12 @@ class Trainer:
 
         barrier()
 
-        # It's possible that we tried restarting a run that had already finished.
-        if self.training_complete:
-            log.warning("Training already complete, ending run now")
-            self._shutdown()
-            return
-
         log.info("Callback order:")
         for i, callback_name in enumerate(self.callbacks.keys()):
             log.info(f"  - Callback {i + 1}: {callback_name}")
 
-        log.info(f"Training for {self.max_steps:,d} steps")
+        if self.max_steps is not None:
+            log.info(f"Training for {self.max_steps:,d} steps")
 
         # Install SIGTERM + SIGINT handlers.
         og_sigterm_handler = signal.signal(signal.SIGTERM, self._handle_os_signal)
@@ -691,8 +704,9 @@ class Trainer:
                 self._shutdown()
                 return
 
-            # Do a dry-run for compiling and catch OOMs.
-            self._dry_run_batch()
+            # Do a dry-run for compiling and catching OOMs early.
+            if not self.training_complete:
+                self._dry_run_batch()
 
             # Iterate over epochs until done.
             while not self.training_complete:
@@ -702,8 +716,10 @@ class Trainer:
             log.error(f"Training failed due to:\n{type(exc).__name__}: {exc}")
             for callback in self._iter_callbacks():
                 callback.on_error(exc)
-            for callback in self._iter_callbacks():
-                callback.close()
+            # Shutdown ungracefully, i.e. without waiting on bookkeeping ops to finish and without
+            # issuing additional distributed collectives because those could result in a deadlock
+            # considering we're already in a bad/inconsistent state across ranks.
+            self._shutdown(gracefully=False)
             raise
         finally:
             # Restore original signal handlers.
@@ -717,18 +733,25 @@ class Trainer:
         self._shutdown()
         log.info("Training complete")
 
-    def _shutdown(self):
-        self._log_metrics()
+    def _shutdown(self, gracefully: bool = True):
+        if gracefully:
+            self._log_metrics()
+            if self._multi_thread_pool is not None:
+                self._multi_thread_pool.shutdown(wait=True, cancel_futures=False)
+                self._multi_thread_pool = None
+            if self._single_thread_pool is not None:
+                self._single_thread_pool.shutdown(wait=True, cancel_futures=False)
+                self._single_thread_pool = None
+
+        # NOTE: '.close' must be called after shutting down thread pools to ensure bookkeeping ops
+        # have finished first. See https://github.com/allenai/OLMo-core/pull/546.
         for callback in self._iter_callbacks():
             callback.close()
-        if self._multi_thread_pool is not None:
-            self._multi_thread_pool.shutdown(wait=True, cancel_futures=False)
-            self._multi_thread_pool = None
-        if self._single_thread_pool is not None:
-            self._single_thread_pool.shutdown(wait=True, cancel_futures=False)
-            self._single_thread_pool = None
+
+        if gracefully:
+            barrier()
+
         gc_cuda()
-        barrier()
 
     def state_dict(self) -> TrainerStateDict:
         """
@@ -737,6 +760,7 @@ class Trainer:
         return {
             "global_step": self.global_step,
             "global_train_tokens_seen": self.global_train_tokens_seen,
+            "global_train_petaflops": self.global_train_petaflops,
             "max_steps": self.max_steps,
             "data_loader": self.data_loader.state_dict(),
             "epoch": self.epoch,
@@ -771,6 +795,7 @@ class Trainer:
         self.data_loader.load_state_dict(state_dict["data_loader"])
         self.global_step = state_dict["global_step"]
         self.global_train_tokens_seen = state_dict["global_train_tokens_seen"]
+        self.global_train_petaflops = state_dict.get("global_train_petaflops", 0.0)
         self.epoch = state_dict["epoch"]
 
         for cb_name, cb_state in state_dict.get("callbacks", {}).items():
@@ -828,10 +853,20 @@ class Trainer:
 
         # NOTE: to avoid making a ton of client requests (S3 or otherwise) we only make those
         # requests from rank 0 then scatter the result to the other ranks.
+        dir_to_scatter: Optional[PathOrStr] = dir
+        error: Optional[Exception] = None
         if get_rank() == 0 and not self.checkpointer.dir_is_checkpoint(dir):
             # Try to find the latest checkpoint in the directory.
-            dir = self.checkpointer.latest_checkpoint(dir)
-        dir = scatter_object(dir)
+            try:
+                dir_to_scatter = self.checkpointer.latest_checkpoint(dir)
+            except FileNotFoundError as e:  # defer raising until after the scatter
+                dir_to_scatter, error = None, e
+        dir_to_scatter = broadcast_object(dir_to_scatter)
+        if dir_to_scatter is None:
+            if error is None:
+                raise FileNotFoundError(f"No checkpoints found in '{dir}'")
+            raise error
+        dir = dir_to_scatter
 
         log.info(f"Loading checkpoint from '{dir}'...")
         trainer_state = self.checkpointer.load(
@@ -869,7 +904,7 @@ class Trainer:
         should_load: bool = True
         if get_rank() == 0:
             should_load = self.checkpointer.contains_checkpoint(dir)
-        should_load = scatter_object(should_load)
+        should_load = broadcast_object(should_load)
         if should_load:
             self.load_checkpoint(
                 dir,
@@ -1225,7 +1260,7 @@ class Trainer:
                 group=self.bookkeeping_pg,
             )
             if canceling_rank >= 0:
-                cancel_reason = scatter_object(
+                cancel_reason = broadcast_object(
                     self._cancel_reason,
                     src=get_global_rank(canceling_rank, group=self.bookkeeping_pg),
                     group=self.bookkeeping_pg,
@@ -1324,17 +1359,29 @@ class Trainer:
                 global_num_tokens := self.data_loader.global_num_tokens_in_batch(batch)
             ) is not None:
                 self.global_train_tokens_seen += global_num_tokens
+            if (global_num_flops := self.train_module.global_num_flops_in_batch(batch)) is not None:
+                self.global_train_petaflops += global_num_flops / 1e15  # flops -> petaflops
+
+            should_skip = False
+            if self.steps_to_skip:
+                for step_range in self.steps_to_skip:
+                    if step_range.start <= self.global_step < step_range.stop:
+                        should_skip = True
+                        break
 
             for callback in self._iter_callbacks():
                 callback.pre_step(batch)
 
-            self.train_module.train_batch(batch)
+            if should_skip:
+                log.warning(f"Skipping training on step {self.global_step:,d} intentionally...")
+            else:
+                self.train_module.train_batch(batch)
 
-            for callback in self._iter_callbacks():
-                callback.pre_optim_step()
+                for callback in self._iter_callbacks():
+                    callback.pre_optim_step()
 
-            self.train_module.optim_step()
-            self.train_module.zero_grads()
+                self.train_module.optim_step()
+                self.train_module.zero_grads()
 
             for callback in self._iter_callbacks():
                 callback.post_train_batch()

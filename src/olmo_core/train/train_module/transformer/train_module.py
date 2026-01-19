@@ -1,7 +1,7 @@
 import contextlib
 import logging
 from dataclasses import replace
-from functools import cached_property
+from functools import cached_property, lru_cache
 from typing import Any, Dict, Generator, Literal, Optional, Tuple, Union
 
 import torch
@@ -40,7 +40,13 @@ from olmo_core.nn.transformer import Transformer
 from olmo_core.nn.transformer.config import TransformerActivationCheckpointingMode
 from olmo_core.optim import OptimConfig, SkipStepOptimizer
 from olmo_core.optim.scheduler import Scheduler
-from olmo_core.utils import gc_cuda, get_default_device, log_once, move_to_device
+from olmo_core.utils import (
+    gc_cuda,
+    get_default_device,
+    log_once,
+    move_to_device,
+    warn_once,
+)
 
 from ...common import ReduceType
 from ..train_module import EvalBatchSpec, TrainModule
@@ -344,22 +350,34 @@ class TransformerTrainModule(TrainModule):
         if "labels" not in batch:
             batch["labels"] = get_labels(batch, label_ignore_index=self.label_ignore_index)
 
-        # Record how many instances are going to be skipped (masked out).
-        if (instance_mask := batch.get("instance_mask")) is not None and not dry_run:
-            self.record_metric(
-                "train/masked instances (%)", (~instance_mask).float().mean(), ReduceType.mean
-            )
-
-        # Calculate and record how many tokens are going to be used in the loss.
+        # Calculate how many tokens will be used in the loss.
         batch_num_tokens = batch["labels"].numel()
+        batch_num_tokens_per_instance = batch["labels"].shape[1]
         batch_num_tokens_for_loss = move_to_device(
             (batch["labels"] != self.label_ignore_index).sum(), self.device
         )
+
+        # Record percentage of masked labels.
         self.record_metric(
-            "train/masked labels (%)",
+            "train/masked labels (%)",  # just a proportion, not a percentage
             (batch_num_tokens - batch_num_tokens_for_loss) / batch_num_tokens,
             ReduceType.mean,
         )
+
+        # Record percentage of masked instances.
+        if (instance_mask := batch.get("instance_mask")) is not None:
+            self.record_metric(
+                "train/masked instances (%)",  # just a proportion, not a percentage
+                (~instance_mask).float().mean(),
+                ReduceType.mean,
+            )
+
+            # WARN: When we mask out instances with the instance filter, we count those tokens
+            # for the loss anyways. They will count as tokens with a zero loss. This means we
+            # get an artificially *low* loss for these batches. But it is really hard (and slow)
+            # to do this properly in a distributed setup. We add back in the full number of tokens
+            # for the loss so that each rank contributes to the loss calculation fairly.
+            batch_num_tokens_for_loss += (~instance_mask).sum() * batch_num_tokens_per_instance
 
         # Batch losses to record.
         ce_batch_loss = move_to_device(torch.tensor(0.0), self.device)
@@ -516,8 +534,20 @@ class TransformerTrainModule(TrainModule):
         with self._model_forward_context():
             return self.model(input_ids, labels=labels, **kwargs)
 
-    def num_flops_per_token(self, seq_len: int) -> int:
-        return self.model.num_flops_per_token(seq_len)
+    @lru_cache
+    def num_flops_per_token(self, seq_len: int) -> Optional[int]:
+        try:
+            return self.model.num_flops_per_token(seq_len)
+        except NotImplementedError as ex:
+            warn_once(f"Unable to estimate num flops per token: {ex}")
+            return None
+
+    def global_num_flops_in_batch(self, batch: Dict[str, Any]) -> Optional[int]:
+        global_num_tokens = self.trainer.data_loader.global_num_tokens_in_batch(batch)
+        if global_num_tokens is None:
+            return None
+        flops_per_token = self.num_flops_per_token(seq_len=batch["input_ids"].shape[1])
+        return flops_per_token * global_num_tokens if flops_per_token is not None else None
 
     @contextlib.contextmanager
     def _train_microbatch_context(

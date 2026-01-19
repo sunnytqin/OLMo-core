@@ -68,7 +68,7 @@ class DataLoaderBase(ABC):
         implementation.
     :param dp_world_size: The data parallel world size.
     :param dp_rank: The local data parallel rank.
-    :param fs_local_rank: The filesystem-local rank.
+    :param fs_local_rank: The filesystem-local rank relative to the working directory.
     """
 
     def __init__(
@@ -78,7 +78,7 @@ class DataLoaderBase(ABC):
         global_batch_size: int,
         dp_world_size: int = 1,
         dp_rank: int = 0,
-        fs_local_rank: int = 0,
+        fs_local_rank: Optional[int] = None,
     ):
         if is_url(work_dir):
             raise OLMoConfigurationError(
@@ -89,8 +89,7 @@ class DataLoaderBase(ABC):
         assert dp_rank < dp_world_size
         self.dp_world_size = dp_world_size
         self.dp_rank = dp_rank
-
-        self.fs_local_rank = fs_local_rank
+        self.fs_local_rank = fs_local_rank if fs_local_rank is not None else get_fs_local_rank()
 
         self.batches_processed = 0
         """
@@ -148,14 +147,22 @@ class DataLoaderBase(ABC):
     @abstractmethod
     def total_batches(self) -> Optional[int]:
         """
-        The total number of batches that the dataset will produce over the course of an epoch, if known.
+        The total number of batches that the dataset will produce over the course of the current epoch, if known.
         Otherwise this should return ``None``.
         """
         raise NotImplementedError
 
+    def batches_in_epoch(self, epoch: int) -> Optional[int]:
+        """
+        By default this is the same as :meth:`total_batches`, though some data loaders might generate
+        a different number of batches per epoch.
+        """
+        del epoch
+        return self.total_batches
+
     def __len__(self) -> int:
         """
-        Returns the total number of batches in an epoch (same as :data:`total_batches`) if known,
+        Returns the total number of batches in the current epoch (same as :data:`total_batches`) if known,
         otherwise a :class:`TypeError` is raised.
         """
         if self.total_batches is not None:
@@ -268,7 +275,7 @@ class TextDataLoaderBase(DataLoaderBase):
         global_batch_size: int,
         dp_world_size: int = 1,
         dp_rank: int = 0,
-        fs_local_rank: int = 0,
+        fs_local_rank: Optional[int] = None,
     ):
         super().__init__(
             work_dir=work_dir,
@@ -347,7 +354,8 @@ class NumpyDataLoaderBase(TextDataLoaderBase):
         target_device_type: str = "cpu",
         dp_world_size: int = 1,
         dp_rank: int = 0,
-        fs_local_rank: int = 0,
+        fs_local_rank: Optional[int] = None,
+        ignore_fingerprint_mismatch: bool = False,
     ):
         super().__init__(
             collator=collator,
@@ -365,6 +373,7 @@ class NumpyDataLoaderBase(TextDataLoaderBase):
         self.prefetch_factor = prefetch_factor
         self.target_device_type = target_device_type
         self._global_indices: Optional[np.ndarray] = None
+        self.ignore_fingerprint_mismatch = ignore_fingerprint_mismatch
 
     @classmethod
     def wrap_numpy_dataset(
@@ -377,12 +386,13 @@ class NumpyDataLoaderBase(TextDataLoaderBase):
         seed: int = 0,
         dp_world_size: int = 1,
         dp_rank: int = 0,
-        fs_local_rank: int = 0,
+        fs_local_rank: Optional[int] = None,
         num_threads: Optional[int] = None,
         num_workers: int = 0,
         prefetch_factor: Optional[int] = None,
         target_device_type: str = "cpu",
         shuffle: bool = True,
+        ignore_fingerprint_mismatch: bool = False,
     ) -> "NumpyDataLoaderBase":
         """
         Construct the corresponding :class:`NumpyDataLoaderBase` instance for the given :class:`NumpyDatasetBase`.
@@ -402,6 +412,7 @@ class NumpyDataLoaderBase(TextDataLoaderBase):
             prefetch_factor=prefetch_factor,
             target_device_type=target_device_type,
             shuffle=shuffle,
+            ignore_fingerprint_mismatch=ignore_fingerprint_mismatch,
         )
         data_loader: DataLoaderBase
         if isinstance(dataset, NumpyFSLDatasetBase):
@@ -434,8 +445,15 @@ class NumpyDataLoaderBase(TextDataLoaderBase):
                 "this could mean the data has changed"
             )
         elif state_dict["dataset_fingerprint"] != self.dataset.fingerprint:
-            raise RuntimeError(
-                "Restoring state from a different dataset is not supported! (fingerprint doesn't match)"
+            if not self.ignore_fingerprint_mismatch:
+                raise RuntimeError(
+                    "Dataset fingerprint does not match the fingerprint in the checkpoint, "
+                    "set ignore_fingerprint_mismatch=True to ignore this error. "
+                    "This will probably result in a different data order!"
+                )
+            log.warning(
+                "Fingerprint mismatch ignored since ignore_fingerprint_mismatch=True. "
+                "This will probably result in a different data order!"
             )
 
         if state_dict["seed"] != self.seed:
@@ -541,6 +559,10 @@ class NumpyDataLoaderBase(TextDataLoaderBase):
         return out
 
     def _iter_batches(self) -> Iterable[Dict[str, Any]]:
+        # If we're already at the end of epoch we can skip creating the iterator.
+        if self.total_batches is not None and self.batches_processed >= self.total_batches:
+            yield from ()
+
         def _build_batch_iterator():
             return iter(
                 torch.utils.data.DataLoader(
@@ -1069,6 +1091,7 @@ class NumpyDataLoaderConfig(Config):
     num_workers: int = 0
     prefetch_factor: Optional[int] = None
     target_device_type: Optional[str] = None
+    ignore_fingerprint_mismatch: bool = False
 
     def build(
         self,
@@ -1113,5 +1136,6 @@ class NumpyDataLoaderConfig(Config):
             num_workers=self.num_workers,
             prefetch_factor=self.prefetch_factor,
             target_device_type=self.target_device_type or get_default_device().type,
+            ignore_fingerprint_mismatch=self.ignore_fingerprint_mismatch,
         )
         return data_loader

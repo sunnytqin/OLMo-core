@@ -31,16 +31,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10"]
+        python: ["3.11"]
         task:
           - name: Lint
             run: make lint-check
 
           - name: Test
             run: |
-              pytest -v --color=yes --durations=3 \
+              pytest -v --color=yes --durations=6 \
                 --ignore-glob='src/test/distributed/checkpoint*' \
                 --ignore-glob='src/test/train/checkpoint*' \
+                --ignore-glob='src/test/nn/transformer*' \
+                --ignore-glob='src/test/nn/attention*' \
+                --ignore-glob='src/test/examples/*' \
+                --ignore-glob='src/test/scripts/*' \
                 src/test/
 
           - name: Test checkpoint
@@ -48,6 +52,35 @@ jobs:
               pytest -v --color=yes --durations=3 \
                 src/test/distributed/checkpoint* \
                 src/test/train/checkpoint*
+
+          - name: Test transformer
+            run: |
+              pytest -v --color=yes --durations=3 \
+                src/test/nn/transformer/
+
+          - name: Test attention
+            run: |
+              # Note: Exclude tensor parallel tests because they are resource-intensive and we test
+              # them on GPU anway.
+              pytest -v --color=yes --durations=3 \
+                -k 'not tensor_parallel' \
+                src/test/nn/attention*
+
+          - name: Test examples
+            run: |
+              pytest -v --color=yes --durations=3 \
+                src/test/examples/
+
+          - name: Test scripts
+            run: |
+              pytest -v --color=yes --durations=3 \
+                src/test/scripts/
+
+          - name: Test olmo3 ladder
+            run: |
+              for size in 190M 370M 600M 760M 1B 3B 7B 13B; do
+                python ./src/scripts/train/ladder/olmo3_ladder.py dry-run --size="$size" --output-dir=./
+              done
 
           - name: Type check
             run: make type-check
@@ -63,7 +96,7 @@ jobs:
               cd docs && make html SPHINXOPTS="-W --keep-going"
 
         include:
-          - python: "3.9"
+          - python: "3.10"
             task:
               name: Lint (min Python)
               run: make lint-check
@@ -122,35 +155,43 @@ jobs:
       matrix:
         task:
           - name: Test (GPU)
-            image: tylerr/olmo-core-tch270cu128-2025-09-24
+            image: &gpu_test_image tylerr/olmo-core-tch291cu128-2025-11-25
             gpus: 2
             run: |
               pytest -v --color=yes --durations=3 -m gpu \
                 --ignore-glob='src/test/distributed/checkpoint*' \
                 --ignore-glob='src/test/nn/transformer*' \
                 --ignore-glob='src/test/nn/moe*' \
+                --ignore-glob='src/test/optim*' \
                 src/test/
 
           - name: Test checkpoint (GPU)
-            image: tylerr/olmo-core-tch270cu128-2025-09-24
+            image: *gpu_test_image
             gpus: 2
             run: |
               pytest -v --color=yes --durations=3 -m gpu \
                 src/test/distributed/checkpoint*
 
           - name: Test transformer (GPU)
-            image: tylerr/olmo-core-tch270cu128-2025-09-24
+            image: *gpu_test_image
             gpus: 2
             run: |
               pytest -v --color=yes --durations=3 -m gpu \
                 src/test/nn/transformer*
 
           - name: Test MoE (GPU)
-            image: tylerr/olmo-core-tch270cu128-2025-09-24
+            image: *gpu_test_image
             gpus: 2
             run: |
               pytest -v --color=yes --durations=3 -m gpu \
                 src/test/nn/moe*
+
+          - name: Test optim (GPU)
+            image: *gpu_test_image
+            gpus: 2
+            run: |
+              pytest -v --color=yes --durations=3 -m gpu \
+                src/test/optim*
     steps:
       - uses: actions/checkout@v5
         with:
@@ -223,7 +264,7 @@ jobs:
       - name: Setup Python environment
         uses: ./.github/actions/setup-venv
         with:
-          python-version: "3.10"
+          python-version: "3.11"
           cache-prefix: ${{ env.CACHE_PREFIX }}
 
       - name: Prepare environment
