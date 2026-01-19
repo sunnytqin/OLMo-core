@@ -1,0 +1,8 @@
+{
+  "30M_seed42_case2_dclm_synthetic_wd1.6_lr1e-2": {
+    "validation_loss": 4.894656269962041,
+    "perplexity": 133.57406616210938,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  }
+}

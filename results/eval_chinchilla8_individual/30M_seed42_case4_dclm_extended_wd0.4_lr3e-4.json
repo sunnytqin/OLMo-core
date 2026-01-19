@@ -1,0 +1,8 @@
+{
+  "30M_seed42_case4_dclm_extended_wd0.4_lr3e-4": {
+    "validation_loss": 4.869523031776184,
+    "perplexity": 130.25877380371094,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  }
+}

@@ -1,0 +1,419 @@
+{
+  "30M_seed42_case3_dclm_repeat_wd0.1_lr1e-3": {
+    "validation_loss": 4.255021664168746,
+    "perplexity": 70.45833587646484,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.1_lr3e-3": {
+    "validation_loss": 4.115229731376004,
+    "perplexity": 61.26628112792969,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.1_lr3e-4": {
+    "validation_loss": 4.532637423357852,
+    "perplexity": 93.0035400390625,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.1_lr6e-4": {
+    "validation_loss": 4.329697167355196,
+    "perplexity": 75.9212875366211,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.4_lr1e-3": {
+    "validation_loss": 4.259842129366359,
+    "perplexity": 70.79878997802734,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.4_lr3e-3": {
+    "validation_loss": 4.151242865273278,
+    "perplexity": 63.512882232666016,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.4_lr3e-4": {
+    "validation_loss": 4.543469142128909,
+    "perplexity": 94.01637268066406,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.4_lr6e-4": {
+    "validation_loss": 4.349707858556508,
+    "perplexity": 77.45584869384766,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.8_lr1e-3": {
+    "validation_loss": 4.289707568841737,
+    "perplexity": 72.94513702392578,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.8_lr3e-3": {
+    "validation_loss": 4.224049840316418,
+    "perplexity": 68.30957794189453,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.8_lr3e-4": {
+    "validation_loss": 4.56506351388281,
+    "perplexity": 96.06869506835938,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.8_lr6e-4": {
+    "validation_loss": 4.377804942688926,
+    "perplexity": 79.6629638671875,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case3_dclm_repeat_wd1.6_lr1e-3": {
+    "validation_loss": 4.452955001931284,
+    "perplexity": 85.88032531738281,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case3_dclm_repeat_wd1.6_lr3e-3": {
+    "validation_loss": 4.455926987019929,
+    "perplexity": 86.13595581054688,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case3_dclm_repeat_wd1.6_lr3e-4": {
+    "validation_loss": 4.705725262005485,
+    "perplexity": 110.57844543457031,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case3_dclm_repeat_wd1.6_lr6e-4": {
+    "validation_loss": 4.557847926972455,
+    "perplexity": 95.37800598144531,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case4_dclm_extended_wd0.1_lr1e-3": {
+    "validation_loss": 4.20333566349365,
+    "perplexity": 66.90914916992188,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case4_dclm_extended_wd0.1_lr3e-3": {
+    "validation_loss": 4.073666133045686,
+    "perplexity": 58.77203369140625,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case4_dclm_extended_wd0.1_lr3e-4": {
+    "validation_loss": 4.508496472066493,
+    "perplexity": 90.78520202636719,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case4_dclm_extended_wd0.1_lr6e-4": {
+    "validation_loss": 4.3172735856346405,
+    "perplexity": 74.98391723632812,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case4_dclm_extended_wd0.4_lr1e-3": {
+    "validation_loss": 4.252387334053359,
+    "perplexity": 70.27298736572266,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case4_dclm_extended_wd0.4_lr3e-3": {
+    "validation_loss": 4.120499712202403,
+    "perplexity": 61.590003967285156,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case4_dclm_extended_wd0.4_lr3e-4": {
+    "validation_loss": 4.523736086190733,
+    "perplexity": 92.17933654785156,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case4_dclm_extended_wd0.4_lr6e-4": {
+    "validation_loss": 4.345519217149457,
+    "perplexity": 77.13206481933594,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case4_dclm_extended_wd0.8_lr1e-3": {
+    "validation_loss": 4.277296287098776,
+    "perplexity": 72.04537200927734,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case4_dclm_extended_wd0.8_lr3e-3": {
+    "validation_loss": 4.190007771530877,
+    "perplexity": 66.02330017089844,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case4_dclm_extended_wd0.8_lr3e-4": {
+    "validation_loss": 4.544028012003725,
+    "perplexity": 94.06893157958984,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case4_dclm_extended_wd0.8_lr6e-4": {
+    "validation_loss": 4.380029571182821,
+    "perplexity": 79.84040069580078,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case4_dclm_extended_wd1.6_lr1e-3": {
+    "validation_loss": 4.433664333694015,
+    "perplexity": 84.23953247070312,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case4_dclm_extended_wd1.6_lr3e-3": {
+    "validation_loss": 4.452767769060522,
+    "perplexity": 85.86427307128906,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case4_dclm_extended_wd1.6_lr3e-4": {
+    "validation_loss": 4.692802406950044,
+    "perplexity": 109.15866088867188,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case4_dclm_extended_wd1.6_lr6e-4": {
+    "validation_loss": 4.528037112734389,
+    "perplexity": 92.57666015625,
+    "tokens_evaluated": 50008507,
+    "num_batches": 3112
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.1_lr1e-2": {
+    "validation_loss": 4.050812830515507,
+    "perplexity": 57.444122314453125,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.1_lr6e-3": {
+    "validation_loss": 4.077659961285776,
+    "perplexity": 59.00723648071289,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.4_lr1e-2": {
+    "validation_loss": 4.1457864549759895,
+    "perplexity": 63.16727066040039,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.4_lr6e-3": {
+    "validation_loss": 4.1478527123036555,
+    "perplexity": 63.29794692993164,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.8_lr1e-2": {
+    "validation_loss": 4.3553481950803725,
+    "perplexity": 77.89393615722656,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.8_lr6e-3": {
+    "validation_loss": 4.271105510932995,
+    "perplexity": 71.6007308959961,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case3_dclm_repeat_wd1.6_lr1e-2": {
+    "validation_loss": 4.602248422805102,
+    "perplexity": 99.7082290649414,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case3_dclm_repeat_wd1.6_lr6e-3": {
+    "validation_loss": 4.441566261518303,
+    "perplexity": 84.90784454345703,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case4_dclm_extended_wd0.1_lr1e-2": {
+    "validation_loss": 4.015075134385746,
+    "perplexity": 55.42746353149414,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case4_dclm_extended_wd0.1_lr6e-3": {
+    "validation_loss": 4.0341280118596705,
+    "perplexity": 56.493648529052734,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case4_dclm_extended_wd0.8_lr1e-2": {
+    "validation_loss": 4.288820484784698,
+    "perplexity": 72.88043975830078,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case4_dclm_extended_wd0.8_lr6e-3": {
+    "validation_loss": 4.22147849264541,
+    "perplexity": 68.13414001464844,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case4_dclm_extended_wd1.6_lr6e-3": {
+    "validation_loss": 4.433129406818477,
+    "perplexity": 84.19447326660156,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case4_dclm_extended_wd0.4_lr1e-2": {
+    "validation_loss": 4.112096935177541,
+    "perplexity": 61.074642181396484,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case4_dclm_extended_wd0.4_lr6e-3": {
+    "validation_loss": 4.103872516005843,
+    "perplexity": 60.574398040771484,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case4_dclm_extended_wd1.6_lr1e-2": {
+    "validation_loss": 4.525024600286386,
+    "perplexity": 92.29817962646484,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.1_lr3e-2": {
+    "validation_loss": 4.060343437683279,
+    "perplexity": 57.99421691894531,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.1_lr6e-2": {
+    "validation_loss": 4.068801130809311,
+    "perplexity": 58.48678970336914,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.4_lr3e-2": {
+    "validation_loss": 4.267829920932734,
+    "perplexity": 71.36659240722656,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case3_dclm_repeat_wd0.4_lr6e-2": {
+    "validation_loss": 4.350302292317223,
+    "perplexity": 77.50188446044922,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case4_dclm_extended_wd0.1_lr3e-2": {
+    "validation_loss": 4.019384043847477,
+    "perplexity": 55.66679763793945,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case4_dclm_extended_wd0.1_lr6e-2": {
+    "validation_loss": 4.065638698343014,
+    "perplexity": 58.3021240234375,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case4_dclm_extended_wd0.4_lr3e-2": {
+    "validation_loss": 4.243012155471766,
+    "perplexity": 69.61721801757812,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case4_dclm_extended_wd0.4_lr6e-2": {
+    "validation_loss": 4.320231689731496,
+    "perplexity": 75.20606994628906,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case2_dclm_synthetic_wd0.1_lr1e-2": {
+    "validation_loss": 4.186530552860756,
+    "perplexity": 65.79412841796875,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case2_dclm_synthetic_wd0.1_lr3e-3": {
+    "validation_loss": 4.247636206609974,
+    "perplexity": 69.93990325927734,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case2_dclm_synthetic_wd0.1_lr6e-3": {
+    "validation_loss": 4.193271023514911,
+    "perplexity": 66.2391128540039,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case2_dclm_synthetic_wd0.4_lr1e-2": {
+    "validation_loss": 4.345164326193198,
+    "perplexity": 77.10470581054688,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case2_dclm_synthetic_wd0.4_lr3e-3": {
+    "validation_loss": 4.268428690783535,
+    "perplexity": 71.40934753417969,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case2_dclm_synthetic_wd0.4_lr6e-3": {
+    "validation_loss": 4.284291820571891,
+    "perplexity": 72.5511474609375,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case2_dclm_synthetic_wd0.8_lr1e-2": {
+    "validation_loss": 4.5229117558681855,
+    "perplexity": 92.1033706665039,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case2_dclm_synthetic_wd0.8_lr1e-3": {
+    "validation_loss": 4.500721924205006,
+    "perplexity": 90.08213806152344,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case2_dclm_synthetic_wd0.8_lr3e-3": {
+    "validation_loss": 4.408554320681253,
+    "perplexity": 82.150634765625,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case2_dclm_synthetic_wd0.8_lr6e-3": {
+    "validation_loss": 4.452330839920545,
+    "perplexity": 85.8267822265625,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case2_dclm_synthetic_wd1.6_lr1e-2": {
+    "validation_loss": 4.831728317863685,
+    "perplexity": 125.42756652832031,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case2_dclm_synthetic_wd1.6_lr1e-3": {
+    "validation_loss": 4.69686380352012,
+    "perplexity": 109.6028823852539,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case2_dclm_synthetic_wd1.6_lr3e-3": {
+    "validation_loss": 4.664159363084336,
+    "perplexity": 106.07637023925781,
+    "tokens_evaluated": 50002423,
+    "num_batches": 12445
+  },
+  "30M_seed42_case2_dclm_synthetic_wd1.6_lr6e-3": {
+    "error": "CUDA out of memory. Tried to allocate 6.12 GiB. GPU 0 has a total capacity of 79.18 GiB of which 3.17 GiB is free. Process 2907337 has 59.99 GiB memory in use. Process 2918958 has 8.94 GiB memory in use. Including non-PyTorch memory, this process has 7.05 GiB memory in use. Of the allocated memory 6.40 GiB is allocated by PyTorch, and 751.00 KiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+  }
+}

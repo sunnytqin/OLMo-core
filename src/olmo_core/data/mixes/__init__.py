@@ -41,6 +41,23 @@ class DataMix(DataMixBase):
     OLMo_mix_0625 = "OLMo-mix-0625"
     OLMo_mix_0925 = "OLMo-mix-0925"
     OLMo_mix_0625_150Bsample = "OLMo-mix-0625-150Bsample"
+    OLMo_dclm = "OLMo-dclm-sample"
+    OLMo_synthetic = "OLMo-synthetic"
+    OLMo_dclm_only = "OLMo-dclm-only"
+    OLMo_dclm_chin0_5 = "OLMo-dclm-chin0_5"
+    OLMo_dclm_chin1 = "OLMo-dclm-chin1"
+    OLMo_dclm_chin2 = "OLMo-dclm-chin2"
+    OLMo_dclm_chin4 = "OLMo-dclm-chin4"
+    OLMo_dclm_chin8 = "OLMo-dclm-chin8"
+    OLMo_dclm_chin16 = "OLMo-dclm-chin16"
+    OLMo_synthetic_chin4 = "OLMo-synthetic-chin4"
+    OLMo_synthetic_chin8 = "OLMo-synthetic-chin8"
+    OLMo_synthetic_chin16 = "OLMo-synthetic-chin16"
+    OLMo_synthetic_chin16_repeat4 = "OLMo-synthetic-chin16-repeat4"
+    OLMo_repeat32_synthetic32 = "OLMo-repeat32-synthetic32"
+    OLMo_repeat64_synthetic32 = "OLMo-repeat64-synthetic32"
+    OLMo_repeat16_synthetic48 = "OLMo-repeat16-synthetic48"
+    dclm_validation = "dclm-validation"
 
     @classmethod
     def _missing_(cls, value: object) -> "DataMix | None":

@@ -1,0 +1,5 @@
+{
+  "30M_seed42_case2_dclm_synthetic_wd1.6_lr6e-3": {
+    "error": "CUDA out of memory. Tried to allocate 6.12 GiB. GPU 0 has a total capacity of 79.18 GiB of which 3.17 GiB is free. Process 2907337 has 59.99 GiB memory in use. Process 2918958 has 8.94 GiB memory in use. Including non-PyTorch memory, this process has 7.05 GiB memory in use. Of the allocated memory 6.40 GiB is allocated by PyTorch, and 751.00 KiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+  }
+}
