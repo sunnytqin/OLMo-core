@@ -2,6 +2,26 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import ScalarFormatter
 
+data_0_05x = {
+    'chinchilla_scale': [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05],
+    'epochs': [1, 2, 4, 8, 16, 32, 64, 128],
+    'flops_multiplier': [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4],
+    'validation_loss': [7.76, 7.71, 7.17, 6.06, 5.57, 5.19, 5.14, 5.18],
+    'learning_rate': [0.02, 0.002, 0.003, 0.06, 0.06, 0.03, 0.01, 0.03],
+    'weight_decay': [1.6, 0.1, 0.4, 1.6, 0.4, 0.8, 0.8, 1.6]
+}
+
+
+data_0_5x = {
+    'chinchilla_scale': [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+    'epochs': [1, 2, 4, 8, 16, 32, 64, 128],
+    'flops_multiplier': [0.5, 1, 2,4, 8, 16, 32, 64],
+    'validation_loss': [6.05, 5.27, 4.69, 4.24, 4.16, 4.13, 4.13, 4.14],
+    'learning_rate': [0.06, 0.06, 0.06, 0.03, 0.03, 0.01, 0.01, 0.03],
+    'weight_decay': [0.4, 0.4, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+}
+
+
 data_1x = {
     'chinchilla_scale': [1, 1, 1, 1, 1, 1, 1],
     'epochs': [1, 4, 8, 16, 32, 64, 128],
@@ -49,6 +69,8 @@ data_16x = {
 
 # Collect all datasets with markers
 datasets = [
+    (data_0_05x, '0.05x Chinchilla', 'o'),
+    (data_0_5x, '0.5x Chinchilla', 'o'),
     (data_1x, '1x Chinchilla', 'o'),
     (data_2x, '2x Chinchilla', 'o'),
     (data_4x, '4x Chinchilla', 'o'),
@@ -57,8 +79,8 @@ datasets = [
 ]
 
 # Get unique chinchilla scales for colormap
-chinchilla_values = [1, 4, 8, 16]
-norm = plt.Normalize(vmin=0, vmax=32)
+chinchilla_values = [0.05, 0.5, 1, 2, 4, 8, 16]
+norm = plt.Normalize(vmin=0, vmax=16)
 cmap = plt.cm.magma_r
 
 # Create figure
