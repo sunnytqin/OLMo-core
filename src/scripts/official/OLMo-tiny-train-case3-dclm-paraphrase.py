@@ -1,5 +1,5 @@
 """
-Training script for Case 3: DCLM with repetition (i.e., multi-epoch training)
+Training script for Case 3: DCLM + Paraphrase (training on paraphrased data).
 """
 
 import argparse
@@ -45,9 +45,10 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
     lr = 1e-3  # Default learning rate
     weight_decay = 0.1  # Default weight decay
     chinchilla_multiplier = 4  # Default chinchilla multiplier (e.g., 4 means 4x0.6B=2.4B tokens)
+    epochs = 1  # Default number of epochs
     dclm_repeat_factor = 1  # Not used in Case 3, but accepted for compatibility with bash script
-    epochs = 1  # Not used in Case 3, but accepted for compatibility with bash script
     microbatch_multiplier = 16  # Default microbatch multiplier (rank_microbatch_size = microbatch_multiplier * 4096)
+    sequence_length = opts.sequence_length if opts.sequence_length is not None else 4096  # Default sequence length
 
     # Filter out hyperparameters that are not part of ExperimentConfig
     filtered_overrides = []
@@ -59,43 +60,61 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
         elif override.startswith("weight_decay="):
             weight_decay = float(override.split("=")[1])
         elif override.startswith("chinchilla_multiplier="):
-            chinchilla_multiplier = int(override.split("=")[1])
+            chinchilla_multiplier = float(override.split("=")[1])
+        elif override.startswith("epochs="):
+            epochs = float(override.split("=")[1])
         elif override.startswith("dclm_repeat_factor="):
             dclm_repeat_factor = int(override.split("=")[1])  # Accepted but not used in Case 3
-        elif override.startswith("epochs="):
-            epochs = int(override.split("=")[1])  # Accepted but not used in Case 3
         elif override.startswith("microbatch_multiplier="):
             microbatch_multiplier = int(override.split("=")[1])
         else:
             # Keep other overrides for ExperimentConfig
             filtered_overrides.append(override)
 
-    # Compute training parameters based on chinchilla_multiplier
+    # Compute training parameters based on chinchilla_multiplier and epochs
     # Base: 0.6B tokens per epoch of DCLM data
+    # For multi-epoch training: total_tokens = base * chinchilla_multiplier * epochs
+    # Dataset selection is still based on chinchilla_multiplier only
     base_tokens_per_epoch = 0.6e9
-    total_training_tokens = int(base_tokens_per_epoch * chinchilla_multiplier)
+    total_training_tokens = int(base_tokens_per_epoch * chinchilla_multiplier * epochs)
 
     # Compute warmup steps (~1.31% of total training, based on previous experiments)
-    global_batch_size =512 * 4096
+    # With global_batch_size=512*4096=2,097,152 tokens per step
+    # Previous: chin_4 used 14 steps (1.22%), chin_16 used 64 steps (1.40%)
+    global_batch_size = 512 * 4096
     total_steps = total_training_tokens // global_batch_size
-    warmup_ratio = 0.013107  
+    warmup_ratio = 0.013107
     warmup_steps = max(1, int(total_steps * warmup_ratio))
 
     # Auto-generate run name based on model size, seed, and hyperparameters
-    run_name = f"30M_seed{init_seed:02d}_case3_dclm_repeat_chin{chinchilla_multiplier}_wd{weight_decay}_lr{lr}"
+    # Format chinchilla_multiplier and epochs to avoid ".0" for whole numbers
+    chin_str = int(chinchilla_multiplier) if chinchilla_multiplier == int(chinchilla_multiplier) else chinchilla_multiplier
+    epoch_str = int(epochs) if epochs == int(epochs) else epochs
+    run_name = f"30M_seed{init_seed:02d}_case3_dclm_paraphrase_chin{chin_str}_epoch{epoch_str}_wd{weight_decay}_lr{lr}"
 
     tokenizer_config = TokenizerConfig.dolma2()
 
-    model_config = TransformerConfig.olmo2_370M(
+    model_config = TransformerConfig.olmo2_30M(
         vocab_size=tokenizer_config.padded_vocab_size(),  # a little bigger than actual vocab size to make it a multiple of 128
     )
 
+    # Select the appropriate paraphrase dataset based on chinchilla_multiplier
+    dataset_mix_map = {
+        0.05: DataMix.OLMo_dclm_para_chin0_05, # 0.03B + paraphrased
+        0.1: DataMix.OLMo_dclm_para_chin0_1, # 0.06B + paraphrased
+        0.25: DataMix.OLMo_dclm_para_chin0_25, # 0.15B + paraphrased
+        0.5: DataMix.OLMo_dclm_para_chin0_5, # 0.3B + paraphrased
+        1: DataMix.OLMo_dclm_para_chin1, # 0.6B + paraphrased
+    }
+    if chinchilla_multiplier not in dataset_mix_map:
+        raise ValueError(f"No extended dataset available for chinchilla_multiplier={chinchilla_multiplier}. Available: {list(dataset_mix_map.keys())}")
+
     dataset_config = NumpyFSLDatasetConfig.from_data_mix(
-        DataMix.OLMo_dclm_chin1,
+        dataset_mix_map[chinchilla_multiplier],
         tokenizer=tokenizer_config,
-        mix_base_dir="/n/netscratch/dam_lab/Lab/sqin/olmo",
-        sequence_length=opts.sequence_length,
-        max_target_sequence_length=max(8192, opts.sequence_length),
+        mix_base_dir=opts.data_root,
+        sequence_length=sequence_length,
+        max_target_sequence_length=max(8192, sequence_length),
         work_dir=opts.work_dir,
     )
 
@@ -107,7 +126,7 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
 
     train_module_config = TransformerTrainModuleConfig(
         rank_microbatch_size=microbatch_multiplier * 4096,
-        max_sequence_length=opts.sequence_length,
+        max_sequence_length=sequence_length,
         optim=SkipStepAdamWConfig(
             lr=lr,
             weight_decay=weight_decay,
@@ -152,8 +171,8 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
         .with_callback(
             "checkpointer",
             CheckpointerCallback(
-                save_interval=1000,
-                ephemeral_save_interval=100,
+                save_interval=2000,
+                ephemeral_save_interval=200,
                 save_async=True,
             ),
         )
@@ -181,13 +200,16 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
             LMEvaluatorCallbackConfig(
                 eval_dataset=NumpyPaddedFSLDatasetConfig.from_data_mix(
                     DataMix.dclm_validation,
-                    mix_base_dir="/n/netscratch/dam_lab/Lab/sqin/olmo",
-                    sequence_length=opts.sequence_length,
+                    mix_base_dir=opts.data_root,
+                    sequence_length=sequence_length,
                     tokenizer=tokenizer_config,
                     work_dir=opts.work_dir,
                 ),
-                eval_interval=100,
+                eval_interval=200,
                 eval_duration=Duration.tokens(50_000_000),  # Evaluate on 50M tokens
+                # "eval only jobs"
+                # eval_on_startup=True,
+                # cancel_after_first_eval=True,
             ),
         )
     )

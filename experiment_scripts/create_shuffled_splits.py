@@ -6,9 +6,13 @@ GOAL
 ----
 Create sequential data splits with nested training sets:
   - validation.npy: 500M tokens (distinct from training)
-  - train_0.3B.npy: 0.3B tokens (first portion of training)
+  - train_0.03B.npy: 0.03B (30M) tokens (first portion of training)
+  - train_0.06B.npy: 0.06B (60M) tokens (contains train_0.03B)
+  - train_0.15B.npy: 0.15B (150M) tokens (contains train_0.06B)
+  - train_0.3B.npy: 0.3B tokens (contains train_0.15B)
   - train_0.6B.npy: 0.6B tokens (contains train_0.3B)
-  - train_2.4B.npy: 2.4B tokens (contains train_0.6B)
+  - train_1.2B.npy: 1.2B tokens (contains train_0.6B)
+  - train_2.4B.npy: 2.4B tokens (contains train_1.2B)
   - train_4.8B.npy: 4.8B tokens (contains train_2.4B)
   - train_9.6B.npy: 9.6B tokens (contains train_4.8B)
 
@@ -35,8 +39,12 @@ OUTPUTS
 -------
 Output dir (required): --output-dir /path/to/resharded
   - validation.npy      (500M tokens)
+  - train_0.03B.npy     (30M tokens)
+  - train_0.06B.npy     (60M tokens)
+  - train_0.15B.npy     (150M tokens)
   - train_0.3B.npy      (300M tokens)
   - train_0.6B.npy      (600M tokens)
+  - train_1.2B.npy      (1.2B tokens)
   - train_2.4B.npy      (2.4B tokens)
   - train_4.8B.npy      (4.8B tokens)
   - train_9.6B.npy      (9.6B tokens)
@@ -45,6 +53,14 @@ PERF / MEMORY
 -------------
 - Streaming copy in chunks (default 100M tokens ~= 400MB per step)
 - Minimal RAM use; scales beyond 32GB nodes
+
+Example: 
+python experiment_scripts/create_shuffled_splits.py \
+     --input-files \
+       /n/netscratch/barak_lab/Lab/sqin/olmo/preprocessed/dclm/text_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/allenai/dolma2-tokenizer/part-000-00000.npy \
+       /n/netscratch/barak_lab/Lab/sqin/olmo/preprocessed/dclm/text_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/allenai/dolma2-tokenizer/part-000-00001.npy \
+       /n/netscratch/barak_lab/Lab/sqin/olmo/preprocessed/dclm/text_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/allenai/dolma2-tokenizer/part-000-00002.npy \
+     --output-dir /n/netscratch/barak_lab/Lab/sqin/olmo/preprocessed/dclm/text_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train/allenai/dolma2-tokenizer/resharded
 """
 
 import argparse
@@ -163,6 +179,9 @@ def main():
     val_size = 500_000_000  # 0.5B
 
     train_shards = [
+        {"name": "train_0.03B.npy", "tokens": 30_000_000},    # 0.03B
+        {"name": "train_0.06B.npy", "tokens": 60_000_000},    # 0.06B
+        {"name": "train_0.15B.npy", "tokens": 150_000_000},   # 0.15B
         {"name": "train_0.3B.npy", "tokens": 300_000_000},    # 0.3B
         {"name": "train_0.6B.npy", "tokens": 600_000_000},    # 0.6B
         {"name": "train_1.2B.npy", "tokens": 1_200_000_000},  # 1.2B

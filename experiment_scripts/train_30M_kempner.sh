@@ -1,13 +1,13 @@
 #!/bin/bash
 
-#SBATCH --job-name=0.5-16e-30M
-#SBATCH --account=kempner_dam_lab
-#SBATCH --partition=kempner_h100
-#SBATCH --gres=gpu:2
+#SBATCH --job-name=1-128e-30M
+#SBATCH --account=dam_lab
+#SBATCH --partition=gpu_h200
+#SBATCH --gres=gpu:1
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=32
-#SBATCH --time=0-02:00
+#SBATCH --cpus-per-task=16
+#SBATCH --time=2-20:00
 #SBATCH --mem=250G
 #SBATCH -o ../slurm_out/slurm-%j_%a.out # Standard out goes to this file (%a = array task ID)
 #SBATCH -e ../slurm_out/slurm-%j_%a.out # Standard err goes to this file
@@ -34,11 +34,11 @@ else
     LR=${LR:-1e-3}
     WD=${WD:-0.1}
 fi
-CHIN=0.5  # Chinchilla multiplier (e.g., 64 means 64x0.6B=38.4B tokens)
-EPOCHS=${EPOCHS:-1}  # Case 4 only, Number of epochs (for multi-epoch training)
+CHIN=1  # Chinchilla multiplier (e.g., 64 means 64x0.6B=38.4B tokens)
+EPOCHS=${EPOCHS:-1}  # Case 3 & 4, Number of epochs (for multi-epoch training)
 REPEAT=${REPEAT:-32}  # Case 2 only, DCLM repeat factor (32 or 64 for chin64)
-MICROBATCH_MULT=${MICROBATCH_MULT:-16}  # Microbatch multiplier (rank_microbatch_size = MICROBATCH_MULT * 4096)
-NGPU=2  # Number of GPUs per node
+MICROBATCH_MULT=${MICROBATCH_MULT:-16}  # Microbatch multiplier (rank_microbatch_size = MICROBATCH_MULT * 4096) 8 for A100, 16 for H100 and 32 for H200
+NGPU=1  # Number of GPUs per node
 
 echo "Starting training with seed: $SEED, lr: $LR, weight_decay: $WD, chinchilla_multiplier: $CHIN, epochs: $EPOCHS, dclm_repeat: $REPEAT, microbatch_multiplier: $MICROBATCH_MULT"
 echo "Job ID: $SLURM_JOB_ID"
@@ -77,15 +77,15 @@ WORK_DIR="/n/netscratch/dam_lab/Lab/sqin/olmo/dataset-cache"
 #     echo "Running Case 2: DCLM + Synthetic (chinchilla_${CHIN}, no repetition)"
 # fi
 
-# Case 3: DCLM with repetition
-# TRAINING_SCRIPT="src/scripts/official/OLMo-tiny-train-case3-dclm-repeat.py"
-# SAVE_FOLDER="/n/netscratch/dam_lab/Lab/sqin/olmo/checkpoints/chinchilla_${CHIN}/370M_seed${SEED}_case3_dclm_repeat_wd${WD}_lr${LR}"
-# echo "Running Case 3: DCLM with repetition (chinchilla_${CHIN})"
+# Case 3: DCLM + Paraphrase (multi-epoch support, dataset selection based on chinchilla_multiplier)
+TRAINING_SCRIPT="src/scripts/official/OLMo-tiny-train-case3-dclm-paraphrase.py"
+SAVE_FOLDER="/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_${CHIN}/30M_seed${SEED}_case3_dclm_paraphrase_epoch${EPOCHS}_wd${WD}_lr${LR}"
+echo "Running Case 3: DCLM + Paraphrase (chinchilla_${CHIN}, ${EPOCHS} epoch(s))"
 
 # Case 4: Extended DCLM (multi-epoch support, dataset selection based on chinchilla_multiplier)
-TRAINING_SCRIPT="src/scripts/official/OLMo-tiny-train-case4-dclm-extended.py"
-SAVE_FOLDER="/n/netscratch/dam_lab/Lab/sqin/olmo/checkpoints/chinchilla_${CHIN}/30M_seed${SEED}_case4_dclm_extended_epoch${EPOCHS}_wd${WD}_lr${LR}"
-echo "Running Case 4: Extended DCLM (chinchilla_${CHIN}, ${EPOCHS} epoch(s))"
+# TRAINING_SCRIPT="src/scripts/official/OLMo-tiny-train-case4-dclm-extended.py"
+# SAVE_FOLDER="/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_${CHIN}/30M_seed${SEED}_case4_dclm_extended_epoch${EPOCHS}_wd${WD}_lr${LR}"
+# echo "Running Case 4: Extended DCLM (chinchilla_${CHIN}, ${EPOCHS} epoch(s))"
 
 ################################################################################
 

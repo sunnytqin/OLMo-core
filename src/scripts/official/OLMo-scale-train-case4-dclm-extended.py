@@ -1,5 +1,16 @@
 """
-Training script for Case 4: Extended DCLM (training on fresh data always).
+Training script for Case 4 (multi-scale): Extended DCLM baseline using dolma resharded data.
+
+Supports multiple model scales via model_size= override. Data mix selection uses an explicit
+lookup table so every (model_size, chinchilla_multiplier) pair is precisely defined — any
+combination not in the table raises an error immediately.
+
+Usage:
+    torchrun ... OLMo-scale-train-case4-dclm-extended.py \
+        --save-folder=... --data-root=... \
+        model_size=30M chinchilla_multiplier=4 lr=1e-3 weight_decay=0.1
+
+Data root should point to /n/netscratch/barak_lab/Everyone/sqin/olmo (dolma data).
 """
 
 import argparse
@@ -26,7 +37,6 @@ from olmo_core.train.callbacks import (
     CheckpointerCallback,
     CometCallback,
     ConfigSaverCallback,
-    DownstreamEvaluatorCallbackConfig,
     GPUMemoryMonitorCallback,
     LMEvaluatorCallbackConfig,
     WandBCallback,
@@ -37,20 +47,71 @@ from olmo_core.train.train_module import (
     TransformerTrainModuleConfig,
 )
 
+# ---------------------------------------------------------------------------
+# Model registry
+# Maps size label -> (config_fn, approximate_param_count)
+# approximate_param_count is used to compute chinchilla-optimal token budgets:
+#   base_tokens = approx_params * 20
+# ---------------------------------------------------------------------------
+_MODEL_REGISTRY = {
+    "30M":  (TransformerConfig.olmo3_30M,  30_000_000),
+    "60M":  (TransformerConfig.olmo3_60M,  60_000_000),
+    "370M": (TransformerConfig.olmo3_370M, 370_000_000),
+}
+
+# ---------------------------------------------------------------------------
+# Explicit dataset lookup: (model_size, chinchilla_multiplier) -> DataMix
+#
+# Only combinations where model_params * 20 * chinchilla aligns exactly with
+# an available dolma split are listed. Anything else raises an error.
+#
+# Token counts per entry (model_params * 20 * chin):
+#   30M  * 20 * chin ->  600M * chin
+#   60M  * 20 * chin -> 1200M * chin
+#   370M * 20 * chin -> 7400M * chin
+# ---------------------------------------------------------------------------
+_DATASET_LOOKUP = {
+    # 30M model (600M tokens per chinchilla unit)
+    ("30M", 0.05): DataMix.OLMo_dolma_0_03B,   #  30M tokens
+    ("30M", 0.1):  DataMix.OLMo_dolma_0_06B,   #  60M tokens
+    ("30M", 0.25): DataMix.OLMo_dolma_0_15B,   # 150M tokens
+    ("30M", 0.5):  DataMix.OLMo_dolma_0_3B,    # 300M tokens
+    ("30M", 1):    DataMix.OLMo_dolma_0_6B,    # 600M tokens
+    ("30M", 2):    DataMix.OLMo_dolma_1_2B,    # 1.2B tokens
+    ("30M", 4):    DataMix.OLMo_dolma_2_4B,    # 2.4B tokens
+    ("30M", 8):    DataMix.OLMo_dolma_4_8B,    # 4.8B tokens
+    ("30M", 16):   DataMix.OLMo_dolma_9_6B,    # 9.6B tokens
+    # 60M model (1200M tokens per chinchilla unit)
+    ("60M", 0.05): DataMix.OLMo_dolma_0_06B,   #  60M tokens
+    ("60M", 0.1):  DataMix.OLMo_dolma_0_12B,   # 120M tokens
+    ("60M", 0.25): DataMix.OLMo_dolma_0_3B,    # 300M tokens
+    ("60M", 0.5):  DataMix.OLMo_dolma_0_6B,    # 600M tokens
+    ("60M", 1):    DataMix.OLMo_dolma_1_2B,    # 1.2B tokens
+    ("60M", 2):    DataMix.OLMo_dolma_2_4B,    # 2.4B tokens
+    ("60M", 4):    DataMix.OLMo_dolma_4_8B,    # 4.8B tokens
+    ("60M", 8):    DataMix.OLMo_dolma_9_6B,    # 9.6B tokens
+    # 370M model (7400M tokens per chinchilla unit)
+    ("370M", 0.05): DataMix.OLMo_dolma_0_37B,  #  370M tokens
+    ("370M", 0.1):  DataMix.OLMo_dolma_0_74B,  #  740M tokens
+    ("370M", 0.25): DataMix.OLMo_dolma_1_85B,  # 1.85B tokens
+    ("370M", 0.5):  DataMix.OLMo_dolma_3_7B,   #  3.7B tokens
+    ("370M", 1):    DataMix.OLMo_dolma_7_4B,   #  7.4B tokens
+    ("370M", 2):    DataMix.OLMo_dolma_14_8B,  # 14.8B tokens
+}
+
 
 def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentConfig:
-    # Training seed - can be overridden via command line argument
-    # Check if init_seed is provided in overrides, otherwise use default
-    init_seed = 42  # Default seed
-    lr = 1e-3  # Default learning rate
-    weight_decay = 0.1  # Default weight decay
-    chinchilla_multiplier = 4  # Default chinchilla multiplier (e.g., 4 means 4x0.6B=2.4B tokens)
-    epochs = 1  # Default number of epochs
-    dclm_repeat_factor = 1  # Not used in Case 4, but accepted for compatibility with bash script
-    microbatch_multiplier = 16  # Default microbatch multiplier (rank_microbatch_size = microbatch_multiplier * 4096)
-    sequence_length = opts.sequence_length if opts.sequence_length is not None else 4096  # Default sequence length
+    # Defaults
+    init_seed = 42
+    lr = 1e-3
+    weight_decay = 0.1
+    chinchilla_multiplier = 1.0
+    epochs = 1
+    model_size = "30M"
+    microbatch_multiplier = 16
+    eval_only = False
+    sequence_length = opts.sequence_length if opts.sequence_length is not None else 4096
 
-    # Filter out hyperparameters that are not part of ExperimentConfig
     filtered_overrides = []
     for override in overrides:
         if override.startswith("init_seed="):
@@ -63,58 +124,55 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
             chinchilla_multiplier = float(override.split("=")[1])
         elif override.startswith("epochs="):
             epochs = float(override.split("=")[1])
-        elif override.startswith("dclm_repeat_factor="):
-            dclm_repeat_factor = int(override.split("=")[1])  # Accepted but not used in Case 4
+        elif override.startswith("model_size="):
+            model_size = override.split("=")[1]
         elif override.startswith("microbatch_multiplier="):
             microbatch_multiplier = int(override.split("=")[1])
+        elif override.startswith("eval_only="):
+            eval_only = override.split("=")[1].lower() in ("true", "1")
         else:
-            # Keep other overrides for ExperimentConfig
             filtered_overrides.append(override)
 
-    # Compute training parameters based on chinchilla_multiplier and epochs
-    # Base: 0.6B tokens per epoch of DCLM data
-    # For multi-epoch training: total_tokens = base * chinchilla_multiplier * epochs
-    # Dataset selection is still based on chinchilla_multiplier only
-    base_tokens_per_epoch = 0.6e9
+    # Validate model size
+    if model_size not in _MODEL_REGISTRY:
+        raise ValueError(
+            f"Unknown model_size={model_size!r}. Available: {sorted(_MODEL_REGISTRY)}"
+        )
+    config_fn, model_params = _MODEL_REGISTRY[model_size]
+
+    # Look up dataset — strict: only explicitly listed (model_size, chinchilla) pairs allowed
+    lookup_key = (model_size, chinchilla_multiplier)
+    if lookup_key not in _DATASET_LOOKUP:
+        valid = sorted(k for k in _DATASET_LOOKUP if k[0] == model_size)
+        raise ValueError(
+            f"No dolma data mix defined for model_size={model_size}, "
+            f"chinchilla_multiplier={chinchilla_multiplier}. "
+            f"Valid chinchilla values for {model_size}: {[k[1] for k in valid]}"
+        )
+    data_mix = _DATASET_LOOKUP[lookup_key]
+
+    # Token budget: model_params * 20 per chinchilla unit, times epochs
+    base_tokens_per_epoch = model_params * 20
     total_training_tokens = int(base_tokens_per_epoch * chinchilla_multiplier * epochs)
 
-    # Compute warmup steps (~1.31% of total training, based on previous experiments)
-    # With global_batch_size=512*4096=2,097,152 tokens per step
-    # Previous: chin_4 used 14 steps (1.22%), chin_16 used 64 steps (1.40%)
+    # Warmup: 2% of total training steps
     global_batch_size = 512 * 4096
     total_steps = total_training_tokens // global_batch_size
-    warmup_ratio = 0.013107
-    warmup_steps = max(1, int(total_steps * warmup_ratio))
+    warmup_steps = max(1, int(total_steps * 0.02))
 
-    # Auto-generate run name based on model size, seed, and hyperparameters
-    # Format chinchilla_multiplier and epochs to avoid ".0" for whole numbers
+    # Run name
     chin_str = int(chinchilla_multiplier) if chinchilla_multiplier == int(chinchilla_multiplier) else chinchilla_multiplier
     epoch_str = int(epochs) if epochs == int(epochs) else epochs
-    run_name = f"30M_seed{init_seed:02d}_case4_dclm_extended_chin{chin_str}_epoch{epoch_str}_wd{weight_decay}_lr{lr}"
+    run_name = f"{model_size}_seed{init_seed:02d}_case4_dolma_chin{chin_str}_epoch{epoch_str}_wd{weight_decay}_lr{lr}"
 
     tokenizer_config = TokenizerConfig.dolma2()
 
-    model_config = TransformerConfig.olmo2_30M(
-        vocab_size=tokenizer_config.padded_vocab_size(),  # a little bigger than actual vocab size to make it a multiple of 128
+    model_config = config_fn(
+        vocab_size=tokenizer_config.padded_vocab_size(),
     )
 
-    # Select the appropriate extended dataset based on chinchilla_multiplier
-    dataset_mix_map = {
-        0.05: DataMix.OLMo_dclm_chin0_05, # 0.03B
-        0.1: DataMix.OLMo_dclm_chin0_1, # 0.06B
-        0.25: DataMix.OLMo_dclm_chin0_25, # 0.15B
-        0.5: DataMix.OLMo_dclm_chin0_5, # 0.3B
-        1: DataMix.OLMo_dclm_chin1, # 0.6B
-        2: DataMix.OLMo_dclm_chin2, # 1.2B
-        4: DataMix.OLMo_dclm_chin4, # 2.4B
-        8: DataMix.OLMo_dclm_chin8, # 4.8B
-        16: DataMix.OLMo_dclm_chin16, # 9.6B
-    }
-    if chinchilla_multiplier not in dataset_mix_map:
-        raise ValueError(f"No extended dataset available for chinchilla_multiplier={chinchilla_multiplier}. Available: {list(dataset_mix_map.keys())}")
-
     dataset_config = NumpyFSLDatasetConfig.from_data_mix(
-        dataset_mix_map[chinchilla_multiplier],
+        data_mix,
         tokenizer=tokenizer_config,
         mix_base_dir=opts.data_root,
         sequence_length=sequence_length,
@@ -124,7 +182,7 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
 
     data_loader_config = NumpyDataLoaderConfig(
         global_batch_size=global_batch_size,
-        seed=init_seed,  # Use same seed for data shuffling
+        seed=init_seed,
         num_workers=4,
     )
 
@@ -140,13 +198,13 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
             ],
             compile=True,
         ),
-        scheduler=CosWithWarmup(warmup_steps=warmup_steps),  # ~1.31% of total training steps
+        scheduler=CosWithWarmup(warmup_steps=warmup_steps),
         compile_model=True,
         dp_config=TransformerDataParallelConfig(
             name=DataParallelType.fsdp if get_world_size() == 1 else DataParallelType.hsdp,
             param_dtype=DType.bfloat16,
             reduce_dtype=DType.float32,
-            num_replicas=max(1, get_world_size() // 2) if get_world_size() > 1 else 1,  # Use FSDP for single GPU, HSDP for multi-GPU
+            num_replicas=max(1, get_world_size() // 2) if get_world_size() > 1 else 1,
         ),
         ac_config=TransformerActivationCheckpointingConfig(
             TransformerActivationCheckpointingMode.full
@@ -155,7 +213,6 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
         max_grad_norm=1.0,
     )
 
-    # If you have 1024 GPUs, you can run slightly faster with a different config.
     if get_world_size() >= 1024:
         train_module_config.rank_microbatch_size //= 2
         train_module_config.ac_config = TransformerActivationCheckpointingConfig(
@@ -169,14 +226,14 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
             save_overwrite=True,
             metrics_collect_interval=10,
             cancel_check_interval=10,
-            max_duration=Duration.tokens(total_training_tokens),  # Computed based on chinchilla_multiplier
+            max_duration=Duration.tokens(total_training_tokens),
         )
         .with_callback("gpu_monitor", GPUMemoryMonitorCallback())
         .with_callback(
             "checkpointer",
             CheckpointerCallback(
                 save_interval=2000,
-                ephemeral_save_interval=200,
+                ephemeral_save_interval=500,
                 save_async=True,
             ),
         )
@@ -185,7 +242,7 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
             CometCallback(
                 name=run_name,
                 cancel_check_interval=10,
-                enabled=False,  # NOTE: change to true to enable
+                enabled=False,
             ),
         )
         .with_callback(
@@ -210,10 +267,9 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
                     work_dir=opts.work_dir,
                 ),
                 eval_interval=200,
-                eval_duration=Duration.tokens(50_000_000),  # Evaluate on 50M tokens
-                # "eval only jobs"
-                # eval_on_startup=True, 
-                # cancel_after_first_eval=True, 
+                eval_duration=Duration.tokens(50_000_000),
+                eval_on_startup=eval_only,
+                cancel_after_first_eval=eval_only,
             ),
         )
     )

@@ -1,6 +1,5 @@
 """
 Training script for Case 2: DCLM + Synthetic (Chinchilla-scaled, no repetition).
-Supports chin4 (2.4B), chin8 (4.8B), and chin16 (9.6B) training tokens.
 Can optionally repeat DCLM data with dclm_repeat_factor parameter (e.g., dclm_repeat_factor=4).
 """
 
@@ -50,6 +49,7 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
     dclm_repeat_factor = 1  # Default DCLM repeat factor (1 = no repeat, 4 = repeat DCLM 4 times)
     epochs = 1  # Not used in Case 2, but accepted for compatibility with bash script
     microbatch_multiplier = 16  # Default microbatch multiplier (rank_microbatch_size = microbatch_multiplier * 4096)
+    sequence_length = opts.sequence_length if opts.sequence_length is not None else 4096  # Default sequence length
 
     # Filter out hyperparameters that are not part of ExperimentConfig
     filtered_overrides = []
@@ -74,22 +74,22 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
 
     # Compute training parameters based on chinchilla_multiplier
     # Base: 0.6B tokens per epoch of DCLM data
-    base_tokens_per_epoch = 0.3e9
+    base_tokens_per_epoch = 0.6e9
     total_training_tokens = int(base_tokens_per_epoch * chinchilla_multiplier)
 
     # Compute warmup steps (~1.31% of total training, based on previous experiments)
-    global_batch_size = 64 * 4096
+    global_batch_size = 512 * 4096
     total_steps = total_training_tokens // global_batch_size
     warmup_ratio = 0.013107
     warmup_steps = max(1, int(total_steps * warmup_ratio))
 
     # Auto-generate run name based on model size, seed, and hyperparameters
     repeat_suffix = f"_repeat{dclm_repeat_factor}" if dclm_repeat_factor > 1 else ""
-    run_name = f"370M_seed{init_seed:02d}_case2_dclm_synthetic_chin{chinchilla_multiplier}{repeat_suffix}_wd{weight_decay}_lr{lr}"
+    run_name = f"30M_seed{init_seed:02d}_case2_dclm_synthetic_chin{chinchilla_multiplier}{repeat_suffix}_wd{weight_decay}_lr{lr}"
 
     tokenizer_config = TokenizerConfig.dolma2()
 
-    model_config = TransformerConfig.olmo2_370M(
+    model_config = TransformerConfig.olmo2_30M(
         vocab_size=tokenizer_config.padded_vocab_size(),  # a little bigger than actual vocab size to make it a multiple of 128
     )
 
@@ -98,8 +98,8 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
     # For older datasets, selection is based on both chinchilla_multiplier and dclm_repeat_factor
     if dclm_repeat_factor == 32:
         data_mix = DataMix.OLMo_repeat32_synthetic32
-    elif dclm_repeat_factor == 64:
-        data_mix = DataMix.OLMo_repeat64_synthetic32
+    # elif dclm_repeat_factor == 64:
+    #     data_mix = DataMix.OLMo_repeat64_synthetic32
     else:
         # Fallback to old tuple-based lookup for chin4, chin8, chin16 datasets
         dataset_mix_map = {
@@ -108,6 +108,9 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
             (16, 1): DataMix.OLMo_synthetic_chin16,
             (16, 4): DataMix.OLMo_synthetic_chin16_repeat4,
             (48, 16): DataMix.OLMo_repeat16_synthetic48,
+            (6, 64): DataMix.OLMo_repeat64_synthetic6,
+            (13, 64): DataMix.OLMo_repeat64_synthetic13,
+            (64, 64): DataMix.OLMo_repeat64_synthetic64,
         }
         mix_key = (chinchilla_multiplier, dclm_repeat_factor)
         if mix_key not in dataset_mix_map:
@@ -117,9 +120,9 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
     dataset_config = NumpyFSLDatasetConfig.from_data_mix(
         data_mix,
         tokenizer=tokenizer_config,
-        mix_base_dir="/n/netscratch/dam_lab/Lab/sqin/olmo",
-        sequence_length=opts.sequence_length,
-        max_target_sequence_length=max(8192, opts.sequence_length),
+        mix_base_dir=opts.data_root,
+        sequence_length=sequence_length,
+        max_target_sequence_length=max(8192, sequence_length),
         work_dir=opts.work_dir,
     )
 
@@ -131,7 +134,7 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
 
     train_module_config = TransformerTrainModuleConfig(
         rank_microbatch_size=microbatch_multiplier * 4096,
-        max_sequence_length=opts.sequence_length,
+        max_sequence_length=sequence_length,
         optim=SkipStepAdamWConfig(
             lr=lr,
             weight_decay=weight_decay,
@@ -205,8 +208,8 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
             LMEvaluatorCallbackConfig(
                 eval_dataset=NumpyPaddedFSLDatasetConfig.from_data_mix(
                     DataMix.dclm_validation,
-                    mix_base_dir="/n/netscratch/dam_lab/Lab/sqin/olmo",
-                    sequence_length=opts.sequence_length,
+                    mix_base_dir=opts.data_root,
+                    sequence_length=sequence_length,
                     tokenizer=tokenizer_config,
                     work_dir=opts.work_dir,
                 ),

@@ -2,13 +2,13 @@
 
 # Configuration
 BASE_URL="http://olmo-data.org"
-OUTPUT_DIR="/n/netscratch/dam_lab/Lab/sqin/olmo"
+OUTPUT_DIR="/n/netscratch/barak_lab/Everyone/sqin/olmo"
 
 # File lists with their corresponding tokenizer paths
 # Training data uses "allenai/dolma2-tokenizer" (with directory structure)
 # Eval data uses "dolma2-tokenizer" (flat naming)
 declare -A FILE_LISTS
-FILE_LISTS["src/olmo_core/data/mixes/OLMo-dclm-sample.txt"]="allenai/dolma2-tokenizer"
+FILE_LISTS["src/olmo_core/data/mixes/OLMo-mix-0625-150Bsample.txt"]="allenai/dolma2-tokenizer"
 FILE_LISTS["src/olmo_core/data/mixes/v3-small-ppl-validation.txt"]="dolma2-tokenizer"
 
 NUM_PARALLEL_JOBS=8  # Adjust based on your network and system capacity

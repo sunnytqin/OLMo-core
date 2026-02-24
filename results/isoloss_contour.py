@@ -4,10 +4,10 @@ from scipy.interpolate import griddata
 from matplotlib.colors import LinearSegmentedColormap
 
 # Import data from case4_analysis.py
-from case4_analysis import data_0_05x, data_0_5x, data_1x, data_2x, data_4x, data_8x, data_16x
+from case4_analysis import data_0_05x, data_0_1x, data_0_5x, data_1x, data_2x, data_4x, data_8x, data_16x
 
 # Combine all data
-all_data = [data_0_05x, data_0_5x, data_1x, data_2x, data_4x, data_8x, data_16x]
+all_data = [data_0_05x, data_0_1x, data_0_5x, data_1x, data_2x, data_4x, data_8x, data_16x]
 
 flops = []
 epochs = []
@@ -30,7 +30,7 @@ val_loss = np.array(val_loss)
 # Create custom colormap (lighter brown/red to orange/yellow - adjusted so lower end is not completely black)
 colors = ['#8b3a1e', '#a84828', '#c45a32', '#d97040', '#e88850', 
           '#f4a060', '#ffb870', '#ffc880', '#ffd890', '#ffe8a0']
-cmap = LinearSegmentedColormap.from_list('isoloss', colors, N=256)
+cmap = LinearSegmentedColormap.from_list('isoloss', colors, N=512)
 
 
 def create_contour_plot(ax, x_data, y_data, z_data, x_label, x_ticks, x_ticklabels,
@@ -50,9 +50,9 @@ def create_contour_plot(ax, x_data, y_data, z_data, x_label, x_ticks, x_ticklabe
 
     # Interpolate
     grid_z = griddata(
-        (log_x, log_y), 
-        z_data, 
-        (grid_x, grid_y), 
+        (log_x, log_y),
+        z_data,
+        (grid_x, grid_y),
         method='cubic'
     )
 
@@ -78,16 +78,16 @@ def create_contour_plot(ax, x_data, y_data, z_data, x_label, x_ticks, x_ticklabe
     )
 
     # Add contour labels
-    ax.clabel(contour, inline=True, fontsize=9, fmt='%.2f', 
+    ax.clabel(contour, inline=True, fontsize=9, fmt='%.2f',
               colors='darkred', inline_spacing=5)
 
     # Plot actual data points with color based on loss value
     scatter = ax.scatter(
-        x_data, y_data, 
-        c=z_data, 
+        x_data, y_data,
+        c=z_data,
         cmap=cmap,
-        s=80, 
-        edgecolors='black', 
+        s=80,
+        edgecolors='black',
         linewidths=1.2,
         zorder=5,
         vmin=z_data.min(),
@@ -96,11 +96,11 @@ def create_contour_plot(ax, x_data, y_data, z_data, x_label, x_ticks, x_ticklabe
 
     # Add validation loss labels next to each dot
     for i in range(len(x_data)):
-        ax.annotate(f'{z_data[i]:.2f}', 
+        ax.annotate(f'{z_data[i]:.2f}',
                     (x_data[i], y_data[i]),
                     xytext=(8, 8), textcoords='offset points',
                     fontsize=9, fontweight='bold',
-                    bbox=dict(boxstyle='round,pad=0.2', facecolor='white', 
+                    bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
                              edgecolor='gray', alpha=0.8, linewidth=0.5),
                     zorder=6)
 
@@ -128,13 +128,14 @@ def create_contour_plot(ax, x_data, y_data, z_data, x_label, x_ticks, x_ticklabe
 
     # Set axis labels and title
     ax.set_xlabel(x_label, fontsize=14, fontweight='bold')
-    ax.set_ylabel('Fresh Data Size (Chinchilla Scale)', fontsize=14, fontweight='bold')
+    ax.set_ylabel('Fresh Data Size (TTP, Chinchilla X)', fontsize=14, fontweight='bold')
     ax.set_title(title, fontsize=16, fontweight='bold', pad=20)
 
-    # Customize tick labels for y-axis
-    y_ticks = [0.5, 1, 2, 4, 8, 16]
+    # Customize tick labels for y-axis (TTP = chinchilla_scale * 20)
+    y_ticks = [0.05, 0.1, 0.5, 1, 2, 4, 8, 16]
     ax.set_yticks(y_ticks)
-    ax.set_yticklabels(['0.5x', '1x', '2x', '4x', '8x', '16x'])
+    ax.set_yticklabels(['1 (0.05x)', '2 (0.1x)', '10 (0.5x)', '20 (1x)',
+                        '40 (2x)', '80 (4x)', '160 (8x)', '320 (16x)'])
 
     # Customize tick labels for x-axis
     ax.set_xticks(x_ticks)
@@ -171,12 +172,31 @@ scatter1 = create_contour_plot(
     y_data=data_amount,
     z_data=val_loss,
     x_label='FLOPS Multiplier',
-    x_ticks=[0.5, 1, 4, 8, 16, 32, 64, 128],
-    x_ticklabels=['0.5', '1', '4', '8', '16', '32', '64', '128'],
+    x_ticks=[0.05, 0.1, 0.5, 1, 4, 8, 16, 32, 64, 128],
+    x_ticklabels=['0.05', '0.1', '0.5', '1', '4', '8', '16', '32', '64', '128'],
     title='Loss Contours (FLOPS)',
-    x_lim=(0.5, 128),
+    x_lim=(0.05, 128),
     diag_label='Single-epoch baseline'
 )
+
+# Add extrapolated vertical lines for single-epoch baseline (styled like contour lines)
+one_epoch_points = []
+for data in all_data:
+    ep = np.array(data['epochs'])
+    idx_1ep = np.where(ep == 1)[0]
+    if len(idx_1ep) > 0 and not np.isnan(data['validation_loss'][idx_1ep[0]]):
+        one_epoch_points.append((
+            data['flops_multiplier'][idx_1ep[0]],
+            data['chinchilla_scale'][idx_1ep[0]],
+            data['validation_loss'][idx_1ep[0]]
+        ))
+
+for i, (f, c, loss_val) in enumerate(one_epoch_points):
+    label = 'Extrapolated 1-epoch' if i == 0 else None
+    ax1.plot([f, f], [c, 16], linestyle='-', color='darkred', linewidth=0.8,
+             alpha=0.9, zorder=4, label=label)
+
+ax1.legend(loc='upper left', fontsize=10)
 
 # Plot 2: Epochs on x-axis
 scatter2 = create_contour_plot(

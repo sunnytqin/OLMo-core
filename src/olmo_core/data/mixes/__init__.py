@@ -43,7 +43,15 @@ class DataMix(DataMixBase):
     OLMo_dclm = "OLMo-dclm-sample"
     OLMo_synthetic = "OLMo-synthetic"
     OLMo_dclm_only = "OLMo-dclm-only"
+    OLMo_dclm_chin0_05 = "OLMo-dclm-chin0_05"
+    OLMo_dclm_chin0_1 = "OLMo-dclm-chin0_1"
+    OLMo_dclm_chin0_25 = "OLMo-dclm-chin0_25"
     OLMo_dclm_chin0_5 = "OLMo-dclm-chin0_5"
+    OLMo_dclm_para_chin0_05 = "OLMo-dclm-para-chin0_05"
+    OLMo_dclm_para_chin0_1 = "OLMo-dclm-para-chin0_1"
+    OLMo_dclm_para_chin0_25 = "OLMo-dclm-para-chin0_25"
+    OLMo_dclm_para_chin0_5 = "OLMo-dclm-para-chin0_5"
+    OLMo_dclm_para_chin1 = "OLMo-dclm-para-chin1"
     OLMo_dclm_chin1 = "OLMo-dclm-chin1"
     OLMo_dclm_chin2 = "OLMo-dclm-chin2"
     OLMo_dclm_chin4 = "OLMo-dclm-chin4"
@@ -56,6 +64,26 @@ class DataMix(DataMixBase):
     OLMo_repeat32_synthetic32 = "OLMo-repeat32-synthetic32"
     OLMo_repeat64_synthetic32 = "OLMo-repeat64-synthetic32"
     OLMo_repeat16_synthetic48 = "OLMo-repeat16-synthetic48"
+    OLMo_repeat64_synthetic6 = "OLMo-repeat64-synthetic6"
+    OLMo_repeat64_synthetic13 = "OLMo-repeat64-synthetic13"
+    OLMo_repeat64_synthetic64 = "OLMo-repeat64-synthetic64"
+    OLMo_dolma_0_03B  = "OLMo-dolma-0.03B"
+    OLMo_dolma_0_06B  = "OLMo-dolma-0.06B"
+    OLMo_dolma_0_12B  = "OLMo-dolma-0.12B"
+    OLMo_dolma_0_15B  = "OLMo-dolma-0.15B"
+    OLMo_dolma_0_3B   = "OLMo-dolma-0.3B"
+    OLMo_dolma_0_37B  = "OLMo-dolma-0.37B"
+    OLMo_dolma_0_6B   = "OLMo-dolma-0.6B"
+    OLMo_dolma_0_74B  = "OLMo-dolma-0.74B"
+    OLMo_dolma_1_2B   = "OLMo-dolma-1.2B"
+    OLMo_dolma_1_85B  = "OLMo-dolma-1.85B"
+    OLMo_dolma_2_4B   = "OLMo-dolma-2.4B"
+    OLMo_dolma_3_7B   = "OLMo-dolma-3.7B"
+    OLMo_dolma_4_8B   = "OLMo-dolma-4.8B"
+    OLMo_dolma_7_4B   = "OLMo-dolma-7.4B"
+    OLMo_dolma_9_6B   = "OLMo-dolma-9.6B"
+    OLMo_dolma_14_8B  = "OLMo-dolma-14.8B"
+    OLMo_dolma_val    = "OLMo-dolma-val"
     dclm_validation = "dclm-validation"
     OLMo_mix_0625_700Bsample = "OLMo-mix-0625-700Bsample"
     OLMo_mix_0625_official = "OLMo-mix-0625-official"
@@ -139,15 +167,77 @@ class DataMix(DataMixBase):
         return paths, labels
 
 
+# Mix files that live under the syn_data_scaling/dolma/ subfolder.
+_SYN_DATA_SCALING_DOLMA_MIXES = frozenset(
+    {
+        "OLMo-dolma-0.03B",
+        "OLMo-dolma-0.06B",
+        "OLMo-dolma-0.12B",
+        "OLMo-dolma-0.15B",
+        "OLMo-dolma-0.3B",
+        "OLMo-dolma-0.37B",
+        "OLMo-dolma-0.6B",
+        "OLMo-dolma-0.74B",
+        "OLMo-dolma-1.2B",
+        "OLMo-dolma-1.85B",
+        "OLMo-dolma-2.4B",
+        "OLMo-dolma-3.7B",
+        "OLMo-dolma-4.8B",
+        "OLMo-dolma-7.4B",
+        "OLMo-dolma-9.6B",
+        "OLMo-dolma-14.8B",
+        "OLMo-dolma-val",
+    }
+)
+
+# Mix files that live under the syn_data_scaling/dclm/ subfolder.
+_SYN_DATA_SCALING_DCLM_MIXES = frozenset(
+    {
+        "OLMo-dclm-chin0_05",
+        "OLMo-dclm-chin0_1",
+        "OLMo-dclm-chin0_25",
+        "OLMo-dclm-chin0_5",
+        "OLMo-dclm-chin1",
+        "OLMo-dclm-chin2",
+        "OLMo-dclm-chin4",
+        "OLMo-dclm-chin8",
+        "OLMo-dclm-chin16",
+        "OLMo-dclm-para-chin0_05",
+        "OLMo-dclm-para-chin0_1",
+        "OLMo-dclm-para-chin0_25",
+        "OLMo-dclm-para-chin0_5",
+        "OLMo-dclm-para-chin1",
+        "OLMo-dclm-repeat-0.3b",
+        "OLMo-dclm-sample",
+        "OLMo-repeat16-synthetic48",
+        "OLMo-repeat32-synthetic32",
+        "OLMo-repeat64-synthetic13",
+        "OLMo-repeat64-synthetic32",
+        "OLMo-repeat64-synthetic64",
+        "OLMo-repeat64-synthetic6",
+        "OLMo-synthetic-chin16",
+        "OLMo-synthetic-chin16-repeat4",
+        "OLMo-synthetic-chin4",
+        "OLMo-synthetic-chin8",
+    }
+)
+
+
 @contextmanager
 def _get_data_mix_path(name: str) -> Generator[Path, None, None]:
     import importlib_resources
 
+    basename = os.path.basename(str(name))
+    if basename in _SYN_DATA_SCALING_DCLM_MIXES:
+        rel_path = f"data/mixes/syn_data_scaling/dclm/{basename}.txt"
+    elif basename in _SYN_DATA_SCALING_DOLMA_MIXES:
+        rel_path = f"data/mixes/syn_data_scaling/dolma/{basename}.txt"
+    else:
+        rel_path = f"data/mixes/{basename}.txt"
+
     try:
         with importlib_resources.as_file(
-            importlib_resources.files("olmo_core").joinpath(
-                f"data/mixes/{os.path.basename(name)}.txt"
-            )
+            importlib_resources.files("olmo_core").joinpath(rel_path)
         ) as path:
             yield path
     finally:
