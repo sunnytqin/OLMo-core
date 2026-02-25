@@ -163,7 +163,7 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
     # Run name
     chin_str = int(chinchilla_multiplier) if chinchilla_multiplier == int(chinchilla_multiplier) else chinchilla_multiplier
     epoch_str = int(epochs) if epochs == int(epochs) else epochs
-    run_name = f"{model_size}_seed{init_seed:02d}_case4_dolma_chin{chin_str}_epoch{epoch_str}_wd{weight_decay}_lr{lr}"
+    run_name = f"{model_size}_seed{init_seed:02d}_multiepoch_dolma_chin{chin_str}_epoch{epoch_str}_wd{weight_decay}_lr{lr}"
 
     tokenizer_config = TokenizerConfig.dolma2()
 
