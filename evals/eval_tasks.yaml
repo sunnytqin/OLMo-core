@@ -1,0 +1,11 @@
+group: syn_pt_eval
+task:
+  - wikitext
+  - c4
+  - lambada_openai
+  - hellaswag
+  - squad_completion
+  - webqs
+  - openbookqa
+  - race
+  - gsm8k
