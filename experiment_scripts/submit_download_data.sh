@@ -12,4 +12,4 @@
 # Change to the OLMo-core directory (parent of experiment_scripts)
 cd /n/home05/sqin/OLMo-core
 
-bash experiment_scripts/download_dclm_data.sh
+bash experiment_scripts/download_data.sh

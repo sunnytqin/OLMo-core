@@ -8,8 +8,9 @@ OUTPUT_DIR="/n/netscratch/barak_lab/Everyone/sqin/olmo"
 # Training data uses "allenai/dolma2-tokenizer" (with directory structure)
 # Eval data uses "dolma2-tokenizer" (flat naming)
 declare -A FILE_LISTS
-FILE_LISTS["src/olmo_core/data/mixes/OLMo-mix-0625-150Bsample.txt"]="allenai/dolma2-tokenizer"
-FILE_LISTS["src/olmo_core/data/mixes/v3-small-ppl-validation.txt"]="dolma2-tokenizer"
+# FILE_LISTS["src/olmo_core/data/mixes/OLMo-mix-0625-150Bsample.txt"]="allenai/dolma2-tokenizer" # aliases to dolma3-0925-150B-mix
+FILE_LISTS["src/olmo_core/data/mixes/v3-small-ppl-validation.txt"]="dolma2-tokenizer" # validation set
+# FILE_LISTS["src/olmo_core/data/mixes/OLMo-midtraining-mix-0625-100B-math-subset-only-10B.txt"]="allenai/dolma3-tokenizer" # math subset only
 
 NUM_PARALLEL_JOBS=8  # Adjust based on your network and system capacity
 LOG_FILE="download_progress.log"
