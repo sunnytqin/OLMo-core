@@ -1,11 +1,20 @@
 group: syn_pt_eval
 task:
-  - wikitext
-  - c4
-  - lambada_openai
-  - hellaswag
-  - squad_completion
-  - webqs
-  - openbookqa
-  - race
-  - gsm8k
+  - task: wikitext
+    num_fewshot: 0
+  - task: c4
+    num_fewshot: 0
+  - task: lambada_openai
+    num_fewshot: 0
+  - task: hellaswag
+    num_fewshot: 0
+  - task: squad_completion
+    num_fewshot: 3
+  - task: webqs
+    num_fewshot: 0
+  - task: openbookqa
+    num_fewshot: 0
+  - task: race
+    num_fewshot: 0
+  - task: gsm8k
+    num_fewshot: 5
