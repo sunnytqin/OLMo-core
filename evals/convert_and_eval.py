@@ -22,7 +22,7 @@ from olmo_core.distributed.checkpoint import load_model_and_optim_state
 from olmo_core.nn.hf.checkpoint import save_hf_model
 from olmo_core.nn.transformer import TransformerConfig
 
-SHARED_DIR = Path("/orcd/home/002/hamidieh/projects/syn_pt/shared")
+SHARED_DIR = Path("/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.1/best_runs")
 TASK_YAML_DIR = Path(__file__).parent
 EVAL_TASKS = "syn_pt_eval"
 
@@ -119,10 +119,9 @@ def run_eval(hf_path: Path, run_name: str, limit: int = None, output_dir: Path =
     cmd = [
         sys.executable, "-m", "lm_eval",
         "--model", "hf",
-        "--model_args", f"pretrained={hf_path},dtype=bfloat16",
+        "--model_args", f"pretrained={hf_path},dtype=bfloat16,max_length=4096",
         "--include_path", str(TASK_YAML_DIR),
         "--tasks", EVAL_TASKS,
-        "--num_fewshot", "0",
         "--batch_size", "auto",
         "--output_path", str(output_path),
     ]
@@ -148,7 +147,7 @@ def run_eval(hf_path: Path, run_name: str, limit: int = None, output_dir: Path =
 def main():
     parser = argparse.ArgumentParser(description="Convert OLMo checkpoints and run lm_eval")
     parser.add_argument("--checkpoint", type=str, help="Path to a single checkpoint (e.g. shared/model/stepN)")
-    parser.add_argument("--all", action="store_true", help="Run on all checkpoints in shared/")
+    parser.add_argument("--all", action="store_true", help="Run on all checkpoints in SHARED")
     parser.add_argument("--output-dir", type=str, default="/tmp/hf_models", help="Where to save HF checkpoints")
     parser.add_argument("--results-dir", type=str, default=None, help="Where to save eval results")
     parser.add_argument("--limit", type=int, default=None, help="Limit samples per task (for testing)")

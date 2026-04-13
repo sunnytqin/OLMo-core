@@ -253,6 +253,7 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
                 project="syn_data_scaling",
                 cancel_check_interval=10,
                 enabled=True,
+                tags=["eval"] if eval_only else ["train"],
             ),
         )
         .with_callback("config_saver", ConfigSaverCallback())
@@ -260,7 +261,7 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
             "lm_evaluator",
             LMEvaluatorCallbackConfig(
                 eval_dataset=NumpyPaddedFSLDatasetConfig.from_data_mix(
-                    DataMix.dclm_validation,
+                    DataMix.OLMo_dolma_val,
                     mix_base_dir=opts.data_root,
                     sequence_length=sequence_length,
                     tokenizer=tokenizer_config,

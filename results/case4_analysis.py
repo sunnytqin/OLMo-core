@@ -1,106 +1,44 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
+import sys
+import os
+sys.path.insert(0, os.path.dirname(__file__))
 
-data_0_05x = {
-    'chinchilla_scale': [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05],
-    'epochs': [1, 2, 4, 8, 16, 32, 64, 128],
-    'flops_multiplier': [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4],
-    'validation_loss': [7.76, 7.71, 7.17, 6.06, 5.57, 5.19, 5.14, 5.18],
-    'learning_rate': [0.02, 0.002, 0.003, 0.06, 0.06, 0.03, 0.01, 0.03],
-    'weight_decay': [1.6, 0.1, 0.4, 1.6, 0.4, 0.8, 0.8, 1.6]
-}   
+# ---- Select model size: '30m' or '370m' ----
+MODEL_SIZE = '30m'
 
-data_0_1x = {
-    'chinchilla_scale': [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
-    'epochs': [1, 2, 4, 8, 16, 32, 64, 128],
-    'flops_multiplier': [0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8],
-    'validation_loss': [7.69, 6.96, 6.04, 5.54, 4.97, 4.80, 4.72, 4.84],
-    'learning_rate': [0.003, 0.06, 0.06, 0.03, 0.03, 0.03, 0.006, 0.003],
-    'weight_decay': [0.1, 1.6, 1.6, 0.8, 0.4, 0.4, 0.4, 0.8]
+if MODEL_SIZE == '30m':
+    import data_30m as model_data
+    self_distill_data = model_data.self_distill_data
+    parap_best_data = model_data.parap_best_data
+elif MODEL_SIZE == '370m':
+    import data_370m as model_data
+    self_distill_data = None
+    parap_best_data = None
+else:
+    raise ValueError(f'Unknown MODEL_SIZE: {MODEL_SIZE}')
+
+all_datasets = model_data.ALL_DATASETS
+
+# Build labeled dataset list for plotting
+_ttp_labels = {
+    0.05: 'TTP=1 (0.05x Chinchilla)',
+    0.1:  'TTP=2 (0.1x Chinchilla)',
+    0.5:  'TTP=10 (0.5x Chinchilla)',
+    1:    'TTP=20 (1x Chinchilla)',
+    2:    'TTP=40 (2x Chinchilla)',
+    4:    'TTP=80 (4x Chinchilla)',
+    8:    'TTP=160 (8x Chinchilla)',
+    16:   'TTP=320 (16x Chinchilla)',
 }
-
-
-data_0_5x = {
-    'chinchilla_scale': [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
-    'epochs': [1, 2, 4, 8, 16, 32, 64, 128],
-    'flops_multiplier': [0.5, 1, 2,4, 8, 16, 32, 64],
-    'validation_loss': [6.05, 5.27, 4.69, 4.24, 4.16, 4.13, 4.13, 4.14],
-    'learning_rate': [0.06, 0.06, 0.06, 0.03, 0.03, 0.01, 0.01, 0.03],
-    'weight_decay': [0.4, 0.4, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
-}
-
-
-data_1x = {
-    'chinchilla_scale': [1, 1, 1, 1, 1, 1, 1],
-    'epochs': [1, 4, 8, 16, 32, 64, 128],
-    'flops_multiplier': [1, 4, 8, 16, 32, 64, 128],
-    'validation_loss': [5.3, 4.39, 4.12, 4.05, 4.02, 4.00, 3.99],
-    'learning_rate': [0.03, 0.01, 0.01, 0.01, 0.01, 0.006, 0.006],
-    'weight_decay': [0.4, 0.4, 0.1, 0.1, 0.1, 0.1, 0.1]
-}
-
-data_2x = {
-    'chinchilla_scale': [2, 2, 2, 2, 2, 2, 2],
-    'epochs': [1, 2, 4, 8, 16, 32, 64],
-    'flops_multiplier': [2, 4, 8, 16, 32, 64, 128],
-    'validation_loss': [4.61, 4.22, 4.11, 4.05, 3.99, 3.97, 3.94],
-    'learning_rate': [0.06, 0.06, 0.03, 0.01, 0.01, 0.003, 0.003],
-    'weight_decay': [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
-}
-
-data_4x = {
-    'chinchilla_scale': [4, 4, 4, 4, 4, 4],
-    'epochs': [1, 2, 4, 8, 16, 32],
-    'flops_multiplier': [4, 8, 16, 32, 64, 128],
-    'validation_loss': [4.20, 4.08, 4.02, 3.97, 3.93, 3.92],
-    'learning_rate': [0.06, 0.03, 0.01, 0.006, 0.006, 0.006],
-    'weight_decay': [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
-}
-
-data_8x = {
-    'chinchilla_scale': [8, 8, 8, 8, 8],
-    'epochs': [1, 2, 4, 8, 16],
-    'flops_multiplier': [8, 16, 32, 64, 128],
-    'validation_loss': [4.07, 4.00, 3.96, 3.93, np.nan],
-    'learning_rate': [0.03, 0.01, 0.01, 0.006, np.nan],
-    'weight_decay': [0.1, 0.1, 0.1, 0.1, np.nan]
-}
-
-data_16x = {
-    'chinchilla_scale': [16, 16, 16, 16],
-    'epochs': [1, 2, 4, 8],
-    'flops_multiplier': [16, 32, 64, 128],
-    'validation_loss': [4.00, 3.96, 3.93, 3.89],
-    'learning_rate': [0.03, 0.01, 0.003, 0.003],
-    'weight_decay': [0.1, 0.1, 0.1, 0.1]
-}
-
-self_distill_data = {
-    'chinchilla_scale': [0.05, 0.1, 0.5, 1],
-    'validation_loss': [4.90, 4.52, 4.08, 3.98],
-}
-
-# Best paraphrasing loss at each data scale (from case 3)
-parap_best_data = {
-    'chinchilla_scale': [0.05, 0.1, 0.5, 1],
-    'validation_loss': [4.98, 4.56, 4.11, 4.04],
-}
-
-# Collect all datasets with markers
 datasets = [
-    (data_0_05x, 'TTP=1 (0.05x Chinchilla)', 'o'),
-    (data_0_1x, 'TTP=2 (0.1x Chinchilla)', 'o'),
-    (data_0_5x, 'TTP=10 (0.5x Chinchilla)', 'o'),
-    (data_1x, 'TTP=20 (1x Chinchilla)', 'o'),
-    (data_2x, 'TTP=40 (2x Chinchilla)', 'o'),
-    (data_4x, 'TTP=80 (4x Chinchilla)', 'o'),
-    (data_8x, 'TTP=160 (8x Chinchilla)', 'o'),
-    (data_16x, 'TTP=320 (16x Chinchilla)', 'o'),
+    (d, _ttp_labels.get(d['chinchilla_scale'][0], f"{d['chinchilla_scale'][0]}x Chinchilla"), 'o')
+    for d in all_datasets
 ]
 
 # Get unique chinchilla scales for colormap
-chinchilla_values = [0.05, 0.1, 0.5, 1, 2, 4, 8, 16]
+chinchilla_values = sorted(d['chinchilla_scale'][0] for d in all_datasets)
 norm = plt.Normalize(vmin=-1, vmax=16)
 cmap = plt.cm.magma_r
 
@@ -140,10 +78,10 @@ ax.plot(one_epoch_flops, one_epoch_loss, linestyle='--', color='black',
 
 ax.set_xlabel('FLOPs (Chinchilla Optimal = 1X)', fontsize=12)
 ax.set_ylabel('Validation Loss', fontsize=12)
-ax.set_title('Validation Loss vs FLOPs for Different Chinchilla Scales', fontsize=14)
+ax.set_title(f'Validation Loss vs FLOPs for Different Chinchilla Scales ({MODEL_SIZE.upper()})', fontsize=14)
 ax.set_xscale('log', base=2)
 ax.set_xlim(0.03, 180)
-ax.set_ylim(3.8, 8.0)
+# ax.set_ylim(3.8, 8.0)
 
 # Format x-axis ticks as plain numbers (0.05, 0.5, 1, 2, 4, etc.)
 ax.xaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{x:g}'))
@@ -158,13 +96,12 @@ cbar = plt.colorbar(sm, ax=ax)
 cbar.set_label('Chinchilla Scale', fontsize=12)
 
 plt.tight_layout()
-plt.savefig('results/case4_flops_vs_loss.png', dpi=150, bbox_inches='tight')
+plt.savefig(f'results/case4_flops_vs_loss_{MODEL_SIZE}.png', dpi=150, bbox_inches='tight')
 plt.show()
 
 # ---- Second plot: Data Size vs Loss, scatter colored by FLOPs ----
 
 # Collect all points as flat arrays
-all_datasets = [data_0_05x, data_0_1x, data_0_5x, data_1x, data_2x, data_4x, data_8x, data_16x]
 all_chin = []
 all_loss = []
 all_flops = []
@@ -195,11 +132,12 @@ sc = ax2.scatter(all_ttp, all_loss, c=np.log2(all_flops), cmap=cmap2, norm=norm2
 
 ax2.set_xlabel('Data Size (TTP, Chinchilla X)', fontsize=12)
 ax2.set_ylabel('Validation Loss', fontsize=12)
-ax2.set_title('Validation Loss vs Data Size for Different FLOPs Budgets', fontsize=14)
+ax2.set_title(f'Validation Loss vs Data Size for Different FLOPs Budgets ({MODEL_SIZE.upper()})', fontsize=14)
 ax2.set_xscale('log', base=2)
 ax2.set_xlim(0.04 * 20, 18 * 20)
 
 # TTP tick values with chinchilla scale in parentheses
+chinchilla_values = sorted(set(all_chin))
 ttp_values = [c * 20 for c in chinchilla_values]
 ax2.set_xticks(ttp_values)
 ax2.xaxis.set_major_formatter(FuncFormatter(
@@ -227,17 +165,18 @@ for data in all_datasets:
 ax2.plot([c * 20 for c in compute_opt_chin], compute_opt_loss, linestyle='--', color='tab:orange',
          linewidth=2.5, alpha=0.7, label='Compute Optimal (1-epoch)', zorder=15)
 
-# Self-distillation points
-ax2.scatter([c * 20 for c in self_distill_data['chinchilla_scale']],
-            self_distill_data['validation_loss'],
-            marker='X', c='red', s=120, edgecolors='k', linewidths=0.5,
-            label='Self-distillation', zorder=20)
+# Self-distillation and paraphrasing points (30M only)
+if self_distill_data is not None:
+    ax2.scatter([c * 20 for c in self_distill_data['chinchilla_scale']],
+                self_distill_data['validation_loss'],
+                marker='X', c='red', s=120, edgecolors='k', linewidths=0.5,
+                label='Self-distillation', zorder=20)
 
-# Paraphrasing points (best loss at each data scale)
-ax2.scatter([c * 20 for c in parap_best_data['chinchilla_scale']],
-            parap_best_data['validation_loss'],
-            marker='D', c='cornflowerblue', s=120, edgecolors='k', linewidths=0.5,
-            label='Paraphrasing', zorder=19)
+if parap_best_data is not None:
+    ax2.scatter([c * 20 for c in parap_best_data['chinchilla_scale']],
+                parap_best_data['validation_loss'],
+                marker='D', c='cornflowerblue', s=120, edgecolors='k', linewidths=0.5,
+                label='Paraphrasing', zorder=19)
 
 ax2.legend(fontsize=10)
 
@@ -249,5 +188,5 @@ cbar2.set_ticks([np.log2(v) for v in flops_ticks])
 cbar2.set_ticklabels([f'{v:g}' for v in flops_ticks])
 
 plt.tight_layout()
-plt.savefig('results/case4_datasize_vs_loss.png', dpi=150, bbox_inches='tight')
+plt.savefig(f'results/case4_datasize_vs_loss_{MODEL_SIZE}.png', dpi=150, bbox_inches='tight')
 plt.show()

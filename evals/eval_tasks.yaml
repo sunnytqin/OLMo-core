@@ -1,20 +1,38 @@
 group: syn_pt_eval
 task:
-  - wikitext
-  - c4
-  - lambada_openai
-  - hellaswag
-  - squad_completion
-  - webqs
-  - openbookqa
-  - race
-  - gsm8k
-  - humaneval_lm
-  - mbpp_lm
-  - gsm8k_lm
-  - asdiv_lm
-  - nq_open_lm
-  - triviaqa_lm
-  - webqs_lm
-  - squad_completion_lm
-  - ifeval_lm
+  - task: wikitext
+    num_fewshot: 0
+  - task: c4
+    num_fewshot: 0
+  - task: lambada_openai
+    num_fewshot: 0
+  - task: hellaswag
+    num_fewshot: 0
+  - task: squad_completion
+    num_fewshot: 3
+  - task: webqs
+    num_fewshot: 0
+  - task: openbookqa
+    num_fewshot: 0
+  - task: race
+    num_fewshot: 0
+  - task: gsm8k
+    num_fewshot: 5
+  - task: humaneval_lm
+    num_fewshot: 0
+  - task: mbpp_lm
+    num_fewshot: 0
+  - task: gsm8k_lm
+    num_fewshot: 0
+  - task: asdiv_lm
+    num_fewshot: 0
+  - task: nq_open_lm
+    num_fewshot: 0
+  - task: triviaqa_lm
+    num_fewshot: 0
+  - task: webqs_lm
+    num_fewshot: 0
+  - task: squad_completion_lm
+    num_fewshot: 0
+  - task: ifeval_lm
+    num_fewshot: 0
