@@ -1,0 +1,14 @@
+task: nq_open_lm
+dataset_path: nq_open
+output_type: loglikelihood
+validation_split: validation
+doc_to_text: "Q: {{question}}?\nA:"
+doc_to_target: " {{answer[0]}}"
+process_results: !function utils_lm.process_results
+metric_list:
+  - metric: word_perplexity
+  - metric: byte_perplexity
+  - metric: bits_per_byte
+num_fewshot: 0
+metadata:
+  version: 1.0

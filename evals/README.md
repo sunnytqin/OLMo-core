@@ -15,6 +15,15 @@ Converts OLMo-core distributed checkpoints to HuggingFace format, then runs [lm-
 | OpenbookQA | accuracy |
 | RACE | accuracy |
 | GSM8K | exact match |
+| HumanEval (LM) | bits_per_byte |
+| MBPP (LM) | bits_per_byte |
+| GSM8K (LM) | bits_per_byte |
+| ASDiv (LM) | bits_per_byte |
+| NQ Open (LM) | bits_per_byte |
+| TriviaQA (LM) | bits_per_byte |
+| WebQuestions (LM) | bits_per_byte |
+| SQuAD Completion (LM) | bits_per_byte |
+| IFEval (LM) | bits_per_byte |
 
 ## Setup
 
