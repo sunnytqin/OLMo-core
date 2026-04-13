@@ -9,3 +9,12 @@ task:
   - openbookqa
   - race
   - gsm8k
+  - humaneval_lm
+  - mbpp_lm
+  - gsm8k_lm
+  - asdiv_lm
+  - nq_open_lm
+  - triviaqa_lm
+  - webqs_lm
+  - squad_completion_lm
+  - ifeval_lm
