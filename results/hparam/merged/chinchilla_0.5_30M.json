@@ -1,0 +1,842 @@
+{
+  "30M_seed42_case4_dolma_epoch16_wd0.1_lr1e-3": {
+    "validation_loss": 4.155041637984964,
+    "perplexity": 63.75462341308594,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd0.1_lr1e-4": {
+    "validation_loss": 5.596293162676228,
+    "perplexity": 269.42578125,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd0.1_lr3e-3": {
+    "validation_loss": 3.99167008637754,
+    "perplexity": 54.14524459838867,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd0.1_lr3e-4": {
+    "validation_loss": 4.683829230546254,
+    "perplexity": 108.18354797363281,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd0.2_lr1e-3": {
+    "validation_loss": 4.154191626201193,
+    "perplexity": 63.700443267822266,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd0.2_lr1e-4": {
+    "validation_loss": 5.6014669136415725,
+    "perplexity": 270.8234558105469,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd0.2_lr3e-3": {
+    "validation_loss": 3.972798506851431,
+    "perplexity": 53.133018493652344,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd0.2_lr3e-4": {
+    "validation_loss": 4.690025983746147,
+    "perplexity": 108.85598754882812,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd0.4_lr1e-3": {
+    "validation_loss": 4.197312806867858,
+    "perplexity": 66.50737762451172,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd0.4_lr1e-4": {
+    "validation_loss": 5.614630079495696,
+    "perplexity": 274.4118957519531,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd0.4_lr3e-3": {
+    "validation_loss": 3.9952089177361056,
+    "perplexity": 54.337196350097656,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd0.4_lr3e-4": {
+    "validation_loss": 4.7045801036179995,
+    "perplexity": 110.45191955566406,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd0.8_lr1e-3": {
+    "validation_loss": 4.219875535099001,
+    "perplexity": 68.0250015258789,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd0.8_lr1e-4": {
+    "validation_loss": 5.638321916419804,
+    "perplexity": 280.99078369140625,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd0.8_lr3e-3": {
+    "validation_loss": 4.0954405174663835,
+    "perplexity": 60.0657844543457,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd0.8_lr3e-4": {
+    "validation_loss": 4.7319999325773505,
+    "perplexity": 113.52236938476562,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd1.6_lr1e-3": {
+    "validation_loss": 4.438114998784442,
+    "perplexity": 84.61530303955078,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd1.6_lr1e-4": {
+    "validation_loss": 5.699645417088027,
+    "perplexity": 298.761474609375,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd1.6_lr3e-3": {
+    "validation_loss": 4.273257314341766,
+    "perplexity": 71.7549819946289,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch16_wd1.6_lr3e-4": {
+    "validation_loss": 4.859616969506356,
+    "perplexity": 128.97476196289062,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3": {
+    "validation_loss": 6.561925575949688,
+    "perplexity": 707.6328735351562,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd0.1_lr1e-4": {
+    "validation_loss": 9.064072952578506,
+    "perplexity": 8639.263671875,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd0.1_lr3e-3": {
+    "validation_loss": 6.4747133463911855,
+    "perplexity": 648.5332641601562,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd0.1_lr3e-4": {
+    "validation_loss": 7.492220913794821,
+    "perplexity": 1794.031982421875,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd0.2_lr1e-3": {
+    "validation_loss": 6.565741153025584,
+    "perplexity": 710.3380737304688,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd0.2_lr1e-4": {
+    "validation_loss": 9.066208411467057,
+    "perplexity": 8657.73828125,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd0.2_lr3e-3": {
+    "validation_loss": 6.4435240594700725,
+    "perplexity": 628.6181030273438,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd0.2_lr3e-4": {
+    "validation_loss": 7.4970524963736125,
+    "perplexity": 1802.7213134765625,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd0.4_lr1e-3": {
+    "validation_loss": 6.556462509549546,
+    "perplexity": 703.7775268554688,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd0.4_lr1e-4": {
+    "validation_loss": 9.070676674345226,
+    "perplexity": 8696.5078125,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd0.4_lr3e-3": {
+    "validation_loss": 6.452797303727736,
+    "perplexity": 634.4747314453125,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd0.4_lr3e-4": {
+    "validation_loss": 7.507289743414812,
+    "perplexity": 1821.27099609375,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd0.8_lr1e-3": {
+    "validation_loss": 6.577238652363424,
+    "perplexity": 718.5523681640625,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd0.8_lr1e-4": {
+    "validation_loss": 9.07925766029943,
+    "perplexity": 8771.455078125,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd0.8_lr3e-3": {
+    "validation_loss": 6.500544092697219,
+    "perplexity": 665.5036010742188,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd0.8_lr3e-4": {
+    "validation_loss": 7.526135351951936,
+    "perplexity": 1855.9193115234375,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd1.6_lr1e-3": {
+    "validation_loss": 6.621362754793338,
+    "perplexity": 750.9677124023438,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd1.6_lr1e-4": {
+    "validation_loss": 9.096804345379192,
+    "perplexity": 8926.72265625,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd1.6_lr3e-3": {
+    "validation_loss": 6.596617240644157,
+    "perplexity": 732.6127319335938,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch1_wd1.6_lr3e-4": {
+    "validation_loss": 7.563096190131968,
+    "perplexity": 1925.7987060546875,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd0.1_lr1e-3": {
+    "validation_loss": 5.820781604656184,
+    "perplexity": 337.2355651855469,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd0.1_lr1e-4": {
+    "validation_loss": 7.89183167478687,
+    "perplexity": 2675.34033203125,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd0.1_lr3e-3": {
+    "validation_loss": 5.648373514460313,
+    "perplexity": 283.8294677734375,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd0.1_lr3e-4": {
+    "validation_loss": 6.578140005035423,
+    "perplexity": 719.2001953125,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd0.2_lr1e-3": {
+    "validation_loss": 5.817840079644558,
+    "perplexity": 336.2450256347656,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd0.2_lr1e-4": {
+    "validation_loss": 7.896003014775525,
+    "perplexity": 2686.5234375,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd0.2_lr3e-3": {
+    "validation_loss": 5.640143977603549,
+    "perplexity": 281.5032043457031,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd0.2_lr3e-4": {
+    "validation_loss": 6.581340486552457,
+    "perplexity": 721.5057373046875,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd0.4_lr1e-3": {
+    "validation_loss": 5.842423756447659,
+    "perplexity": 344.6136474609375,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd0.4_lr1e-4": {
+    "validation_loss": 7.90429561428523,
+    "perplexity": 2708.893310546875,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd0.4_lr3e-3": {
+    "validation_loss": 5.656835538548194,
+    "perplexity": 286.2414245605469,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd0.4_lr3e-4": {
+    "validation_loss": 6.5922291084555305,
+    "perplexity": 729.4048461914062,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd0.8_lr1e-3": {
+    "validation_loss": 5.855025681707009,
+    "perplexity": 348.98388671875,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd0.8_lr1e-4": {
+    "validation_loss": 7.921477269492724,
+    "perplexity": 2755.83935546875,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd0.8_lr3e-3": {
+    "validation_loss": 5.769681684289823,
+    "perplexity": 320.4356384277344,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd0.8_lr3e-4": {
+    "validation_loss": 6.612440823295902,
+    "perplexity": 744.2973022460938,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd1.6_lr1e-3": {
+    "validation_loss": 5.95107051203238,
+    "perplexity": 384.164306640625,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd1.6_lr1e-4": {
+    "validation_loss": 7.955189442201992,
+    "perplexity": 2850.32763671875,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd1.6_lr3e-3": {
+    "validation_loss": 5.886216979932932,
+    "perplexity": 360.04071044921875,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch2_wd1.6_lr3e-4": {
+    "validation_loss": 6.655426981366628,
+    "perplexity": 776.9896240234375,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd0.1_lr1e-3": {
+    "validation_loss": 4.053618423214613,
+    "perplexity": 57.60552215576172,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd0.1_lr1e-4": {
+    "validation_loss": 4.94303295194376,
+    "perplexity": 140.1947784423828,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd0.1_lr3e-3": {
+    "validation_loss": 3.9255626132766634,
+    "perplexity": 50.681583404541016,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd0.1_lr3e-4": {
+    "validation_loss": 4.315931199305854,
+    "perplexity": 74.88333129882812,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd0.2_lr1e-3": {
+    "validation_loss": 4.051026830604085,
+    "perplexity": 57.456424713134766,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd0.2_lr1e-4": {
+    "validation_loss": 4.9472447545964755,
+    "perplexity": 140.78651428222656,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd0.2_lr3e-3": {
+    "validation_loss": 3.896129773711182,
+    "perplexity": 49.21162414550781,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd0.2_lr3e-4": {
+    "validation_loss": 4.320236097184615,
+    "perplexity": 75.20639038085938,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd0.4_lr1e-3": {
+    "validation_loss": 4.036751416499229,
+    "perplexity": 56.64202880859375,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd0.4_lr1e-4": {
+    "validation_loss": 4.961579134031274,
+    "perplexity": 142.8191680908203,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd0.4_lr3e-3": {
+    "validation_loss": 3.903392117574511,
+    "perplexity": 49.570308685302734,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd0.4_lr3e-4": {
+    "validation_loss": 4.3428859148919665,
+    "perplexity": 76.92923736572266,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd0.8_lr1e-3": {
+    "validation_loss": 4.042234452771335,
+    "perplexity": 56.95345687866211,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd0.8_lr1e-4": {
+    "validation_loss": 4.993011677499683,
+    "perplexity": 147.3795928955078,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd0.8_lr3e-3": {
+    "validation_loss": 3.9901902674848233,
+    "perplexity": 54.0651741027832,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd0.8_lr3e-4": {
+    "validation_loss": 4.381114180647623,
+    "perplexity": 79.9270248413086,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd1.6_lr1e-3": {
+    "validation_loss": 4.245669786933368,
+    "perplexity": 69.80249786376953,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd1.6_lr1e-4": {
+    "validation_loss": 5.086513411626085,
+    "perplexity": 161.82467651367188,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd1.6_lr3e-3": {
+    "validation_loss": 4.211624380043071,
+    "perplexity": 67.46602630615234,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch32_wd1.6_lr3e-4": {
+    "validation_loss": 4.550810542866509,
+    "perplexity": 94.70912170410156,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd0.1_lr1e-3": {
+    "validation_loss": 5.167809698668838,
+    "perplexity": 175.52992248535156,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd0.1_lr1e-4": {
+    "validation_loss": 6.832761718388493,
+    "perplexity": 927.74951171875,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd0.1_lr3e-3": {
+    "validation_loss": 4.928202092090448,
+    "perplexity": 138.13095092773438,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd0.1_lr3e-4": {
+    "validation_loss": 5.904896753149182,
+    "perplexity": 366.829345703125,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd0.2_lr1e-3": {
+    "validation_loss": 5.194359612523251,
+    "perplexity": 180.25270080566406,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd0.2_lr1e-4": {
+    "validation_loss": 6.838163196768991,
+    "perplexity": 932.7744140625,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd0.2_lr3e-3": {
+    "validation_loss": 4.876044100307983,
+    "perplexity": 131.11099243164062,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd0.2_lr3e-4": {
+    "validation_loss": 5.914167154106766,
+    "perplexity": 370.2457275390625,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd0.4_lr1e-3": {
+    "validation_loss": 5.19960655230493,
+    "perplexity": 181.20091247558594,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd0.4_lr1e-4": {
+    "validation_loss": 6.847705955724112,
+    "perplexity": 941.7179565429688,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd0.4_lr3e-3": {
+    "validation_loss": 4.873612701863908,
+    "perplexity": 130.7926025390625,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd0.4_lr3e-4": {
+    "validation_loss": 5.923499845875119,
+    "perplexity": 373.71746826171875,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd0.8_lr1e-3": {
+    "validation_loss": 5.256412097386885,
+    "perplexity": 191.7921142578125,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd0.8_lr1e-4": {
+    "validation_loss": 6.868847025311674,
+    "perplexity": 961.8388061523438,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd0.8_lr3e-3": {
+    "validation_loss": 5.085335287498879,
+    "perplexity": 161.63412475585938,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd0.8_lr3e-4": {
+    "validation_loss": 5.947900729699473,
+    "perplexity": 382.9486083984375,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd1.6_lr1e-3": {
+    "validation_loss": 5.37127134694253,
+    "perplexity": 215.1361541748047,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd1.6_lr1e-4": {
+    "validation_loss": 6.913228475997347,
+    "perplexity": 1005.4882202148438,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd1.6_lr3e-3": {
+    "validation_loss": 5.264560683177651,
+    "perplexity": 193.36134338378906,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch4_wd1.6_lr3e-4": {
+    "validation_loss": 6.00058248052068,
+    "perplexity": 403.6639404296875,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd0.1_lr1e-3": {
+    "validation_loss": 4.08673803255298,
+    "perplexity": 59.545345306396484,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd0.1_lr1e-4": {
+    "validation_loss": 4.505787707659901,
+    "perplexity": 90.5396499633789,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd0.1_lr3e-3": {
+    "validation_loss": 3.919236323435853,
+    "perplexity": 50.361976623535156,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd0.1_lr3e-4": {
+    "validation_loss": 4.1723215496718185,
+    "perplexity": 64.86585235595703,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd0.2_lr1e-3": {
+    "validation_loss": 4.0672524221336905,
+    "perplexity": 58.396305084228516,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd0.2_lr1e-4": {
+    "validation_loss": 4.508435543856609,
+    "perplexity": 90.77970123291016,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd0.2_lr3e-3": {
+    "validation_loss": 3.8962833046353356,
+    "perplexity": 49.219181060791016,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd0.2_lr3e-4": {
+    "validation_loss": 4.167559856239948,
+    "perplexity": 64.5577163696289,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd0.4_lr1e-3": {
+    "validation_loss": 3.983753659696725,
+    "perplexity": 53.71829605102539,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd0.4_lr1e-4": {
+    "validation_loss": 4.517179891721674,
+    "perplexity": 91.57698059082031,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd0.4_lr3e-3": {
+    "validation_loss": 3.8819877539138377,
+    "perplexity": 48.52056884765625,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd0.4_lr3e-4": {
+    "validation_loss": 4.1616592309968405,
+    "perplexity": 64.17791748046875,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd0.8_lr1e-3": {
+    "validation_loss": 3.964130121463438,
+    "perplexity": 52.67443084716797,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd0.8_lr1e-4": {
+    "validation_loss": 4.550686752647931,
+    "perplexity": 94.69742584228516,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd0.8_lr3e-3": {
+    "validation_loss": 3.9623892143072363,
+    "perplexity": 52.58280944824219,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd0.8_lr3e-4": {
+    "validation_loss": 4.174008424860872,
+    "perplexity": 64.97537994384766,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd1.6_lr1e-3": {
+    "validation_loss": 4.15944616395134,
+    "perplexity": 64.03604888916016,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd1.6_lr1e-4": {
+    "validation_loss": 4.67416037172898,
+    "perplexity": 107.142578125,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd1.6_lr3e-3": {
+    "validation_loss": 4.197428359789095,
+    "perplexity": 66.51505279541016,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch64_wd1.6_lr3e-4": {
+    "validation_loss": 4.330774306050115,
+    "perplexity": 76.00311279296875,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd0.1_lr1e-3": {
+    "validation_loss": 4.490875291091569,
+    "perplexity": 89.1994857788086,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd0.1_lr1e-4": {
+    "validation_loss": 6.138312051459099,
+    "perplexity": 463.2708435058594,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd0.1_lr3e-3": {
+    "validation_loss": 4.211470823454577,
+    "perplexity": 67.4556655883789,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd0.1_lr3e-4": {
+    "validation_loss": 5.333972196718878,
+    "perplexity": 207.2595672607422,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd0.2_lr1e-3": {
+    "validation_loss": 4.4991324848418195,
+    "perplexity": 89.9390869140625,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd0.2_lr1e-4": {
+    "validation_loss": 6.141462015552907,
+    "perplexity": 464.7324523925781,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd0.2_lr3e-3": {
+    "validation_loss": 4.265985036429915,
+    "perplexity": 71.23505401611328,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd0.2_lr3e-4": {
+    "validation_loss": 5.343387053057377,
+    "perplexity": 209.2201690673828,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd0.4_lr1e-3": {
+    "validation_loss": 4.5233161175230805,
+    "perplexity": 92.140625,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd0.4_lr1e-4": {
+    "validation_loss": 6.1497550714319456,
+    "perplexity": 468.6025695800781,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd0.4_lr3e-3": {
+    "validation_loss": 4.262714154170495,
+    "perplexity": 71.00244903564453,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd0.4_lr3e-4": {
+    "validation_loss": 5.3626704714185385,
+    "perplexity": 213.2937774658203,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd0.8_lr1e-3": {
+    "validation_loss": 4.585822213576099,
+    "perplexity": 98.08378601074219,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd0.8_lr1e-4": {
+    "validation_loss": 6.168473363293611,
+    "perplexity": 477.45660400390625,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd0.8_lr3e-3": {
+    "validation_loss": 4.370908088571591,
+    "perplexity": 79.1154556274414,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd0.8_lr3e-4": {
+    "validation_loss": 5.396522909529362,
+    "perplexity": 220.63792419433594,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd1.6_lr1e-3": {
+    "validation_loss": 4.7968690385193105,
+    "perplexity": 121.13053894042969,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd1.6_lr1e-4": {
+    "validation_loss": 6.21197137053125,
+    "perplexity": 498.6833190917969,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd1.6_lr3e-3": {
+    "validation_loss": 4.520777673555749,
+    "perplexity": 91.90704345703125,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  },
+  "30M_seed42_case4_dolma_epoch8_wd1.6_lr3e-4": {
+    "validation_loss": 5.481806299466494,
+    "perplexity": 240.28033447265625,
+    "tokens_evaluated": 13279917,
+    "num_batches": 1526
+  }
+}

@@ -63,3 +63,5 @@ core
 slurm_out/
 logs/
 random_plots/
+**/deprecated/
+.claude/

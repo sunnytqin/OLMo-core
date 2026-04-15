@@ -56,6 +56,7 @@ from olmo_core.train.train_module import (
 _MODEL_REGISTRY = {
     "30M":  (TransformerConfig.olmo3_30M,  30_000_000),
     "60M":  (TransformerConfig.olmo3_60M,  60_000_000),
+    "190M": (TransformerConfig.olmo3_190M, 190_000_000),
     "370M": (TransformerConfig.olmo3_370M, 370_000_000),
 }
 
@@ -68,6 +69,7 @@ _MODEL_REGISTRY = {
 # Token counts per entry (model_params * 20 * chin):
 #   30M  * 20 * chin ->  600M * chin
 #   60M  * 20 * chin -> 1200M * chin
+#   190M * 20 * chin -> 3800M * chin
 #   370M * 20 * chin -> 7400M * chin
 # ---------------------------------------------------------------------------
 _DATASET_LOOKUP = {
@@ -90,6 +92,17 @@ _DATASET_LOOKUP = {
     ("60M", 2):    DataMix.OLMo_dolma_2_4B,    # 2.4B tokens
     ("60M", 4):    DataMix.OLMo_dolma_4_8B,    # 4.8B tokens
     ("60M", 8):    DataMix.OLMo_dolma_9_6B,    # 9.6B tokens
+    ("60M", 16):   DataMix.OLMo_dolma_19_2B,   # 19.2B tokens
+    # 190M model (3800M tokens per chinchilla unit)
+    ("190M", 0.05): DataMix.OLMo_dolma_0_19B,  #  190M tokens
+    ("190M", 0.1):  DataMix.OLMo_dolma_0_38B,  #  380M tokens
+    ("190M", 0.25): DataMix.OLMo_dolma_0_95B,  #  950M tokens
+    ("190M", 0.5):  DataMix.OLMo_dolma_1_9B,   #  1.9B tokens
+    ("190M", 1):    DataMix.OLMo_dolma_3_8B,   #  3.8B tokens
+    ("190M", 2):    DataMix.OLMo_dolma_7_6B,   #  7.6B tokens
+    ("190M", 4):    DataMix.OLMo_dolma_15_2B,  # 15.2B tokens
+    ("190M", 8):    DataMix.OLMo_dolma_30_4B,  # 30.4B tokens
+    ("190M", 16):   DataMix.OLMo_dolma_60_8B,  # 60.8B tokens
     # 370M model (7400M tokens per chinchilla unit)
     ("370M", 0.05): DataMix.OLMo_dolma_0_37B,  #  370M tokens
     ("370M", 0.1):  DataMix.OLMo_dolma_0_74B,  #  740M tokens
@@ -97,6 +110,8 @@ _DATASET_LOOKUP = {
     ("370M", 0.5):  DataMix.OLMo_dolma_3_7B,   #  3.7B tokens
     ("370M", 1):    DataMix.OLMo_dolma_7_4B,   #  7.4B tokens
     ("370M", 2):    DataMix.OLMo_dolma_14_8B,  # 14.8B tokens
+    ("370M", 4):    DataMix.OLMo_dolma_29_6B,  # 29.6B tokens
+    ("370M", 8):    DataMix.OLMo_dolma_59_2B,  # 59.2B tokens
 }
 
 
@@ -267,7 +282,7 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
                     tokenizer=tokenizer_config,
                     work_dir=opts.work_dir,
                 ),
-                eval_interval=200,
+                eval_interval=min(200, max(1, total_steps // 2)),
                 eval_duration=Duration.tokens(50_000_000),
                 eval_on_startup=eval_only,
                 cancel_after_first_eval=eval_only,

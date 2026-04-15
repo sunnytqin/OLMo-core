@@ -83,6 +83,18 @@ class DataMix(DataMixBase):
     OLMo_dolma_7_4B   = "OLMo-dolma-7.4B"
     OLMo_dolma_9_6B   = "OLMo-dolma-9.6B"
     OLMo_dolma_14_8B  = "OLMo-dolma-14.8B"
+    OLMo_dolma_15_2B  = "OLMo-dolma-15.2B"
+    OLMo_dolma_19_2B  = "OLMo-dolma-19.2B"
+    OLMo_dolma_29_6B  = "OLMo-dolma-29.6B"
+    OLMo_dolma_30_4B  = "OLMo-dolma-30.4B"
+    OLMo_dolma_59_2B  = "OLMo-dolma-59.2B"
+    OLMo_dolma_60_8B  = "OLMo-dolma-60.8B"
+    OLMo_dolma_0_19B  = "OLMo-dolma-0.19B"
+    OLMo_dolma_0_38B  = "OLMo-dolma-0.38B"
+    OLMo_dolma_0_95B  = "OLMo-dolma-0.95B"
+    OLMo_dolma_1_9B   = "OLMo-dolma-1.9B"
+    OLMo_dolma_3_8B   = "OLMo-dolma-3.8B"
+    OLMo_dolma_7_6B   = "OLMo-dolma-7.6B"
     OLMo_dolma_val    = "OLMo-dolma-val"
     dclm_validation = "dclm-validation"
     OLMo_mix_0625_700Bsample = "OLMo-mix-0625-700Bsample"
@@ -186,6 +198,18 @@ _SYN_DATA_SCALING_DOLMA_MIXES = frozenset(
         "OLMo-dolma-7.4B",
         "OLMo-dolma-9.6B",
         "OLMo-dolma-14.8B",
+        "OLMo-dolma-15.2B",
+        "OLMo-dolma-19.2B",
+        "OLMo-dolma-29.6B",
+        "OLMo-dolma-30.4B",
+        "OLMo-dolma-59.2B",
+        "OLMo-dolma-60.8B",
+        "OLMo-dolma-0.19B",
+        "OLMo-dolma-0.38B",
+        "OLMo-dolma-0.95B",
+        "OLMo-dolma-1.9B",
+        "OLMo-dolma-3.8B",
+        "OLMo-dolma-7.6B",
         "OLMo-dolma-val",
     }
 )

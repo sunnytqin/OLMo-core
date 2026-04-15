@@ -17,7 +17,7 @@ data_0_1x = {
     'chinchilla_scale': [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
     'epochs': [1, 2, 4, 8, 16, 32, 64],
     'flops_multiplier': [0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4],
-    'validation_loss': [5.14, 4.01, np.nan, 3.08, 2.96, 2.98, np.nan],
+    'validation_loss': [5.14, 4.01, 3.32, 3.08, 2.96, 2.98, np.nan],
     'learning_rate': [0.001, 0.003, 0.001, 0.003, 0.003, 0.003, np.nan],
     'weight_decay': [0.1, 0.1, 0.8, 0.2, 0.8, 0.8, np.nan],
 }

@@ -1,0 +1,8 @@
+{
+  "370M_seed42_case4_dolma_epoch8_wd0.2_lr3e-3": {
+    "validation_loss": 2.8237607961321056,
+    "perplexity": 16.840063095092773,
+    "tokens_evaluated": 13279917,
+    "num_batches": 3052
+  }
+}

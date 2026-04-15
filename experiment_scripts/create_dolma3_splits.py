@@ -115,6 +115,18 @@ _PER_MODEL_SHARDS = {
         "train_2.4B.npy":   ( 2_400_000_000,  40),  # TTP=40  chin=2
         "train_4.8B.npy":   ( 4_800_000_000,  80),  # TTP=80  chin=4
         "train_9.6B.npy":   ( 9_600_000_000, 160),  # TTP=160 chin=8
+        "train_19.2B.npy":  (19_200_000_000, 320),  # TTP=320 chin=16
+    },
+    "190M": {  # non-embedding params ≈ 190M; chin unit = 3800M tokens
+        "train_0.19B.npy":  (   190_000_000,   1),  # TTP=1
+        "train_0.38B.npy":  (   380_000_000,   2),  # TTP=2
+        "train_0.95B.npy":  (   950_000_000,   5),  # TTP=5
+        "train_1.9B.npy":   ( 1_900_000_000,  10),  # TTP=10
+        "train_3.8B.npy":   ( 3_800_000_000,  20),  # TTP=20  chin=1
+        "train_7.6B.npy":   ( 7_600_000_000,  40),  # TTP=40  chin=2
+        "train_15.2B.npy":  (15_200_000_000,  80),  # TTP=80  chin=4
+        "train_30.4B.npy":  (30_400_000_000, 160),  # TTP=160 chin=8
+        "train_60.8B.npy":  (60_800_000_000, 320),  # TTP=320 chin=16
     },
     "370M": {  # non-embedding params ≈ 370M; chin unit = 7400M tokens
         "train_0.37B.npy":  (   370_000_000,   1),  # TTP=1
@@ -123,6 +135,8 @@ _PER_MODEL_SHARDS = {
         "train_3.7B.npy":   ( 3_700_000_000,  10),  # TTP=10
         "train_7.4B.npy":   ( 7_400_000_000,  20),  # TTP=20  chin=1
         "train_14.8B.npy":  (14_800_000_000,  40),  # TTP=40  chin=2
+        "train_29.6B.npy":  (29_600_000_000,  80),  # TTP=80  chin=4
+        "train_59.2B.npy":  (59_200_000_000, 160),  # TTP=160 chin=8
     },
 }
 

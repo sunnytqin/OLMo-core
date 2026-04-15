@@ -1,0 +1,17 @@
+task: gsm8k_bpb_task
+dataset_path: openai/gsm8k
+dataset_name: main
+output_type: loglikelihood_rolling
+test_split: test
+doc_to_text: ""
+doc_to_target: "Question: {{question}}\nAnswer: {{answer}}"
+metric_list:
+  - metric: bits_per_byte
+    aggregation: bits_per_byte
+    higher_is_better: false
+metadata:
+  version: 1.0
+  description: >
+    GSM8k scored by bits-per-byte instead of exact-match accuracy.
+    Gives a continuous signal even at small model scales where accuracy
+    is near zero. Following OLMo 3 (2024) methodology.
