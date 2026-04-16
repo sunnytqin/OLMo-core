@@ -11,7 +11,7 @@
 #SBATCH --mem=250G
 #SBATCH -o ../slurm_out/slurm-eval-batch-%A_%a.out
 #SBATCH -e ../slurm_out/slurm-eval-batch-%A_%a.out
-#SBATCH --array=0-7
+#SBATCH --array=0-11
 
 # Each array task processes ~1/8 of the manifest in-process.
 # Model architecture + data loader are loaded once per model size,
@@ -25,9 +25,9 @@ mamba activate openrlhf
 cd /n/home05/sqin/OLMo-core/experiment_scripts/
 
 python run_eval_batch.py \
-    --manifest /n/home05/sqin/OLMo-core/results/hparam/manifest.json \
+    --manifest /n/home05/sqin/OLMo-core/results/chinchilla_fit_dolma/manifest_needs_eval.json \
     --results-dir /n/home05/sqin/OLMo-core/results/dolma_val_loss \
     --worker-id $SLURM_ARRAY_TASK_ID \
-    --num-workers 8
+    --num-workers 12
 
 echo "Worker $SLURM_ARRAY_TASK_ID done."

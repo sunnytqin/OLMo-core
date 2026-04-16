@@ -16,9 +16,9 @@ BATCH_SIZE = 2097152  # tokens per step
 
 CHINCHILLA_DIRS = [
     "chinchilla_0.05", "chinchilla_0.1", "chinchilla_0.25", "chinchilla_0.5",
-    "chinchilla_1", "chinchilla_2", "chinchilla_4", "chinchilla_8",
+    "chinchilla_1", "chinchilla_2", "chinchilla_4", "chinchilla_8", "chinchilla_16",
 ]
-MODEL_SIZES = ["30M", "60M", "370M"]
+MODEL_SIZES = ["30M", "60M", "190M", "370M"]
 
 RUN_PATTERN = re.compile(
     r"(?P<size>\d+M)_seed42_case4_dolma_epoch(?P<epoch>\d+)_wd(?P<wd>[\d.]+)_lr(?P<lr>[\de.-]+)"

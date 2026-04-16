@@ -6,8 +6,8 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
-# ---- Select model size: '30m' or '370m' ----
-MODEL_SIZE = '30m'
+# ---- Select model size: '30m', '370m', 'dolma_30m', 'dolma_60m', 'dolma_190m', 'dolma_370m' ----
+MODEL_SIZE = 'dolma_30m'
 
 if MODEL_SIZE == '30m':
     import dclm_30m as model_data
@@ -15,6 +15,22 @@ if MODEL_SIZE == '30m':
     parap_datasets = getattr(model_data, 'parap_datasets', None)
 elif MODEL_SIZE == '370m':
     import data_370m as model_data
+    self_distill_data = None
+    parap_datasets = None
+elif MODEL_SIZE == 'dolma_30m':
+    import dolma_30m as model_data
+    self_distill_data = None
+    parap_datasets = None
+elif MODEL_SIZE == 'dolma_60m':
+    import dolma_60m as model_data
+    self_distill_data = None
+    parap_datasets = None
+elif MODEL_SIZE == 'dolma_190m':
+    import dolma_190m as model_data
+    self_distill_data = None
+    parap_datasets = None
+elif MODEL_SIZE == 'dolma_370m':
+    import dolma_370m as model_data
     self_distill_data = None
     parap_datasets = None
 else:
@@ -156,10 +172,13 @@ ax.plot([c * 20 for c in compute_opt_chin], compute_opt_loss,
         label='Compute Optimal', zorder=5)
 
 # === Shade regions ===
-_FLOOR = 3.7
-_XLEFT = 0.04 * 20   # xlim left edge
-_XRIGHT = 18 * 20    # xlim right edge
-_X_CUTOFF = 64.0     # TTP=64, between tick marks 40(2x) and 80(4x)
+# Derive axis limits and shading floor from data
+_all_min_loss = all_loss.min()  # min across ALL runs for this model size
+_FLOOR = np.floor(_all_min_loss * 10) / 10 - 0.1  # floor slightly below min loss
+_chin_max = max(chin_unique)
+_XLEFT = min(chin_unique) * 20 * 0.5
+_XRIGHT = _chin_max * 20 * 1.5
+_MODEL_BOUND_Y = _all_min_loss  # model-bound = best achievable loss for this model size
 
 # Build interpolators in log2(x) space — matches matplotlib's log-scale line rendering exactly.
 _co_pairs = sorted(zip([c * 20 for c in compute_opt_chin], compute_opt_loss))
@@ -194,26 +213,26 @@ def _blue_min(x):
 _do_fn = _blue_fns[-1]
 def _do(x): return _do_fn(np.log2(np.asarray(x, dtype=float)))
 
-# Compute-bound (yellow): above max(blue_min, 4.0), up to compute-optimal (black) line
+# Compute-bound (yellow): above max(blue_min, _MODEL_BOUND_Y), up to compute-optimal (black) line
 _x_cb = np.geomspace(_XLEFT, _XRIGHT, 500)
 _co_y_cb = _co(_x_cb)
 _blue_bot = _blue_min(_x_cb)
-_y_bot_cb = np.maximum(_blue_bot, 4.0)  # lower bound: whichever is higher, blue or 4.0
+_y_bot_cb = np.maximum(_blue_bot, _MODEL_BOUND_Y)
 ax.fill_between(_x_cb, _y_bot_cb, _co_y_cb,
                 where=_co_y_cb > _y_bot_cb,
                 color='#ffcc44', alpha=0.25, zorder=1, label='Compute-bound')
 
-# Data-bound: below darkest blue, above y=4.0, from y-spine to end of blue
+# Data-bound: below darkest blue, above _MODEL_BOUND_Y, from y-spine to end of blue
 _do_xs = np.array([x for x, y in _sd_pairs]) if self_distill_data is not None else \
          np.array([x for x, y in _pa_pairs]) if parap_datasets is not None else \
          np.array([x for x, y in _me_pairs])
 _x_db = np.geomspace(_XLEFT, _do_xs.max(), 300)
-ax.fill_between(_x_db, 4.0, _do(_x_db),
-                where=_do(_x_db) > 4.0,
+ax.fill_between(_x_db, _MODEL_BOUND_Y, _do(_x_db),
+                where=_do(_x_db) > _MODEL_BOUND_Y,
                 color='#6baed6', alpha=0.25, zorder=2, label='Data-bound')
 
-# Model-bound (green): strictly y <= 4.0 across full x range
-ax.fill_between([_XLEFT, _XRIGHT], _FLOOR, 4.0,
+# Model-bound (green): strictly y <= _MODEL_BOUND_Y across full x range
+ax.fill_between([_XLEFT, _XRIGHT], _FLOOR, _MODEL_BOUND_Y,
                 color='#74c476', alpha=0.25, zorder=3, label='Model-bound')
 
 ax.set_xlabel('Fresh Data Size,  TTP (Chinchilla X)', fontsize=FONT_LABEL)
@@ -221,8 +240,8 @@ ax.set_ylabel('Validation Loss', fontsize=FONT_LABEL)
 # ax.set_title(f'Validation Loss vs Data Size for Different FLOPs Budgets ({MODEL_SIZE.upper()})',
 #              fontsize=FONT_TITLE)
 ax.set_xscale('log', base=2)
-ax.set_xlim(0.04 * 20, 18 * 20)
-ax.set_ylim(bottom=3.7)
+ax.set_xlim(_XLEFT, _XRIGHT)
+ax.set_ylim(bottom=_FLOOR)
 ax.tick_params(axis='both', labelsize=FONT_TICK)
 
 # TTP tick values with chinchilla scale in parentheses (use unshifted positions)

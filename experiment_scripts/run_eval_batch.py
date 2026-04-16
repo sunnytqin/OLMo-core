@@ -26,6 +26,7 @@ from olmo_core.utils import get_default_device, move_to_device, seed_all
 _MODEL_CONFIGS = {
     "30M": TransformerConfig.olmo3_30M,
     "60M": TransformerConfig.olmo3_60M,
+    "190M": TransformerConfig.olmo3_190M,
     "370M": TransformerConfig.olmo3_370M,
 }
 
