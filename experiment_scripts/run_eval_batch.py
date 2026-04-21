@@ -24,10 +24,13 @@ from olmo_core.optim import AdamWConfig
 from olmo_core.utils import get_default_device, move_to_device, seed_all
 
 _MODEL_CONFIGS = {
+    "14M": TransformerConfig.olmo3_14M,
     "30M": TransformerConfig.olmo3_30M,
     "60M": TransformerConfig.olmo3_60M,
+    "100M": TransformerConfig.olmo3_100M,
     "190M": TransformerConfig.olmo3_190M,
     "370M": TransformerConfig.olmo3_370M,
+    "600M": TransformerConfig.olmo3_600M,
 }
 
 

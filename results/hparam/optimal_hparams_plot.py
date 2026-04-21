@@ -3,7 +3,13 @@
 Heatmap matrices showing optimal LR and WD as a function of
 fresh data size (chinchilla multiplier) and epochs.
 One figure per model size, two subplots: optimal LR and optimal WD.
+
+Cells are only considered "explored" (and colored) if more than
+`MIN_CONFIGS_FOR_OPTIMAL` unique (wd, lr) configs were run for that
+(chinchilla, epoch) setting. Otherwise, the cell is grayed out with "n/a"
+since the "optimal" pick from a tiny sweep isn't meaningful.
 """
+import argparse
 import json
 import re
 from collections import defaultdict
@@ -13,8 +19,15 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
 
+MODEL_SIZES = ["14M", "30M", "60M", "190M", "370M"]
+
+# An "optimal" call needs at least this many distinct (wd, lr) configs
+# evaluated for that (chinchilla, epoch) setting. Below this, we gray
+# out and label "n/a" because picking a best from <5 points is noisy.
+MIN_CONFIGS_FOR_OPTIMAL = 5
+
 RUN_PATTERN = re.compile(
-    r'(30M|60M|190M|370M)_seed\d+_case4_dolma_epoch(\d+)_wd([\d.]+)_lr([\d.e-]+)'
+    r'(14M|30M|60M|190M|370M)_seed\d+_case4_dolma_epoch(\d+)_wd([\d.]+)_lr([\d.e-]+)'
 )
 
 
@@ -26,7 +39,8 @@ def parse_run_name(run_name):
 
 
 def parse_merged_filename(stem):
-    for size in ["370M", "190M", "60M", "30M"]:
+    # Match longer suffixes first so "190M" isn't caught by "30M"/"90M".
+    for size in sorted(MODEL_SIZES, key=len, reverse=True):
         suffix = f"_{size}"
         if stem.endswith(suffix):
             return stem[:-len(suffix)], size
@@ -38,6 +52,8 @@ def chin_scale(chin_dir):
 
 
 def load_optimal_hparams(merged_dir):
+    """For each (chin, size, epoch), collect the grid of configs and pick
+    the best only when enough configs were explored."""
     records = []
     for json_file in sorted(Path(merged_dir).glob("*.json")):
         chin, size = parse_merged_filename(json_file.stem)
@@ -59,6 +75,7 @@ def load_optimal_hparams(merged_dir):
         for epoch, grid in epoch_data.items():
             if not grid:
                 continue
+            n_configs = len(grid)
             best_key = min(grid, key=grid.get)
             records.append({
                 "chin": chin_scale(chin),
@@ -67,6 +84,7 @@ def load_optimal_hparams(merged_dir):
                 "best_lr": best_key[1],
                 "best_wd": best_key[0],
                 "best_loss": grid[best_key],
+                "n_configs": n_configs,
             })
     return records
 
@@ -81,13 +99,12 @@ def plot_model_figure(records, model_size, output_path):
     epochs = sorted(set(r["epoch"] for r in recs))
 
     # Build lookup
-    lookup = {}
-    for r in recs:
-        lookup[(r["chin"], r["epoch"])] = r
+    lookup = {(r["chin"], r["epoch"]): r for r in recs}
 
-    # All possible LR and WD values (for discrete colormap)
-    all_lrs = sorted(set(r["best_lr"] for r in recs))
-    all_wds = sorted(set(r["best_wd"] for r in recs))
+    # Only values from cells that pass the threshold define the colorbar.
+    explored = [r for r in recs if r["n_configs"] >= MIN_CONFIGS_FOR_OPTIMAL]
+    all_lrs = sorted(set(r["best_lr"] for r in explored))
+    all_wds = sorted(set(r["best_wd"] for r in explored))
 
     fig, (ax_lr, ax_wd) = plt.subplots(1, 2, figsize=(14, 5))
 
@@ -104,43 +121,64 @@ def plot_model_figure(records, model_size, output_path):
 
         grid = np.full((n_epochs, n_chins), np.nan)
         annot = np.full((n_epochs, n_chins), "", dtype=object)
+        # Cells that have data but didn't pass the threshold.
+        undersampled = np.zeros((n_epochs, n_chins), dtype=bool)
 
         for i, epoch in enumerate(epochs):
             for j, chin in enumerate(chins):
                 key = (chin, epoch)
-                if key in lookup:
-                    val = lookup[key][param]
-                    grid[i, j] = val_to_idx[val]
-                    if param == "best_lr":
-                        annot[i, j] = f"{val:.0e}"
-                    else:
-                        annot[i, j] = f"{val}"
+                if key not in lookup:
+                    continue
+                rec = lookup[key]
+                if rec["n_configs"] < MIN_CONFIGS_FOR_OPTIMAL:
+                    undersampled[i, j] = True
+                    annot[i, j] = f"n/a\n({rec['n_configs']})"
+                    continue
+                val = rec[param]
+                grid[i, j] = val_to_idx[val]
+                if param == "best_lr":
+                    annot[i, j] = f"{val:.0e}"
+                else:
+                    annot[i, j] = f"{val}"
 
         mask = np.isnan(grid)
 
-        # Discrete colormap
-        cmap = plt.cm.get_cmap("RdYlGn_r", n_vals)
-        bounds = np.arange(-0.5, n_vals)
-        norm = mcolors.BoundaryNorm(bounds, cmap.N)
+        # Discrete colormap (if we have any explored cells)
+        if n_vals > 0:
+            cmap = plt.get_cmap("RdYlGn_r", n_vals)
+            bounds = np.arange(-0.5, n_vals)
+            norm = mcolors.BoundaryNorm(bounds, cmap.N)
+            im = ax.imshow(grid, cmap=cmap, norm=norm, aspect="auto",
+                           interpolation="nearest")
+        else:
+            # No explored data at all for this size/param — draw empty canvas
+            im = ax.imshow(np.zeros((n_epochs, n_chins)), cmap="gray",
+                           vmin=0, vmax=1, aspect="auto",
+                           interpolation="nearest", alpha=0)
 
-        im = ax.imshow(grid, cmap=cmap, norm=norm, aspect="auto",
-                       interpolation="nearest")
-
-        # Annotate
-        for i in range(n_epochs):
-            for j in range(n_chins):
-                if not mask[i, j]:
-                    ax.text(j, i, annot[i, j], ha="center", va="center",
-                            fontsize=9, fontweight="bold",
-                            color="white" if grid[i, j] > n_vals / 2 else "black")
-
-        # Gray out missing cells
+        # Fill cells: gray for missing or undersampled
         for i in range(n_epochs):
             for j in range(n_chins):
                 if mask[i, j]:
+                    facecolor = "#b0b0b0" if undersampled[i, j] else "#e0e0e0"
                     ax.add_patch(plt.Rectangle((j - 0.5, i - 0.5), 1, 1,
-                                               fill=True, facecolor="#e0e0e0",
+                                               fill=True, facecolor=facecolor,
                                                edgecolor="white", linewidth=0.5))
+
+        # Annotate cells
+        for i in range(n_epochs):
+            for j in range(n_chins):
+                if annot[i, j] == "":
+                    continue
+                if mask[i, j]:
+                    # undersampled cell: dark gray label
+                    ax.text(j, i, annot[i, j], ha="center", va="center",
+                            fontsize=8, color="#333333")
+                else:
+                    # colored cell: black/white text based on color
+                    color = "white" if grid[i, j] > n_vals / 2 else "black"
+                    ax.text(j, i, annot[i, j], ha="center", va="center",
+                            fontsize=9, fontweight="bold", color=color)
 
         ax.set_xticks(range(n_chins))
         ax.set_xticklabels([f"{c}x" for c in chins], fontsize=9)
@@ -151,12 +189,13 @@ def plot_model_figure(records, model_size, output_path):
         ax.set_title(f"{label}", fontsize=13, fontweight="bold")
 
         # Colorbar with actual values
-        cbar = fig.colorbar(im, ax=ax, shrink=0.8)
-        cbar.set_ticks(range(n_vals))
-        if param == "best_lr":
-            cbar.set_ticklabels([f"{v:.0e}" for v in all_vals])
-        else:
-            cbar.set_ticklabels([f"{v}" for v in all_vals])
+        if n_vals > 0:
+            cbar = fig.colorbar(im, ax=ax, shrink=0.8)
+            cbar.set_ticks(range(n_vals))
+            if param == "best_lr":
+                cbar.set_ticklabels([f"{v:.0e}" for v in all_vals])
+            else:
+                cbar.set_ticklabels([f"{v}" for v in all_vals])
 
         # Grid lines
         ax.set_xticks(np.arange(-0.5, n_chins), minor=True)
@@ -164,8 +203,11 @@ def plot_model_figure(records, model_size, output_path):
         ax.grid(which="minor", color="white", linewidth=1.5)
         ax.tick_params(which="minor", size=0)
 
-    fig.suptitle(f"{model_size} — Optimal Hyperparameters",
-                 fontsize=14, fontweight="bold", y=1.02)
+    fig.suptitle(
+        f"{model_size} — Optimal Hyperparameters  "
+        f"(gray = <{MIN_CONFIGS_FOR_OPTIMAL} configs swept)",
+        fontsize=14, fontweight="bold", y=1.02,
+    )
     plt.tight_layout()
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_path, bbox_inches="tight")
@@ -174,16 +216,15 @@ def plot_model_figure(records, model_size, output_path):
 
 
 def main():
-    import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--merged-dir", default="merged")
     parser.add_argument("--output-dir", default="heatmaps")
     args = parser.parse_args()
 
     records = load_optimal_hparams(args.merged_dir)
-    print(f"Loaded {len(records)} optimal points")
+    print(f"Loaded {len(records)} (chin, size, epoch) cells")
 
-    for size in ["30M", "60M", "190M", "370M"]:
+    for size in MODEL_SIZES:
         print(f"\nGenerating {size} figure...")
         out = str(Path(args.output_dir) / f"{size}_optimal_hparams.pdf")
         plot_model_figure(records, size, out)

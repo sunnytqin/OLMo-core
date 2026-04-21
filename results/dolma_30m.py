@@ -64,21 +64,21 @@ data_4x = {
 }
 
 data_8x = {
-    'chinchilla_scale': [8, 8],
-    'epochs': [1, 2],
-    'flops_multiplier': [8, 16],
-    'validation_loss': [3.8764, 3.7343],
-    'learning_rate': [3e-3, 3e-3],
-    'weight_decay': [0.1, 0.1],
+    'chinchilla_scale': [8, 8, 8, 8, 8],
+    'epochs': [1, 2, 4, 8, 16],
+    'flops_multiplier': [8, 16, 32, 64, 128],
+    'validation_loss': [3.8764, 3.7343, 3.6493, 3.5995, 3.5642],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.1, 0.1, 0.1, 0.1],
 }
 
 data_16x = {
-    'chinchilla_scale': [16],
-    'epochs': [1],
-    'flops_multiplier': [16],
-    'validation_loss': [3.7454],
-    'learning_rate': [3e-3],
-    'weight_decay': [0.1],
+    'chinchilla_scale': [16, 16, 16, 16, 16],
+    'epochs': [1, 2, 4, 8, 16],
+    'flops_multiplier': [16, 32, 64, 128, 256],
+    'validation_loss': [3.7454, 3.6549, 3.5926, 3.5629, 3.5457],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.1, 0.1, 0.1, 0.1],
 }
 
 ALL_DATASETS = [

@@ -12,37 +12,23 @@ import json
 import re
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 
-# Hyperparameter grids per model size
-GRIDS = {
-    "30M": {
-        "weight_decays": [0.1, 0.2, 0.4, 0.8, 1.6],
-        "learning_rates": [1e-4, 3e-4, 1e-3, 3e-3],
-    },
-    "60M": {
-        "weight_decays": [0.1, 0.2, 0.4, 0.8, 1.6],
-        "learning_rates": [1e-4, 3e-4, 1e-3, 3e-3],
-    },
-    "190M": {
-        "weight_decays": [0.1, 0.2, 0.4, 0.8, 1.6],
-        "learning_rates": [1e-4, 3e-4, 1e-3, 3e-3],
-    },
-    "370M": {
-        "weight_decays": [0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4],
-        "learning_rates": [1e-4, 3e-4, 1e-3, 3e-3, 6e-3],
-    },
-}
+MODEL_SIZES = ["14M", "30M", "60M", "190M", "370M"]
 
-# Chinchilla multiplier extracted from dir name, used for row ordering
-CHIN_ORDER = [0.05, 0.1, 0.25, 0.5, 1, 2, 4]
+# Hyperparameter grids per model size. All sizes share the same sweep axes
+# currently; extend here if a size ever uses different axes.
+DEFAULT_GRID = {
+    "weight_decays": [0.1, 0.2, 0.4, 0.8, 1.6],
+    "learning_rates": [1e-4, 3e-4, 1e-3, 3e-3],
+}
+GRIDS = {size: DEFAULT_GRID for size in MODEL_SIZES}
 
 RUN_PATTERN = re.compile(
-    r'(30M|60M|190M|370M)_seed\d+_case4_dolma_epoch(\d+)_wd([\d.]+)_lr([\d.e-]+)'
+    r'(14M|30M|60M|190M|370M)_seed\d+_case4_dolma_epoch(\d+)_wd([\d.]+)_lr([\d.e-]+)'
 )
 
 
@@ -54,7 +40,8 @@ def parse_run_name(run_name: str):
 
 
 def parse_merged_filename(stem: str):
-    for size in ["370M", "60M", "30M"]:
+    # Match longer suffixes first so "190M" isn't caught by "30M"/"90M".
+    for size in sorted(MODEL_SIZES, key=len, reverse=True):
         suffix = f"_{size}"
         if stem.endswith(suffix):
             chin = stem[:-len(suffix)]
@@ -112,8 +99,8 @@ def generate_combined_figure(data, model_size: str, output_path: str):
     n_rows = len(chin_dirs)
     n_cols = len(epochs)
 
-    cell_w = 2.8 if model_size == "30M" else 3.5
-    cell_h = 2.2 if model_size == "30M" else 2.8
+    cell_w = 2.8 if model_size in ("14M", "30M") else 3.2
+    cell_h = 2.2 if model_size in ("14M", "30M") else 2.6
     fig, axes = plt.subplots(
         n_rows, n_cols,
         figsize=(n_cols * cell_w + 1.5, n_rows * cell_h + 1.5),
@@ -126,7 +113,17 @@ def generate_combined_figure(data, model_size: str, output_path: str):
             key = (chin, model_size, epoch)
 
             if key not in data or not data[key]:
-                ax.set_visible(False)
+                # Leave axis visible with gray fill and "n/a" so the reader
+                # can still see which row/col existed.
+                ax.set_xticks([])
+                ax.set_yticks([])
+                for spine in ax.spines.values():
+                    spine.set_visible(False)
+                ax.set_facecolor("#eeeeee")
+                ax.text(0.5, 0.5, "n/a", ha="center", va="center",
+                        fontsize=9, color="#888888", transform=ax.transAxes)
+                chin_label = chin.replace("chinchilla_", "")
+                ax.set_title(f'{chin_label}x / ep{epoch}', fontsize=8, fontweight='bold')
                 continue
 
             grid_data = data[key]
@@ -159,7 +156,6 @@ def generate_combined_figure(data, model_size: str, output_path: str):
             )
 
             # Highlight the best (lowest loss) cell
-            best_val = np.nanmin(loss_grid)
             best_idx = np.unravel_index(np.nanargmin(loss_grid), loss_grid.shape)
             ax.add_patch(plt.Rectangle(
                 (best_idx[1], best_idx[0]), 1, 1,
@@ -170,7 +166,7 @@ def generate_combined_figure(data, model_size: str, output_path: str):
             ax.set_title(f'{chin_label}x / ep{epoch}', fontsize=8, fontweight='bold')
 
             if c == 0:
-                ax.set_ylabel(f'WD', fontsize=7)
+                ax.set_ylabel('WD', fontsize=7)
             else:
                 ax.set_ylabel('')
                 ax.set_yticklabels([])
@@ -205,7 +201,7 @@ def generate_combined_figure(data, model_size: str, output_path: str):
     fig.suptitle(
         f'{model_size} — Validation Loss (WD vs LR)\n'
         f'Rows: Chinchilla multiplier (fresh data size)  |  Columns: Epochs\n'
-        f'Red box = best hyperparams per setting',
+        f'Red box = best hyperparams per setting  |  Gray = n/a',
         fontsize=12, fontweight='bold', y=1.02,
     )
 
@@ -229,7 +225,7 @@ def main():
     data = load_all_data(merged_path)
     print(f"Found {len(data)} (chinchilla, size, epoch) combinations")
 
-    for model_size in ["30M", "60M", "190M", "370M"]:
+    for model_size in MODEL_SIZES:
         print(f"\nGenerating {model_size} figure...")
         out_file = output_path / f"{model_size}_heatmap_grid.pdf"
         generate_combined_figure(data, model_size, str(out_file))

@@ -13,11 +13,11 @@
 #SBATCH -e ../slurm_out/slurm-%j_%a.out # Standard err goes to this file
 
 # Job array for hyperparameter sweep (pass --array=0-N when submitting to enable)
-##SBATCH --array=0-19
+##SBATCH --array=0-1
 
 # Define parameter grids for job array sweeps
 WD_VALUES=(0.1 0.2 0.4 0.8 1.6)
-LR_VALUES=(1e-4 3e-4 1e-3 3e-3)
+LR_VALUES=(1e-3 3e-3)
 
 # Set hyperparameters
 SEED=${SEED:-42}

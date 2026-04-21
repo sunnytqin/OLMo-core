@@ -95,6 +95,18 @@ VAL_TARGET = 500_000_000  # 0.5 B tokens
 # appear only once in the output — the merge step deduplicates by token count.
 # ---------------------------------------------------------------------------
 _PER_MODEL_SHARDS = {
+    "14M": {   # non-embedding params ≈ 14M; chin unit = 280M tokens
+        "train_0.014B.npy": (   14_000_000,   1),   # TTP=1   chin=0.05
+        "train_0.028B.npy": (   28_000_000,   2),   # TTP=2   chin=0.1
+        "train_0.07B.npy":  (   70_000_000,   5),   # TTP=5   chin=0.25
+        "train_0.14B.npy":  (  140_000_000,  10),   # TTP=10  chin=0.5
+        "train_0.28B.npy":  (  280_000_000,  20),   # TTP=20  chin=1
+        "train_0.56B.npy":  (  560_000_000,  40),   # TTP=40  chin=2
+        "train_1.12B.npy":  (1_120_000_000,  80),   # TTP=80  chin=4
+        "train_2.24B.npy":  (2_240_000_000, 160),   # TTP=160 chin=8
+        "train_4.48B.npy":  (4_480_000_000, 320),   # TTP=320 chin=16
+        "train_8.96B.npy":  (8_960_000_000, 640),   # TTP=640 chin=32
+    },
     "30M": {   # non-embedding params ≈ 30M; chin unit = 600M tokens
         "train_0.03B.npy":  (   30_000_000,   1),   # TTP=1
         "train_0.06B.npy":  (   60_000_000,   2),   # TTP=2
@@ -117,6 +129,17 @@ _PER_MODEL_SHARDS = {
         "train_9.6B.npy":   ( 9_600_000_000, 160),  # TTP=160 chin=8
         "train_19.2B.npy":  (19_200_000_000, 320),  # TTP=320 chin=16
     },
+    "100M": {  # non-embedding params ≈ 100M; chin unit = 2000M tokens
+        "train_0.1B.npy":   (   100_000_000,   1),  # TTP=1   chin=0.05
+        "train_0.2B.npy":   (   200_000_000,   2),  # TTP=2   chin=0.1
+        "train_0.5B.npy":   (   500_000_000,   5),  # TTP=5   chin=0.25
+        "train_1.0B.npy":   ( 1_000_000_000,  10),  # TTP=10  chin=0.5
+        "train_2.0B.npy":   ( 2_000_000_000,  20),  # TTP=20  chin=1
+        "train_4.0B.npy":   ( 4_000_000_000,  40),  # TTP=40  chin=2
+        "train_8.0B.npy":   ( 8_000_000_000,  80),  # TTP=80  chin=4
+        "train_16.0B.npy":  (16_000_000_000, 160),  # TTP=160 chin=8
+        "train_32.0B.npy":  (32_000_000_000, 320),  # TTP=320 chin=16
+    },
     "190M": {  # non-embedding params ≈ 190M; chin unit = 3800M tokens
         "train_0.19B.npy":  (   190_000_000,   1),  # TTP=1
         "train_0.38B.npy":  (   380_000_000,   2),  # TTP=2
@@ -138,7 +161,41 @@ _PER_MODEL_SHARDS = {
         "train_29.6B.npy":  (29_600_000_000,  80),  # TTP=80  chin=4
         "train_59.2B.npy":  (59_200_000_000, 160),  # TTP=160 chin=8
     },
+    "600M": {  # non-embedding params ≈ 600M; chin unit = 12000M tokens
+        "train_0.6B.npy":   (   600_000_000,   1),  # TTP=1   chin=0.05
+        "train_1.2B.npy":   ( 1_200_000_000,   2),  # TTP=2   chin=0.1
+        "train_3.0B.npy":   ( 3_000_000_000,   5),  # TTP=5   chin=0.25
+        "train_6.0B.npy":   ( 6_000_000_000,  10),  # TTP=10  chin=0.5
+        "train_12.0B.npy":  (12_000_000_000,  20),  # TTP=20  chin=1
+        "train_24.0B.npy":  (24_000_000_000,  40),  # TTP=40  chin=2
+        "train_48.0B.npy":  (48_000_000_000,  80),  # TTP=80  chin=4
+    },
 }
+
+# ---------------------------------------------------------------------------
+# Chunking: shards at or above CHUNK_THRESHOLD are written as multiple part
+# files (train_XB.part00.npy, train_XB.part01.npy, ...) so each part fits in
+# a reasonable SLURM wallclock.  Parts are contiguous slices of the same
+# globally-shuffled doc_order, so nested-prefix invariants are preserved
+# across shards of different sizes.
+# ---------------------------------------------------------------------------
+CHUNK_THRESHOLD = 20_000_000_000   # shards >= 20B get chunked into parts
+PART_TARGET     =  5_000_000_000   # target tokens per part (→ 24B: 5 parts, 29.6B: 6, 59.2B: 12, etc.)
+
+
+def num_parts_for(target_tokens: int) -> int:
+    """How many part files a shard of `target_tokens` should be written as."""
+    if target_tokens < CHUNK_THRESHOLD:
+        return 1
+    return max(1, int(np.ceil(target_tokens / PART_TARGET)))
+
+
+def part_filenames(shard_name: str, n_parts: int) -> list:
+    """Given 'train_29.6B.npy' and n_parts=6, return 6 'train_29.6B.partNN.npy' names."""
+    if n_parts == 1:
+        return [shard_name]
+    stem = shard_name[: -len(".npy")]
+    return [f"{stem}.part{i:02d}.npy" for i in range(n_parts)]
 
 # Merge: deduplicate by token count, sort ascending.
 # Smaller shards ⊆ larger shards because write_split always takes the first N
@@ -332,6 +389,48 @@ def find_doc_cutoff(
     return idx + 1, int(cumsum[idx])
 
 
+def slice_doc_order_into_parts(
+    doc_order:  np.ndarray,
+    doc_starts: np.ndarray,
+    doc_ends:   np.ndarray,
+    n_parts:    int,
+) -> list:
+    """
+    Split `doc_order` into n_parts contiguous slices carrying roughly equal
+    token counts.  Returns a list of (part_order, n_tokens) tuples.
+
+    Parts are contiguous prefixes of `doc_order`, so smaller-shard nesting
+    is preserved (the first part of a large shard equals the first part of
+    a smaller shard when both share the same underlying global pool).
+    """
+    if n_parts <= 1:
+        total = int((doc_ends[doc_order] - doc_starts[doc_order]).sum())
+        return [(doc_order, total)]
+
+    lengths = (doc_ends[doc_order] - doc_starts[doc_order]).astype(np.int64)
+    cumsum  = np.cumsum(lengths)
+    total   = int(cumsum[-1])
+
+    target_per_part = total / n_parts
+    boundaries = [0]
+    for i in range(1, n_parts):
+        target = int(round(target_per_part * i))
+        idx    = int(np.searchsorted(cumsum, target, side="left"))
+        idx    = min(idx, len(cumsum) - 1)
+        if idx <= boundaries[-1]:
+            idx = boundaries[-1] + 1
+        boundaries.append(idx)
+    boundaries.append(len(doc_order))
+
+    parts = []
+    for i in range(n_parts):
+        a, b = boundaries[i], boundaries[i + 1]
+        part_order  = doc_order[a:b]
+        part_tokens = int(lengths[a:b].sum())
+        parts.append((part_order, part_tokens))
+    return parts
+
+
 # ---------------------------------------------------------------------------
 # Writing splits
 # ---------------------------------------------------------------------------
@@ -432,7 +531,20 @@ def main():
         "--rebuild-index", action="store_true",
         help="Force rebuild the document index even if a valid cache exists.",
     )
+    parser.add_argument(
+        "--only", type=str, default=None,
+        help="Comma-separated list of shard or part names to write. "
+             "Accepts parent shard names (e.g. 'train_29.6B' → writes all its parts) "
+             "or individual parts (e.g. 'train_29.6B.part03'). "
+             "If set, all other shards are skipped even if missing. Useful for "
+             "SLURM array jobs that write one part per task.",
+    )
     args = parser.parse_args()
+
+    only_shards = set()
+    if args.only:
+        only_shards = {s.strip() for s in args.only.split(",")}
+        only_shards = {s if s.endswith(".npy") else s + ".npy" for s in only_shards}
 
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -556,7 +668,9 @@ def main():
         return True
 
     val_path = out_dir / "validation.npy"
-    if _should_write(val_path, "validation.npy"):
+    if only_shards and "validation.npy" not in only_shards:
+        print(f"  [SKIP] validation.npy (not in --only filter)")
+    elif _should_write(val_path, "validation.npy"):
         print(f"\n  [1/{total_shards}] validation  ({val_actual/1e9:.4f}B tokens, {val_n:,} docs)")
         idx_path = idx_dir / "validation_doc_indices.npz"
         _save_doc_indices(idx_path, val_order)
@@ -566,32 +680,72 @@ def main():
         print(f"    ✓ {idx_path}")
 
     for idx, (shard, shard_order, actual) in enumerate(assignments, start=2):
-        shard_path = out_dir / shard["name"]
-        label      = shard["name"].replace(".npy", "")
-        if _should_write(shard_path, shard["name"]):
+        label    = shard["name"].replace(".npy", "")
+        n_parts  = num_parts_for(shard["tokens"])
+        part_names = part_filenames(shard["name"], n_parts)
+
+        # --only filter: parent shard name (with or without .npy) expands to
+        # all its parts; an individual part name writes just that part.
+        if only_shards:
+            parent_match = shard["name"] in only_shards
+            active_parts = [p for p in part_names if parent_match or p in only_shards]
+            if not active_parts:
+                print(f"  [SKIP] {shard['name']} (not in --only filter)")
+                continue
+        else:
+            active_parts = part_names
+
+        # Slice the shard's doc_order into parts (no-op if n_parts == 1).
+        part_slices = slice_doc_order_into_parts(
+            shard_order, doc_starts, doc_ends, n_parts
+        )
+
+        if n_parts > 1:
             print(f"\n  [{idx}/{total_shards}] {label:<15}  "
-                  f"({actual/1e9:.4f}B tokens, {len(shard_order):,} docs)")
-            idx_path = idx_dir / shard["name"].replace(".npy", "_doc_indices.npz")
-            _save_doc_indices(idx_path, shard_order)
+                  f"({actual/1e9:.4f}B tokens, {len(shard_order):,} docs) → {n_parts} parts")
+
+        for part_name, (part_order, part_tokens) in zip(part_names, part_slices):
+            if part_name not in active_parts:
+                continue
+            part_path = out_dir / part_name
+            if not _should_write(part_path, part_name):
+                continue
+
+            if n_parts == 1:
+                print(f"\n  [{idx}/{total_shards}] {label:<15}  "
+                      f"({part_tokens/1e9:.4f}B tokens, {len(part_order):,} docs)")
+            else:
+                print(f"      → {part_name}  "
+                      f"({part_tokens/1e9:.4f}B tokens, {len(part_order):,} docs)")
+
+            idx_path = idx_dir / part_name.replace(".npy", "_doc_indices.npz")
+            _save_doc_indices(idx_path, part_order)
             write_split(files, doc_file_idx, doc_starts, doc_ends,
-                        shard_order, shard_path, args.chunk_tokens)
-            print(f"    ✓ {shard_path}")
+                        part_order, part_path, args.chunk_tokens)
+            print(f"    ✓ {part_path}")
             print(f"    ✓ {idx_path}")
 
     # ── Final report ─────────────────────────────────────────────────────────
     print("\n" + "=" * 72)
-    print("SUCCESS!  All splits written:")
+    print("SUCCESS!  Splits written:")
     if val_path.exists():
         sz = val_path.stat().st_size / 1e9
-        print(f"  {'validation.npy':<22}: {val_actual:>15,} tokens  ({sz:.2f} GB)")
+        print(f"  {'validation.npy':<26}: {val_actual:>15,} tokens  ({sz:.2f} GB)")
     for shard, shard_order, actual in assignments:
-        p  = out_dir / shard["name"]
-        sz = p.stat().st_size / 1e9 if p.exists() else 0.0
-        print(f"  {shard['name']:<22}: {actual:>15,} tokens  ({sz:.2f} GB)")
+        n_parts    = num_parts_for(shard["tokens"])
+        part_names = part_filenames(shard["name"], n_parts)
+        for part_name in part_names:
+            p  = out_dir / part_name
+            if p.exists():
+                sz = p.stat().st_size / 1e9
+                tok = p.stat().st_size // 4
+                print(f"  {part_name:<26}: {tok:>15,} tokens  ({sz:.2f} GB)")
 
     names = [s["name"].replace(".npy", "") for s, _, _ in assignments]
     print("\nNested structure (each ⊇ all to its right):")
     print("  " + " ⊇ ".join(reversed(names)))
+    print("  Chunked shards: each parent shard's parts concatenate (in order) "
+          "to form the full shard.")
     print("  All training splits are disjoint from validation.")
     print("=" * 72)
 

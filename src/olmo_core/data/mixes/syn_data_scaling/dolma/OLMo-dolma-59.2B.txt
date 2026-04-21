@@ -1,1 +1,12 @@
-dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_59.2B.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_59.2B.part00.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_59.2B.part01.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_59.2B.part02.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_59.2B.part03.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_59.2B.part04.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_59.2B.part05.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_59.2B.part06.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_59.2B.part07.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_59.2B.part08.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_59.2B.part09.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_59.2B.part10.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_59.2B.part11.npy

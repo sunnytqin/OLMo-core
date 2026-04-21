@@ -1,0 +1,1 @@
+{"checkpoints": [{"run_name": "370M_seed42_case4_dolma_epoch1_wd0.2_lr3e-3", "chinchilla_dir": "chinchilla_4", "model_size": "370M", "epoch": 1, "wd": "0.2", "lr": "3e-3", "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_4/370M_seed42_case4_dolma_epoch1_wd0.2_lr3e-3/step14115", "last_step": 14115, "complete": true}], "summary": {"total_valid": 1}}

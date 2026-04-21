@@ -5,21 +5,27 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
-# ---- Select model size: '30m', '370m', 'dolma_30m', 'dolma_60m', 'dolma_190m', 'dolma_370m' ----
+# ---- Select model size ----
 MODEL_SIZE = 'dolma_30m'
 
 if MODEL_SIZE == '30m':
     import dclm_30m as model_data
 elif MODEL_SIZE == '370m':
     import data_370m as model_data
+elif MODEL_SIZE == 'dolma_14m':
+    import dolma_14m as model_data
 elif MODEL_SIZE == 'dolma_30m':
     import dolma_30m as model_data
 elif MODEL_SIZE == 'dolma_60m':
     import dolma_60m as model_data
+elif MODEL_SIZE == 'dolma_100m':
+    import dolma_100m as model_data
 elif MODEL_SIZE == 'dolma_190m':
     import dolma_190m as model_data
 elif MODEL_SIZE == 'dolma_370m':
     import dolma_370m as model_data
+elif MODEL_SIZE == 'dolma_600m':
+    import dolma_600m as model_data
 else:
     raise ValueError(f'Unknown MODEL_SIZE: {MODEL_SIZE}')
 

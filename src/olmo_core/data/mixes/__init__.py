@@ -67,34 +67,58 @@ class DataMix(DataMixBase):
     OLMo_repeat64_synthetic6 = "OLMo-repeat64-synthetic6"
     OLMo_repeat64_synthetic13 = "OLMo-repeat64-synthetic13"
     OLMo_repeat64_synthetic64 = "OLMo-repeat64-synthetic64"
+    OLMo_dolma_0_014B = "OLMo-dolma-0.014B"
+    OLMo_dolma_0_028B = "OLMo-dolma-0.028B"
     OLMo_dolma_0_03B  = "OLMo-dolma-0.03B"
     OLMo_dolma_0_06B  = "OLMo-dolma-0.06B"
+    OLMo_dolma_0_07B  = "OLMo-dolma-0.07B"
+    OLMo_dolma_0_1B   = "OLMo-dolma-0.1B"
     OLMo_dolma_0_12B  = "OLMo-dolma-0.12B"
+    OLMo_dolma_0_14B  = "OLMo-dolma-0.14B"
     OLMo_dolma_0_15B  = "OLMo-dolma-0.15B"
+    OLMo_dolma_0_19B  = "OLMo-dolma-0.19B"
+    OLMo_dolma_0_2B   = "OLMo-dolma-0.2B"
+    OLMo_dolma_0_28B  = "OLMo-dolma-0.28B"
     OLMo_dolma_0_3B   = "OLMo-dolma-0.3B"
     OLMo_dolma_0_37B  = "OLMo-dolma-0.37B"
+    OLMo_dolma_0_38B  = "OLMo-dolma-0.38B"
+    OLMo_dolma_0_5B   = "OLMo-dolma-0.5B"
+    OLMo_dolma_0_56B  = "OLMo-dolma-0.56B"
     OLMo_dolma_0_6B   = "OLMo-dolma-0.6B"
     OLMo_dolma_0_74B  = "OLMo-dolma-0.74B"
+    OLMo_dolma_0_95B  = "OLMo-dolma-0.95B"
+    OLMo_dolma_1_0B   = "OLMo-dolma-1.0B"
+    OLMo_dolma_1_12B  = "OLMo-dolma-1.12B"
     OLMo_dolma_1_2B   = "OLMo-dolma-1.2B"
     OLMo_dolma_1_85B  = "OLMo-dolma-1.85B"
+    OLMo_dolma_1_9B   = "OLMo-dolma-1.9B"
+    OLMo_dolma_2_0B   = "OLMo-dolma-2.0B"
+    OLMo_dolma_2_24B  = "OLMo-dolma-2.24B"
     OLMo_dolma_2_4B   = "OLMo-dolma-2.4B"
+    OLMo_dolma_3_0B   = "OLMo-dolma-3.0B"
     OLMo_dolma_3_7B   = "OLMo-dolma-3.7B"
+    OLMo_dolma_3_8B   = "OLMo-dolma-3.8B"
+    OLMo_dolma_4_0B   = "OLMo-dolma-4.0B"
+    OLMo_dolma_4_48B  = "OLMo-dolma-4.48B"
     OLMo_dolma_4_8B   = "OLMo-dolma-4.8B"
+    OLMo_dolma_6_0B   = "OLMo-dolma-6.0B"
     OLMo_dolma_7_4B   = "OLMo-dolma-7.4B"
+    OLMo_dolma_7_6B   = "OLMo-dolma-7.6B"
+    OLMo_dolma_8_0B   = "OLMo-dolma-8.0B"
+    OLMo_dolma_8_96B  = "OLMo-dolma-8.96B"
     OLMo_dolma_9_6B   = "OLMo-dolma-9.6B"
+    OLMo_dolma_12_0B  = "OLMo-dolma-12.0B"
     OLMo_dolma_14_8B  = "OLMo-dolma-14.8B"
     OLMo_dolma_15_2B  = "OLMo-dolma-15.2B"
+    OLMo_dolma_16_0B  = "OLMo-dolma-16.0B"
     OLMo_dolma_19_2B  = "OLMo-dolma-19.2B"
+    OLMo_dolma_24_0B  = "OLMo-dolma-24.0B"
     OLMo_dolma_29_6B  = "OLMo-dolma-29.6B"
     OLMo_dolma_30_4B  = "OLMo-dolma-30.4B"
+    OLMo_dolma_32_0B  = "OLMo-dolma-32.0B"
+    OLMo_dolma_48_0B  = "OLMo-dolma-48.0B"
     OLMo_dolma_59_2B  = "OLMo-dolma-59.2B"
     OLMo_dolma_60_8B  = "OLMo-dolma-60.8B"
-    OLMo_dolma_0_19B  = "OLMo-dolma-0.19B"
-    OLMo_dolma_0_38B  = "OLMo-dolma-0.38B"
-    OLMo_dolma_0_95B  = "OLMo-dolma-0.95B"
-    OLMo_dolma_1_9B   = "OLMo-dolma-1.9B"
-    OLMo_dolma_3_8B   = "OLMo-dolma-3.8B"
-    OLMo_dolma_7_6B   = "OLMo-dolma-7.6B"
     OLMo_dolma_val    = "OLMo-dolma-val"
     dclm_validation = "dclm-validation"
     OLMo_mix_0625_700Bsample = "OLMo-mix-0625-700Bsample"
@@ -182,34 +206,58 @@ class DataMix(DataMixBase):
 # Mix files that live under the syn_data_scaling/dolma/ subfolder.
 _SYN_DATA_SCALING_DOLMA_MIXES = frozenset(
     {
+        "OLMo-dolma-0.014B",
+        "OLMo-dolma-0.028B",
         "OLMo-dolma-0.03B",
         "OLMo-dolma-0.06B",
+        "OLMo-dolma-0.07B",
+        "OLMo-dolma-0.1B",
         "OLMo-dolma-0.12B",
+        "OLMo-dolma-0.14B",
         "OLMo-dolma-0.15B",
+        "OLMo-dolma-0.19B",
+        "OLMo-dolma-0.2B",
+        "OLMo-dolma-0.28B",
         "OLMo-dolma-0.3B",
         "OLMo-dolma-0.37B",
+        "OLMo-dolma-0.38B",
+        "OLMo-dolma-0.5B",
+        "OLMo-dolma-0.56B",
         "OLMo-dolma-0.6B",
         "OLMo-dolma-0.74B",
+        "OLMo-dolma-0.95B",
+        "OLMo-dolma-1.0B",
+        "OLMo-dolma-1.12B",
         "OLMo-dolma-1.2B",
         "OLMo-dolma-1.85B",
+        "OLMo-dolma-1.9B",
+        "OLMo-dolma-2.0B",
+        "OLMo-dolma-2.24B",
         "OLMo-dolma-2.4B",
+        "OLMo-dolma-3.0B",
         "OLMo-dolma-3.7B",
+        "OLMo-dolma-3.8B",
+        "OLMo-dolma-4.0B",
+        "OLMo-dolma-4.48B",
         "OLMo-dolma-4.8B",
+        "OLMo-dolma-6.0B",
         "OLMo-dolma-7.4B",
+        "OLMo-dolma-7.6B",
+        "OLMo-dolma-8.0B",
+        "OLMo-dolma-8.96B",
         "OLMo-dolma-9.6B",
+        "OLMo-dolma-12.0B",
         "OLMo-dolma-14.8B",
         "OLMo-dolma-15.2B",
+        "OLMo-dolma-16.0B",
         "OLMo-dolma-19.2B",
+        "OLMo-dolma-24.0B",
         "OLMo-dolma-29.6B",
         "OLMo-dolma-30.4B",
+        "OLMo-dolma-32.0B",
+        "OLMo-dolma-48.0B",
         "OLMo-dolma-59.2B",
         "OLMo-dolma-60.8B",
-        "OLMo-dolma-0.19B",
-        "OLMo-dolma-0.38B",
-        "OLMo-dolma-0.95B",
-        "OLMo-dolma-1.9B",
-        "OLMo-dolma-3.8B",
-        "OLMo-dolma-7.6B",
         "OLMo-dolma-val",
     }
 )

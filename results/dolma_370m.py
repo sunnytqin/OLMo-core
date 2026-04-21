@@ -28,12 +28,12 @@ data_0_25x = {
 }
 
 data_0_5x = {
-    'chinchilla_scale': [0.5, 0.5, 0.5, 0.5, 0.5],
-    'epochs': [1, 2, 4, 8, 16],
-    'flops_multiplier': [0.5, 1.0, 2.0, 4.0, 8.0],
-    'validation_loss': [3.1976, 2.9057, 2.7548, 2.6704, 2.6763],
-    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
-    'weight_decay': [0.2, 0.2, 0.2, 0.2, 0.4],
+    'chinchilla_scale': [0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+    'epochs': [1, 2, 4, 8, 16, 32],
+    'flops_multiplier': [0.5, 1.0, 2.0, 4.0, 8.0, 16.0],
+    'validation_loss': [3.1976, 2.9057, 2.7548, 2.6704, 2.6763, 2.6602],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.2, 0.2, 0.2, 0.2, 0.4, 0.4],
 }
 
 data_1x = {

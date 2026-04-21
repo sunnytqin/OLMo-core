@@ -1,0 +1,38 @@
+{
+  "60M_seed42_case4_dolma_epoch16_wd0.2_lr1e-3": {
+    "validation_loss": 3.337355861305709,
+    "perplexity": 28.144609451293945,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "60M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3": {
+    "validation_loss": 4.905882357116658,
+    "perplexity": 135.08204650878906,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "60M_seed42_case4_dolma_epoch32_wd0.4_lr1e-3": {
+    "validation_loss": 3.3003683735806777,
+    "perplexity": 27.12262725830078,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "60M_seed42_case4_dolma_epoch4_wd0.1_lr1e-3": {
+    "validation_loss": 3.6322173841363217,
+    "perplexity": 37.79653549194336,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "60M_seed42_case4_dolma_epoch64_wd0.4_lr1e-3": {
+    "validation_loss": 3.272275870904815,
+    "perplexity": 26.37129020690918,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "60M_seed42_case4_dolma_epoch8_wd0.1_lr1e-3": {
+    "validation_loss": 3.4454003300120655,
+    "perplexity": 31.355831146240234,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  }
+}

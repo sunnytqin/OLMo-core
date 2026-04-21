@@ -8,11 +8,14 @@ EVALS_DIR="../dolma_val_loss"
 MERGED_DIR="merged"
 HEATMAPS_DIR="heatmaps"
 
+MODEL_SIZES=("14M" "30M" "60M" "190M" "370M")
+CHIN_DIRS=(chinchilla_0.05 chinchilla_0.1 chinchilla_0.25 chinchilla_0.5 chinchilla_1 chinchilla_2 chinchilla_4 chinchilla_8 chinchilla_16)
+
 mkdir -p "$MERGED_DIR"
 
 echo "=== Merging individual eval results ==="
-for chin in chinchilla_0.05 chinchilla_0.1 chinchilla_0.25 chinchilla_0.5 chinchilla_1 chinchilla_2 chinchilla_4; do
-    for size in 30M 190M 370M; do
+for chin in "${CHIN_DIRS[@]}"; do
+    for size in "${MODEL_SIZES[@]}"; do
         indir="$EVALS_DIR/$chin/$size"
         if [ -d "$indir" ]; then
             outfile="$MERGED_DIR/${chin}_${size}.json"

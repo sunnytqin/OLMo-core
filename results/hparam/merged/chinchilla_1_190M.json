@@ -1,0 +1,68 @@
+{
+  "190M_seed42_case4_dolma_epoch16_wd0.1_lr3e-3": {
+    "validation_loss": 2.777938814419464,
+    "perplexity": 16.085830688476562,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "190M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3": {
+    "validation_loss": 3.3310148131808233,
+    "perplexity": 27.96670913696289,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "190M_seed42_case4_dolma_epoch1_wd0.1_lr3e-3": {
+    "validation_loss": 3.3349948781887697,
+    "perplexity": 28.078237533569336,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "190M_seed42_case4_dolma_epoch2_wd0.1_lr1e-3": {
+    "validation_loss": 3.0883134428558017,
+    "perplexity": 21.940040588378906,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "190M_seed42_case4_dolma_epoch2_wd0.1_lr3e-3": {
+    "validation_loss": 3.0389929389302663,
+    "perplexity": 20.884199142456055,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "190M_seed42_case4_dolma_epoch4_wd0.1_lr3e-3": {
+    "validation_loss": 2.88980967394908,
+    "perplexity": 17.989883422851562,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "190M_seed42_case4_dolma_epoch4_wd0.2_lr3e-3": {
+    "validation_loss": 2.8826779609574973,
+    "perplexity": 17.862043380737305,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "190M_seed42_case4_dolma_epoch4_wd0.4_lr3e-3": {
+    "validation_loss": 2.9048390125872374,
+    "perplexity": 18.262304306030273,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "190M_seed42_case4_dolma_epoch4_wd0.8_lr3e-3": {
+    "validation_loss": 2.9890180500373047,
+    "perplexity": 19.86616325378418,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "190M_seed42_case4_dolma_epoch4_wd1.6_lr3e-3": {
+    "validation_loss": 3.187220186005794,
+    "perplexity": 24.22100257873535,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "190M_seed42_case4_dolma_epoch8_wd0.4_lr3e-3": {
+    "validation_loss": 2.850157861736703,
+    "perplexity": 17.29051399230957,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  }
+}

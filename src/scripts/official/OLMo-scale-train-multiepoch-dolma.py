@@ -54,10 +54,13 @@ from olmo_core.train.train_module import (
 #   base_tokens = approx_params * 20
 # ---------------------------------------------------------------------------
 _MODEL_REGISTRY = {
-    "30M":  (TransformerConfig.olmo3_30M,  30_000_000),
-    "60M":  (TransformerConfig.olmo3_60M,  60_000_000),
+    "14M":  (TransformerConfig.olmo3_14M,   14_000_000),
+    "30M":  (TransformerConfig.olmo3_30M,   30_000_000),
+    "60M":  (TransformerConfig.olmo3_60M,   60_000_000),
+    "100M": (TransformerConfig.olmo3_100M, 100_000_000),
     "190M": (TransformerConfig.olmo3_190M, 190_000_000),
     "370M": (TransformerConfig.olmo3_370M, 370_000_000),
+    "600M": (TransformerConfig.olmo3_600M, 600_000_000),
 }
 
 # ---------------------------------------------------------------------------
@@ -73,6 +76,17 @@ _MODEL_REGISTRY = {
 #   370M * 20 * chin -> 7400M * chin
 # ---------------------------------------------------------------------------
 _DATASET_LOOKUP = {
+    # 14M model (280M tokens per chinchilla unit)
+    ("14M", 0.05): DataMix.OLMo_dolma_0_014B,  #  14M tokens
+    ("14M", 0.1):  DataMix.OLMo_dolma_0_028B,  #  28M tokens
+    ("14M", 0.25): DataMix.OLMo_dolma_0_07B,   #  70M tokens
+    ("14M", 0.5):  DataMix.OLMo_dolma_0_14B,   # 140M tokens
+    ("14M", 1):    DataMix.OLMo_dolma_0_28B,   # 280M tokens
+    ("14M", 2):    DataMix.OLMo_dolma_0_56B,   # 560M tokens
+    ("14M", 4):    DataMix.OLMo_dolma_1_12B,   # 1.12B tokens
+    ("14M", 8):    DataMix.OLMo_dolma_2_24B,   # 2.24B tokens
+    ("14M", 16):   DataMix.OLMo_dolma_4_48B,   # 4.48B tokens
+    ("14M", 32):   DataMix.OLMo_dolma_8_96B,   # 8.96B tokens
     # 30M model (600M tokens per chinchilla unit)
     ("30M", 0.05): DataMix.OLMo_dolma_0_03B,   #  30M tokens
     ("30M", 0.1):  DataMix.OLMo_dolma_0_06B,   #  60M tokens
@@ -93,16 +107,26 @@ _DATASET_LOOKUP = {
     ("60M", 4):    DataMix.OLMo_dolma_4_8B,    # 4.8B tokens
     ("60M", 8):    DataMix.OLMo_dolma_9_6B,    # 9.6B tokens
     ("60M", 16):   DataMix.OLMo_dolma_19_2B,   # 19.2B tokens
+    # 100M model (2000M tokens per chinchilla unit)
+    ("100M", 0.05): DataMix.OLMo_dolma_0_1B,   #  100M tokens
+    ("100M", 0.1):  DataMix.OLMo_dolma_0_2B,   #  200M tokens
+    ("100M", 0.25): DataMix.OLMo_dolma_0_5B,   #  500M tokens
+    ("100M", 0.5):  DataMix.OLMo_dolma_1_0B,   #  1.0B tokens
+    ("100M", 1):    DataMix.OLMo_dolma_2_0B,   #  2.0B tokens
+    ("100M", 2):    DataMix.OLMo_dolma_4_0B,   #  4.0B tokens
+    ("100M", 4):    DataMix.OLMo_dolma_8_0B,   #  8.0B tokens
+    ("100M", 8):    DataMix.OLMo_dolma_16_0B,  # 16.0B tokens
+    ("100M", 16):   DataMix.OLMo_dolma_32_0B,  # 32.0B tokens (7 parts)
     # 190M model (3800M tokens per chinchilla unit)
     ("190M", 0.05): DataMix.OLMo_dolma_0_19B,  #  190M tokens
     ("190M", 0.1):  DataMix.OLMo_dolma_0_38B,  #  380M tokens
     ("190M", 0.25): DataMix.OLMo_dolma_0_95B,  #  950M tokens
     ("190M", 0.5):  DataMix.OLMo_dolma_1_9B,   #  1.9B tokens
     ("190M", 1):    DataMix.OLMo_dolma_3_8B,   #  3.8B tokens
-    ("190M", 2):    DataMix.OLMo_dolma_7_6B,   #  7.6B tokens
-    ("190M", 4):    DataMix.OLMo_dolma_15_2B,  # 15.2B tokens
-    ("190M", 8):    DataMix.OLMo_dolma_30_4B,  # 30.4B tokens
-    ("190M", 16):   DataMix.OLMo_dolma_60_8B,  # 60.8B tokens
+    ("190M", 2):    DataMix.OLMo_dolma_7_4B,   #  7.4B tokens (approx 7.6B)
+    ("190M", 4):    DataMix.OLMo_dolma_14_8B,  # 14.8B tokens (approx 15.2B)
+    ("190M", 8):    DataMix.OLMo_dolma_29_6B,  # 29.6B tokens (approx 30.4B, reusing 370M chin=4 shards)
+    ("190M", 16):   DataMix.OLMo_dolma_59_2B,  # 59.2B tokens (approx 60.8B, reusing 370M chin=8 shards)
     # 370M model (7400M tokens per chinchilla unit)
     ("370M", 0.05): DataMix.OLMo_dolma_0_37B,  #  370M tokens
     ("370M", 0.1):  DataMix.OLMo_dolma_0_74B,  #  740M tokens
@@ -110,8 +134,16 @@ _DATASET_LOOKUP = {
     ("370M", 0.5):  DataMix.OLMo_dolma_3_7B,   #  3.7B tokens
     ("370M", 1):    DataMix.OLMo_dolma_7_4B,   #  7.4B tokens
     ("370M", 2):    DataMix.OLMo_dolma_14_8B,  # 14.8B tokens
-    ("370M", 4):    DataMix.OLMo_dolma_29_6B,  # 29.6B tokens
-    ("370M", 8):    DataMix.OLMo_dolma_59_2B,  # 59.2B tokens
+    ("370M", 4):    DataMix.OLMo_dolma_29_6B,  # 29.6B tokens (6 parts)
+    ("370M", 8):    DataMix.OLMo_dolma_59_2B,  # 59.2B tokens (12 parts)
+    # 600M model (12000M tokens per chinchilla unit)
+    ("600M", 0.05): DataMix.OLMo_dolma_0_6B,   #  600M tokens
+    ("600M", 0.1):  DataMix.OLMo_dolma_1_2B,   #  1.2B tokens
+    ("600M", 0.25): DataMix.OLMo_dolma_3_0B,   #  3.0B tokens
+    ("600M", 0.5):  DataMix.OLMo_dolma_6_0B,   #  6.0B tokens
+    ("600M", 1):    DataMix.OLMo_dolma_12_0B,  #  12.0B tokens
+    ("600M", 2):    DataMix.OLMo_dolma_24_0B,  #  24.0B tokens (5 parts)
+    ("600M", 4):    DataMix.OLMo_dolma_48_0B,  #  48.0B tokens (10 parts)
 }
 
 

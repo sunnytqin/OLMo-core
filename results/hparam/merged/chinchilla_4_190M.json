@@ -1,0 +1,20 @@
+{
+  "190M_seed42_case4_dolma_epoch1_wd0.1_lr3e-3": {
+    "validation_loss": 2.877827028149277,
+    "perplexity": 17.775604248046875,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "190M_seed42_case4_dolma_epoch2_wd0.1_lr3e-3": {
+    "validation_loss": 2.78961683418226,
+    "perplexity": 16.274782180786133,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "190M_seed42_case4_dolma_epoch4_wd0.1_lr3e-3": {
+    "validation_loss": 2.7381121382698885,
+    "perplexity": 15.457776069641113,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  }
+}

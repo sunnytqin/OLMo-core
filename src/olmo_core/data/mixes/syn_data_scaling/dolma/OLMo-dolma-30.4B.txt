@@ -1,1 +1,7 @@
-dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_30.4B.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_30.4B.part00.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_30.4B.part01.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_30.4B.part02.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_30.4B.part03.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_30.4B.part04.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_30.4B.part05.npy
+dolma,preprocessed/dolma2-0625/resharded/{TOKENIZER}/train_30.4B.part06.npy
