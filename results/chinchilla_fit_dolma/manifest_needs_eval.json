@@ -1,163 +1,31 @@
 {
   "checkpoints": [
     {
-      "run_name": "14M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3",
-      "chinchilla_dir": "chinchilla_0.25",
-      "model_size": "14M",
+      "run_name": "100M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3",
+      "chinchilla_dir": "chinchilla_2",
+      "model_size": "100M",
       "epoch": 1,
       "wd": "0.1",
       "lr": "1e-3",
-      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/14M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3/step34",
-      "last_step": 34,
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_2/100M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3/step1908",
+      "last_step": 1908,
       "complete": true,
       "has_eval": false
     },
     {
-      "run_name": "14M_seed42_case4_dolma_epoch1_wd0.2_lr1e-3",
-      "chinchilla_dir": "chinchilla_0.25",
-      "model_size": "14M",
-      "epoch": 1,
-      "wd": "0.2",
-      "lr": "1e-3",
-      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/14M_seed42_case4_dolma_epoch1_wd0.2_lr1e-3/step34",
-      "last_step": 34,
-      "complete": true,
-      "has_eval": false
-    },
-    {
-      "run_name": "14M_seed42_case4_dolma_epoch1_wd0.4_lr1e-3",
-      "chinchilla_dir": "chinchilla_0.25",
-      "model_size": "14M",
-      "epoch": 1,
-      "wd": "0.4",
-      "lr": "1e-3",
-      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/14M_seed42_case4_dolma_epoch1_wd0.4_lr1e-3/step34",
-      "last_step": 34,
-      "complete": true,
-      "has_eval": false
-    },
-    {
-      "run_name": "14M_seed42_case4_dolma_epoch1_wd0.8_lr1e-3",
-      "chinchilla_dir": "chinchilla_0.25",
-      "model_size": "14M",
-      "epoch": 1,
-      "wd": "0.8",
-      "lr": "1e-3",
-      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/14M_seed42_case4_dolma_epoch1_wd0.8_lr1e-3/step34",
-      "last_step": 34,
-      "complete": true,
-      "has_eval": false
-    },
-    {
-      "run_name": "14M_seed42_case4_dolma_epoch1_wd0.8_lr3e-3",
-      "chinchilla_dir": "chinchilla_0.25",
-      "model_size": "14M",
-      "epoch": 1,
-      "wd": "0.8",
-      "lr": "3e-3",
-      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/14M_seed42_case4_dolma_epoch1_wd0.8_lr3e-3/step34",
-      "last_step": 34,
-      "complete": true,
-      "has_eval": false
-    },
-    {
-      "run_name": "14M_seed42_case4_dolma_epoch1_wd1.6_lr1e-3",
-      "chinchilla_dir": "chinchilla_0.25",
-      "model_size": "14M",
-      "epoch": 1,
-      "wd": "1.6",
-      "lr": "1e-3",
-      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/14M_seed42_case4_dolma_epoch1_wd1.6_lr1e-3/step34",
-      "last_step": 34,
-      "complete": true,
-      "has_eval": false
-    },
-    {
-      "run_name": "14M_seed42_case4_dolma_epoch1_wd1.6_lr3e-3",
-      "chinchilla_dir": "chinchilla_0.25",
-      "model_size": "14M",
-      "epoch": 1,
-      "wd": "1.6",
-      "lr": "3e-3",
-      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/14M_seed42_case4_dolma_epoch1_wd1.6_lr3e-3/step34",
-      "last_step": 34,
-      "complete": true,
-      "has_eval": false
-    },
-    {
-      "run_name": "14M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3",
-      "chinchilla_dir": "chinchilla_0.5",
-      "model_size": "14M",
+      "run_name": "100M_seed42_case4_dolma_epoch1_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_2",
+      "model_size": "100M",
       "epoch": 1,
       "wd": "0.1",
-      "lr": "1e-3",
-      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/14M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3/step67",
-      "last_step": 67,
-      "complete": true,
-      "has_eval": false
-    },
-    {
-      "run_name": "14M_seed42_case4_dolma_epoch1_wd0.2_lr1e-3",
-      "chinchilla_dir": "chinchilla_0.5",
-      "model_size": "14M",
-      "epoch": 1,
-      "wd": "0.2",
-      "lr": "1e-3",
-      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/14M_seed42_case4_dolma_epoch1_wd0.2_lr1e-3/step67",
-      "last_step": 67,
-      "complete": true,
-      "has_eval": false
-    },
-    {
-      "run_name": "14M_seed42_case4_dolma_epoch1_wd0.8_lr1e-3",
-      "chinchilla_dir": "chinchilla_0.5",
-      "model_size": "14M",
-      "epoch": 1,
-      "wd": "0.8",
-      "lr": "1e-3",
-      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/14M_seed42_case4_dolma_epoch1_wd0.8_lr1e-3/step67",
-      "last_step": 67,
-      "complete": true,
-      "has_eval": false
-    },
-    {
-      "run_name": "14M_seed42_case4_dolma_epoch1_wd0.8_lr3e-3",
-      "chinchilla_dir": "chinchilla_0.5",
-      "model_size": "14M",
-      "epoch": 1,
-      "wd": "0.8",
       "lr": "3e-3",
-      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/14M_seed42_case4_dolma_epoch1_wd0.8_lr3e-3/step67",
-      "last_step": 67,
-      "complete": true,
-      "has_eval": false
-    },
-    {
-      "run_name": "14M_seed42_case4_dolma_epoch1_wd1.6_lr1e-3",
-      "chinchilla_dir": "chinchilla_0.5",
-      "model_size": "14M",
-      "epoch": 1,
-      "wd": "1.6",
-      "lr": "1e-3",
-      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/14M_seed42_case4_dolma_epoch1_wd1.6_lr1e-3/step67",
-      "last_step": 67,
-      "complete": true,
-      "has_eval": false
-    },
-    {
-      "run_name": "14M_seed42_case4_dolma_epoch16_wd0.1_lr3e-3",
-      "chinchilla_dir": "chinchilla_8",
-      "model_size": "14M",
-      "epoch": 16,
-      "wd": "0.1",
-      "lr": "3e-3",
-      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_8/14M_seed42_case4_dolma_epoch16_wd0.1_lr3e-3/step17090",
-      "last_step": 17090,
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_2/100M_seed42_case4_dolma_epoch1_wd0.1_lr3e-3/step1908",
+      "last_step": 1908,
       "complete": true,
       "has_eval": false
     }
   ],
   "summary": {
-    "total": 13
+    "total": 2
   }
 }

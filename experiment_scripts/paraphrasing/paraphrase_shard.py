@@ -28,13 +28,34 @@ os.environ["HF_HOME"] = "/n/netscratch/barak_lab/Lab/sqin/cache"
 EOS_TOKEN_ID = 100257
 MODEL_NAME = "allenai/OLMo-3-7B-Instruct"
 
-SYSTEM_PROMPT = "Provide direct and detailed response to the instructions without adding additional notes."
+SYSTEM_PROMPT = (
+    "You paraphrase documents faithfully and at the same length as the input. "
+    "You are NOT a summarizer. Every fact, number, name, date, URL, equation, "
+    "and technical detail in the source must appear in the output. Never add "
+    "information not in the source. Only change wording and sentence structure.\n\n"
+    "Output ONLY the rephrased text itself. Do not include any preamble, "
+    "acknowledgement, meta-commentary about the process, word counts, "
+    "explanations of what you did, or wrapper headings like 'Paraphrased "
+    "version:' or 'Here is...'. Start your response directly with the first "
+    "sentence of the paraphrase."
+)
 
 USER_PROMPT_TEMPLATE = (
-    "For the following document, regardless of its original content or formatting, "
-    "write a full article of the same content in high quality English language as in "
-    "texts on Wikipedia: {text}. Provide the rephrased article without any additional "
-    "notes. Long article with full length and complete details. Rephrased article:"
+    "Rephrase the following document in the clear, encyclopedic prose style of "
+    "Wikipedia. You are PARAPHRASING, not summarizing — the output MUST be "
+    "approximately the same length as the input (aim for 90–110% of the original "
+    "length; do NOT shorten or compress).\n\n"
+    "Strict rules:\n"
+    "- Preserve every fact, claim, number, name, date, URL, equation, code "
+    "snippet, and technical detail from the source.\n"
+    "- Do not add any information (no invented URLs, dates, names, "
+    "interpretations, transitions, or context).\n"
+    "- Do not drop information. If the source contains equations, code, tables, "
+    "or lists, preserve them.\n"
+    "- Only change phrasing and sentence structure. Length and information "
+    "content must match the original.\n\n"
+    "Original document (~{n_words} words):\n{text}\n\n"
+    "Rephrased version (same length, same information, new phrasing):"
 )
 
 
@@ -80,7 +101,8 @@ def extract_shard_documents(arr, shard_id, num_shards, subsample=1):
 
 def format_prompt(text, model_tokenizer):
     """Format a single chat prompt for paraphrasing."""
-    user_msg = USER_PROMPT_TEMPLATE.format(text=text)
+    n_words = len(text.split())
+    user_msg = USER_PROMPT_TEMPLATE.format(text=text, n_words=n_words)
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_msg},
@@ -90,13 +112,55 @@ def format_prompt(text, model_tokenizer):
     )
 
 
+PREAMBLE_OPENERS = (
+    "Here is", "Here's", "Here follows", "Below is",
+    "The following is", "I have", "I'll", "Let me",
+    "Sure,", "Certainly,", "Of course,",
+)
+
+
+def strip_preamble(text: str) -> str:
+    """
+    Remove LLM meta-preamble ("Here is your paraphrased version:\n\n---\n\n...") when
+    the model ignores the no-preamble instruction. Conservative: only strips when
+    the first line starts with a known acknowledgment opener AND a clean boundary
+    is present. Leaves ambiguous text alone.
+    """
+    text = text.strip()
+    if not text:
+        return text
+    first_nl = text.find("\n")
+    if first_nl < 0:
+        return text
+    first_line = text[:first_nl]
+    if not any(first_line.startswith(p) for p in PREAMBLE_OPENERS):
+        return text
+    # Pattern 1: explicit "---" separator (very common)
+    sep = text.find("\n---\n")
+    if 0 < sep < 600:
+        return text[sep + len("\n---\n"):].lstrip()
+    sep = text.find("\n---")
+    if 0 < sep < 600 and text[sep:sep+8] in ("\n---\n\n", "\n---\n", "\n----\n"):
+        return text[sep:].lstrip("-\n ")
+    # Pattern 2: first line (the acknowledgment) ends with ":" — content starts next
+    if first_line.rstrip().endswith(":"):
+        return text[first_nl + 1:].lstrip()
+    # Pattern 3: acknowledgment paragraph is followed by a blank line within 500 chars
+    para_break = text.find("\n\n")
+    if 0 < para_break < 500:
+        return text[para_break + 2:].lstrip()
+    # No confident boundary — leave text alone rather than risk dropping real content
+    return text
+
+
 def tokenize_to_npy(texts, dolma2_tok, output_path):
     """Re-tokenize paraphrased texts and save as .npy (uint32 memmap)."""
     all_tokens = []
     for text in texts:
         if not text or not text.strip():
             continue
-        token_ids = dolma2_tok.encode(text.strip()).ids
+        cleaned = strip_preamble(text)
+        token_ids = dolma2_tok.encode(cleaned).ids
         token_ids.append(EOS_TOKEN_ID)
         all_tokens.extend(token_ids)
 
@@ -136,9 +200,13 @@ def main():
     parser.add_argument("--output-dir", type=str, required=True, help="Output directory for shard .npy files")
     parser.add_argument("--shard-id", type=int, required=True)
     parser.add_argument("--num-shards", type=int, default=16)
-    parser.add_argument("--subsample", type=int, default=2, help="Paraphrase every Nth document (2 = every other doc for ~2:1 ratio)")
+    parser.add_argument("--subsample", type=int, default=1, help="Paraphrase every Nth document (1 = every doc, 2 = every other)")
     parser.add_argument("--max-model-len", type=int, default=16384, help="Max total sequence length (input + output) for vLLM")
     parser.add_argument("--batch-size", type=int, default=500, help="Number of documents to process per vLLM batch")
+    parser.add_argument("--seed", type=int, default=0, help="Sampling seed (use different seeds for multiple paraphrases of the same data)")
+    parser.add_argument("--temperature", type=float, default=1.0, help="Sampling temperature")
+    parser.add_argument("--top-p", type=float, default=0.95, help="Top-p (nucleus) sampling cutoff")
+    parser.add_argument("--max-output-tokens", type=int, default=None, help="Max generation tokens (default: max_model_len)")
     parser.add_argument("--resume", action="store_true", help="Resume from checkpoint")
     args = parser.parse_args()
 
@@ -188,9 +256,10 @@ def main():
         max_model_len=args.max_model_len,
     )
     sampling_params = SamplingParams(
-        temperature=0.7,
-        top_p=0.95,
-        max_tokens=args.max_model_len,
+        temperature=args.temperature,
+        top_p=args.top_p,
+        max_tokens=args.max_output_tokens if args.max_output_tokens is not None else args.max_model_len,
+        seed=args.seed,
     )
 
     # --- 4. Process in chunks ---
