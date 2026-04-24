@@ -1,0 +1,516 @@
+"""
+η fitting for multi-epoch Dolma runs, across all model sizes.
+
+For each size with multi-epoch data, fit
+
+    L = E_eff(N) + B / (D + η(D, D'; N) · D')^β
+
+using the joint-Chinchilla anchors (E, A, B, α, β) — so E_eff(N) = E + A/N^α
+and (B, β) are shared across sizes. This lets η be compared across sizes
+on a consistent footing.
+
+Reports per-size η parameters for each candidate form, plus a joint fit
+that pools multi-epoch data across all sizes (testing whether a single
+(c, γ, b) captures the full N × D × D' dependence).
+
+η forms:
+  const           η = c
+  power(D/N)      η = c · (D/N)^(−γ)
+  power(D'/D)     η = c · (D'/D)^(−γ)
+  sat(D'/D)       η = c / (1 + b · D'/D)           [saturating in D'/D]
+  sat × (D/N)     η = c · (D/N)^(−γ) / (1 + b · D'/D)      ← best from 30M
+  double power    η = c · (D/N)^(−γ₁) · (D'/D)^(−γ₂)
+
+Fit machinery: LSE + Huber(δ=1e-3) + L-BFGS + grid-search init.
+"""
+
+import os
+import sys
+from typing import Callable, Dict, List, Tuple
+
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+from matplotlib.ticker import FuncFormatter
+
+sys.path.insert(0, os.path.dirname(__file__))
+
+from data import (DEFAULT_SCALE_MIN, OVERFIT_EXCLUDE, SIZES, TTP_RATIO,  # noqa: E402
+                  extract_multi_epoch, load)
+from fit_chinchilla_joint import fit_joint, collect_1epoch_all_sizes  # noqa: E402
+from fit_lse import expand_grid, fit_lse, logsumexp_stable  # noqa: E402
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DELTA = 1e-3       # η fit — Besiroglu-style L1-ish Huber
+SCALE_MIN = DEFAULT_SCALE_MIN
+
+FONT_LABEL, FONT_TICK, FONT_LEGEND, FONT_TITLE = 15, 12, 10, 17
+
+
+# ──────────────────────────────────────────────────────────────────────
+# η forms
+# ──────────────────────────────────────────────────────────────────────
+
+def _eta_const(p, D, Dp, N):       return p["c"] * torch.ones_like(D)
+def _eta_pow_DoverN(p, D, Dp, N):  return p["c"] * (D / N) ** (-p["gamma"])
+def _eta_pow_DpoverD(p, D, Dp, N): return p["c"] * (Dp / D) ** (-p["gamma"])
+def _eta_sat_DpoverD(p, D, Dp, N): return p["c"] / (1.0 + p["b"] * (Dp / D))
+
+def _eta_sat_mul_DoverN(p, D, Dp, N):
+    return p["c"] * (D / N) ** (-p["gamma"]) / (1.0 + p["b"] * (Dp / D))
+
+def _eta_double_power(p, D, Dp, N):
+    return p["c"] * (D / N) ** (-p["gamma1"]) * (Dp / D) ** (-p["gamma2"])
+
+
+# N-dependent saturation: b_eff = b0 · (N/N_ref)^κ.  Captures the observed
+# trend that larger models saturate faster (b rises with N per-size fits).
+_N_REF = 30e6
+
+
+def _eta_sat_Nb(p, D, Dp, N):
+    N_ref = torch.tensor(_N_REF, dtype=N.dtype)
+    b_eff = p["b0"] * (N / N_ref) ** p["kappa"]
+    return p["c"] * (D / N) ** (-p["gamma"]) / (1.0 + b_eff * (Dp / D))
+
+
+FORMS: Dict[str, dict] = {
+    "const": dict(
+        fn=_eta_const,
+        grid=expand_grid({"c": [0.02, 0.05, 0.1, 0.2, 0.4, 0.7, 1.0, 1.5, 2.5]}),
+        desc="η = c",
+    ),
+    "power(D/N)": dict(
+        fn=_eta_pow_DoverN,
+        grid=expand_grid({
+            "c":     [0.05, 0.2, 0.5, 1.0, 2.5, 5.0, 15.0, 40.0],
+            "gamma": [-0.2, 0.0, 0.15, 0.3, 0.5, 0.8, 1.2, 1.6],
+        }),
+        desc="η = c · (D/N)^(−γ)",
+    ),
+    "power(D'/D)": dict(
+        fn=_eta_pow_DpoverD,
+        grid=expand_grid({
+            "c":     [0.05, 0.2, 0.5, 1.0, 2.0, 4.0, 8.0],
+            "gamma": [-0.3, -0.1, 0.0, 0.2, 0.4, 0.6, 0.9, 1.3],
+        }),
+        desc="η = c · (D'/D)^(−γ)",
+    ),
+    "sat(D'/D)": dict(
+        fn=_eta_sat_DpoverD,
+        grid=expand_grid({
+            "c": [0.2, 0.5, 1.0, 2.0, 4.0, 10.0, 30.0, 80.0],
+            "b": [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0],
+        }),
+        desc="η = c / (1 + b · D'/D)",
+    ),
+    "sat × (D/N)": dict(
+        fn=_eta_sat_mul_DoverN,
+        grid=expand_grid({
+            "c":     [0.5, 2.0, 6.0, 15.0, 40.0],
+            "gamma": [0.0, 0.2, 0.4, 0.7, 1.1],
+            "b":     [0.003, 0.03, 0.1, 0.3, 1.0],
+        }),
+        desc="η = c · (D/N)^(−γ) / (1 + b · D'/D)",
+    ),
+    "double power": dict(
+        fn=_eta_double_power,
+        grid=expand_grid({
+            "c":      [0.1, 0.5, 2.0, 8.0, 25.0],
+            "gamma1": [-0.2, 0.0, 0.3, 0.6, 1.0],
+            "gamma2": [-0.2, 0.0, 0.3, 0.6, 1.0],
+        }),
+        desc="η = c · (D/N)^(−γ₁) · (D'/D)^(−γ₂)",
+    ),
+    "sat × (D/N), b(N)": dict(
+        fn=_eta_sat_Nb,
+        grid=expand_grid({
+            "c":     [0.5, 2.0, 6.0, 15.0, 40.0],
+            "gamma": [0.0, 0.2, 0.4, 0.7, 1.1],
+            "b0":    [0.01, 0.05, 0.2, 1.0],
+            "kappa": [0.0, 0.5, 1.0, 1.5],
+        }),
+        desc=f"η = c · (D/N)^(−γ) / (1 + b₀·(N/{_N_REF:.0e})^κ · D'/D)",
+    ),
+}
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Fit machinery
+# ──────────────────────────────────────────────────────────────────────
+
+def _make_forward(eta_fn, D_np, Dp_np, N_np, E_eff_np, B, beta):
+    """Build forward(params) → log L pred.
+
+    E_eff can be per-point (np array) to support pooled fits across sizes.
+    """
+    D_t    = torch.tensor(D_np, dtype=torch.float64)
+    Dp_t   = torch.tensor(Dp_np, dtype=torch.float64)
+    N_t    = torch.tensor(N_np, dtype=torch.float64)
+    log_E  = torch.tensor(np.log(E_eff_np), dtype=torch.float64)
+    log_B  = torch.tensor(float(np.log(B)), dtype=torch.float64)
+    beta_c = float(beta)
+
+    def forward(p):
+        eta = eta_fn(p, D_t, Dp_t, N_t)
+        D_eff = D_t + eta * Dp_t
+        terms = torch.stack([log_E, log_B - beta_c * torch.log(D_eff)], dim=0)
+        return logsumexp_stable(terms, dim=0)
+    return forward
+
+
+def per_point_eta(D, Dp, L, E_eff, B, beta):
+    """Invert L = E_eff + B/D_eff^β to solve η per point."""
+    denom = L - E_eff
+    eta = np.full_like(D, np.nan)
+    v = denom > 0
+    eta[v] = ((B / denom[v]) ** (1.0 / beta) - D[v]) / Dp[v]
+    return eta
+
+
+def fit_form(form: dict, D, Dp, N_arr, L, E_eff, B, beta, delta=DELTA):
+    """Fit a single form. All arrays are np, length R.
+    E_eff and N_arr can be scalar or per-point."""
+    if np.isscalar(E_eff):
+        E_eff = np.full_like(D, float(E_eff))
+    if np.isscalar(N_arr):
+        N_arr = np.full_like(D, float(N_arr))
+    log_L = torch.tensor(np.log(L), dtype=torch.float64)
+    forward = _make_forward(form["fn"], D, Dp, N_arr, E_eff, B, beta)
+    res = fit_lse(forward, log_L, form["grid"], delta=delta)
+    p_t = {k: torch.tensor(v, dtype=torch.float64) for k, v in res["params"].items()}
+    D_t = torch.tensor(D, dtype=torch.float64)
+    Dp_t = torch.tensor(Dp, dtype=torch.float64)
+    N_t = torch.tensor(N_arr, dtype=torch.float64)
+    with torch.no_grad():
+        eta_pred = form["fn"](p_t, D_t, Dp_t, N_t).numpy()
+        logL_pred = forward(p_t).numpy()
+    resid = np.log(L) - logL_pred
+    return dict(
+        params=res["params"], eta_pred=eta_pred, resid=resid,
+        rmse=float(np.sqrt(np.mean(resid ** 2))),
+        max_abs=float(np.max(np.abs(resid))),
+        r2=1 - np.sum(resid ** 2) / np.sum((np.log(L) - np.log(L).mean()) ** 2),
+    )
+
+
+def leave_one_out(form: dict, D, Dp, N_arr, L, E_eff, B, beta,
+                   delta=DELTA, warm_init=None):
+    """Warm-started LOO: starts each fold from the full-data fit's params,
+    skipping the grid search.  ~50× faster than re-doing the grid each fold."""
+    if np.isscalar(E_eff): E_eff = np.full_like(D, float(E_eff))
+    if np.isscalar(N_arr): N_arr = np.full_like(D, float(N_arr))
+    # Build a single-point "grid" from the warm-start params
+    if warm_init is None:
+        res_full = fit_form(form, D, Dp, N_arr, L, E_eff, B, beta, delta)
+        warm_init = res_full["params"]
+    single_grid = [{k: float(v) for k, v in warm_init.items()}]
+    form_warm = {**form, "grid": single_grid}
+
+    n = len(D)
+    oob = np.full(n, np.nan)
+    for i in range(n):
+        keep = np.ones(n, dtype=bool); keep[i] = False
+        try:
+            res = fit_form(form_warm, D[keep], Dp[keep], N_arr[keep], L[keep],
+                           E_eff[keep], B, beta, delta)
+        except RuntimeError:
+            # warm-start failed for this fold; fall back to full grid
+            try:
+                res = fit_form(form, D[keep], Dp[keep], N_arr[keep], L[keep],
+                               E_eff[keep], B, beta, delta)
+            except RuntimeError:
+                continue
+        p_t = {k: torch.tensor(v, dtype=torch.float64) for k, v in res["params"].items()}
+        with torch.no_grad():
+            eta_i = form["fn"](
+                p_t,
+                torch.tensor(D[i:i+1], dtype=torch.float64),
+                torch.tensor(Dp[i:i+1], dtype=torch.float64),
+                torch.tensor(N_arr[i:i+1], dtype=torch.float64),
+            ).item()
+        pred_i = E_eff[i] + B / (D[i] + eta_i * Dp[i]) ** beta
+        oob[i] = np.log(L[i]) - np.log(pred_i)
+    return oob
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Data pooling
+# ──────────────────────────────────────────────────────────────────────
+
+def collect_multi_epoch_all_sizes(scale_min=SCALE_MIN):
+    """Return (size_tag, N, scale, D, epochs, D', L) arrays across all sizes
+    that have multi-epoch data, with per-size overfit exclusions applied."""
+    tags, Ns, scales, Ds, eps, Dps, Ls = [], [], [], [], [], [], []
+    for size in SIZES:
+        N, datasets = load(size)
+        s, D, ep, Dp, L = extract_multi_epoch(
+            datasets, N, scale_min=scale_min,
+            exclude_overfit=OVERFIT_EXCLUDE.get(size, set()))
+        if len(D) == 0:
+            continue
+        tags.extend([size] * len(D))
+        Ns.extend([N] * len(D))
+        scales.extend(s)
+        Ds.extend(D)
+        eps.extend(ep)
+        Dps.extend(Dp)
+        Ls.extend(L)
+    return (np.array(tags), np.array(Ns, dtype=np.float64),
+            np.array(scales), np.array(Ds), np.array(eps),
+            np.array(Dps), np.array(Ls))
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Plots
+# ──────────────────────────────────────────────────────────────────────
+
+def fmt_tokens(x, pos=None):
+    if x >= 1e9:  return f"{x/1e9:.1f}B"
+    if x >= 1e6:  return f"{x/1e6:.0f}M"
+    if x >= 1e3:  return f"{x/1e3:.0f}K"
+    return f"{x:.0f}"
+
+
+def plot_per_size_eta(results, path, title):
+    """One column per size × one row per form — showing η vs D'/D on log-log."""
+    sizes = sorted(results.keys(), key=lambda t: SIZES[t][0])
+    forms = ["const", "power(D'/D)", "sat(D'/D)", "sat × (D/N)"]
+    fig, axes = plt.subplots(len(forms), len(sizes),
+                             figsize=(3.2 * len(sizes), 2.6 * len(forms)),
+                             squeeze=False)
+    for row, form_name in enumerate(forms):
+        for col, size in enumerate(sizes):
+            ax = axes[row, col]
+            r = results[size].get(form_name)
+            if r is None:
+                ax.set_visible(False)
+                continue
+            # scatter η_parametric(data) vs D'/D
+            d = results[size]
+            ax.scatter(d["Dp"] / d["D"], r["eta_pred"], s=22, color="tab:blue",
+                       edgecolors="k", linewidths=0.3, zorder=5)
+            # per-point η (target) — grey
+            ax.scatter(d["Dp"] / d["D"], d["eta_pp"], s=22, color="gray",
+                       edgecolors="k", linewidths=0.2, alpha=0.55, zorder=4)
+            ax.axhline(1.0, color="gray", linestyle="--", linewidth=0.8, alpha=0.5)
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            if row == 0:
+                ax.set_title(f"{size}  (N={SIZES[size][0]/1e6:.0f}M)",
+                             fontsize=FONT_LEGEND)
+            if col == 0:
+                ax.set_ylabel(f"{form_name}\nη", fontsize=FONT_LEGEND)
+            if row == len(forms) - 1:
+                ax.set_xlabel("D'/D", fontsize=FONT_LEGEND)
+            ax.tick_params(labelsize=FONT_TICK - 2)
+            ax.grid(alpha=0.25, which="both")
+            if "rmse" in r:
+                ax.text(0.03, 0.03, f"LOO={r.get('loo_rmse', r['rmse']):.3f}",
+                        transform=ax.transAxes, fontsize=FONT_LEGEND - 2,
+                        bbox=dict(boxstyle="round,pad=0.2",
+                                  facecolor="white", alpha=0.8))
+    fig.suptitle(title, fontsize=FONT_TITLE + 1, y=1.00)
+    fig.tight_layout()
+    fig.savefig(path, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved {path}")
+
+
+def plot_joint_eta(tags, D, Dp, N_arr, L, eta_pp, res, form_name, path):
+    """For the pooled joint fit, plot η vs D'/D coloured by size, with
+    fitted-curve overlays."""
+    sizes = sorted(set(tags), key=lambda t: SIZES[t][0])
+    cmap = plt.cm.viridis
+    cnorm = plt.Normalize(vmin=0, vmax=len(sizes) - 1)
+
+    fig, axes = plt.subplots(1, 2, figsize=(16, 7))
+    ax_eta, ax_res = axes
+
+    for i, size in enumerate(sizes):
+        m = tags == size
+        color = cmap(cnorm(i))
+        ax_eta.scatter((Dp[m] / D[m]), eta_pp[m], s=50, color=color,
+                       edgecolors="k", linewidths=0.3, alpha=0.6,
+                       label=f"{size}  (per-point)")
+        ax_eta.scatter((Dp[m] / D[m]), res["eta_pred"][m], s=40, color=color,
+                       marker="x", linewidths=1.3)
+        ax_res.scatter(Dp[m] / D[m], res["resid"][m], s=50, color=color,
+                       edgecolors="k", linewidths=0.3,
+                       label=f"{size}")
+
+    ax_eta.axhline(1.0, color="gray", linestyle="--", linewidth=1, alpha=0.6)
+    ax_eta.set_xscale("log"); ax_eta.set_yscale("log")
+    ax_eta.set_xlabel("D'/D", fontsize=FONT_LABEL)
+    ax_eta.set_ylabel("η", fontsize=FONT_LABEL)
+    ax_eta.set_title(f"Joint η fit — {form_name}\n"
+                     f"(circles = per-point; × = fitted)",
+                     fontsize=FONT_TITLE)
+    ax_eta.legend(fontsize=FONT_LEGEND - 1, loc="best", ncol=2)
+    ax_eta.grid(alpha=0.3, which="both")
+
+    ax_res.axhline(0, color="gray", linestyle="--", linewidth=1, alpha=0.6)
+    ax_res.set_xscale("log")
+    ax_res.set_xlabel("D'/D", fontsize=FONT_LABEL)
+    ax_res.set_ylabel("log-loss residual (obs − pred)", fontsize=FONT_LABEL)
+    ax_res.set_title(f"Residuals  (RMSE={res['rmse']:.4f})", fontsize=FONT_TITLE)
+    ax_res.legend(fontsize=FONT_LEGEND - 1, loc="best")
+    ax_res.grid(alpha=0.3)
+
+    fig.tight_layout()
+    fig.savefig(path, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved {path}")
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Main
+# ──────────────────────────────────────────────────────────────────────
+
+def diagnose_size(per_size, joint_results, anchor, size: str):
+    """Print per-point η and the joint-fit residuals for one size.
+    Useful for understanding η>1 or η<0 points."""
+    if size not in per_size:
+        print(f"\n(no per-size data for {size})")
+        return
+    d = per_size[size]
+    N = SIZES[size][0]
+    E_eff_ = anchor["E"] + anchor["A"] / N ** anchor["alpha"]
+    B, beta = anchor["B"], anchor["beta"]
+
+    print(f"\n{'='*100}")
+    print(f"Per-point η diagnostic for {size}  (N={N/1e6:.0f}M, E_eff={E_eff_:.3f})")
+    print(f"{'='*100}")
+
+    # Predicted 1-epoch L at same D (no repetition)
+    L_pred_1ep = E_eff_ + B / d["D"] ** beta
+    resid_1ep = np.log(d["L"]) - np.log(L_pred_1ep)  # positive if obs > pred at same D
+
+    # Per-point η (already in per_size)
+    eta_pp = d["eta_pp"]
+
+    # Sort by scale then epochs for readable output
+    order = np.lexsort((d["ep"], d["D"]))
+    hdr_tot = "D+D'"
+    print(f"  {'scale':>7s}  {'ep':>4s}  {'D':>10s}  {'D/N':>7s}  "
+          f"{hdr_tot:>10s}  {'L_obs':>7s}  {'L_pred':>7s}  {'Δlog':>7s}  "
+          f"{'η_pp':>7s}  flag")
+    for i in order:
+        scale = d["D"][i] / (TTP_RATIO * N)
+        dn = d["D"][i] / N
+        tot = d["D"][i] + d["Dp"][i]
+        flag = []
+        if eta_pp[i] > 1:   flag.append("η>1")
+        if eta_pp[i] < 0:   flag.append("η<0!")
+        flag_s = " ".join(flag)
+        print(f"  {scale:>7.2f}  {int(d['ep'][i]):>4d}  {d['D'][i]:>10.2e}  "
+              f"{dn:>7.1f}  {tot:>10.2e}  {d['L'][i]:>7.4f}  "
+              f"{L_pred_1ep[i]:>7.4f}  {resid_1ep[i]:>+7.3f}  "
+              f"{eta_pp[i]:>7.3f}  {flag_s}")
+
+    # Sign pattern of 1-epoch residuals — if systematically positive, joint
+    # fit under-predicts for this size.
+    mean_res = float(np.mean(resid_1ep))
+    n_pos = int(np.sum(resid_1ep > 0))
+    print(f"\n  Δlog summary (joint 1-ep pred vs observed multi-ep L at same D):")
+    print(f"    mean = {mean_res:+.4f}   positive: {n_pos}/{len(resid_1ep)}")
+    if abs(mean_res) > 0.01:
+        direction = "over" if mean_res < 0 else "under"
+        print(f"    joint Chinchilla {direction}-predicts loss at this N "
+              f"→ η inversion is biased")
+
+
+def main():
+    # 1) Joint 5-param Chinchilla anchors
+    print(f"\n{'='*100}")
+    print("Fitting joint Chinchilla anchors (E, A, B, α, β) across all sizes ...")
+    print(f"{'='*100}")
+    tags_1ep, N_1ep, _, D_1ep, L_1ep = collect_1epoch_all_sizes(scale_min=SCALE_MIN)
+    anchor = fit_joint(N_1ep, D_1ep, L_1ep)
+    E_joint, A_joint = anchor["E"], anchor["A"]
+    B_joint, alpha_joint, beta_joint = anchor["B"], anchor["alpha"], anchor["beta"]
+    print(f"  E={E_joint:.4f}  A={A_joint:.2f}  B={B_joint:.2f}  "
+          f"α={alpha_joint:.4f}  β={beta_joint:.4f}")
+
+    def E_eff(N):
+        return E_joint + A_joint / N ** alpha_joint
+
+    # 2) Per-size η fits (for sizes with multi-epoch data)
+    print(f"\n{'='*100}")
+    print(f"Per-size η fits  (scale ≥ {SCALE_MIN}×, δ={DELTA})")
+    print(f"{'='*100}")
+    per_size: Dict[str, Dict] = {}
+    for size in SIZES:
+        N, datasets = load(size)
+        s, D, ep, Dp, L = extract_multi_epoch(
+            datasets, N, scale_min=SCALE_MIN,
+            exclude_overfit=OVERFIT_EXCLUDE.get(size, set()))
+        if len(D) < 5:
+            print(f"  {size}: only {len(D)} multi-epoch points — skipping per-size fit")
+            continue
+        E_size = E_eff(N)
+        eta_pp = per_point_eta(D, Dp, L, E_size, B_joint, beta_joint)
+        n_gt1 = int(np.sum(eta_pp > 1))
+        print(f"\n  {size}  (N={N/1e6:.0f}M, n={len(D)}, E_eff={E_size:.3f}):")
+        print(f"    per-point η: min={np.nanmin(eta_pp):.3f} "
+              f"median={np.nanmedian(eta_pp):.3f} max={np.nanmax(eta_pp):.3f} "
+              f"(η>1: {n_gt1}/{len(eta_pp)})")
+        print(f"    {'form':<16s}  {'RMSE':>7s}  {'LOO':>7s}  {'R²':>6s}  params")
+        per_size[size] = {"D": D, "Dp": Dp, "eta_pp": eta_pp, "L": L, "ep": ep}
+        for name, form in FORMS.items():
+            res = fit_form(form, D, Dp, N, L, E_size, B_joint, beta_joint)
+            loo = leave_one_out(form, D, Dp, N, L, E_size, B_joint, beta_joint,
+                                warm_init=res["params"])
+            valid = ~np.isnan(loo)
+            res["loo_rmse"] = float(np.sqrt(np.mean(loo[valid] ** 2))) if valid.any() else float("nan")
+            per_size[size][name] = res
+            pstr = "  ".join(f"{k}={v:.3g}" for k, v in res["params"].items())
+            print(f"    {name:<16s}  {res['rmse']:>7.4f}  {res['loo_rmse']:>7.4f}  "
+                  f"{res['r2']:>6.3f}  {pstr}")
+
+    # 3) Joint η fit across all sizes (pooled)
+    print(f"\n{'='*100}")
+    print("Joint η fit across all sizes  (pooled multi-epoch data)")
+    print(f"{'='*100}")
+    tags, Ns, scales, Ds, eps, Dps, Ls = collect_multi_epoch_all_sizes(SCALE_MIN)
+    E_eff_arr = np.array([E_eff(n) for n in Ns])
+    eta_pp_pool = per_point_eta(Ds, Dps, Ls, E_eff_arr, B_joint, beta_joint)
+    n_gt1 = int(np.sum(eta_pp_pool > 1))
+    print(f"  pooled n = {len(Ds)} across sizes: "
+          f"{sorted(set(tags.tolist()))}")
+    print(f"  per-point η: min={np.nanmin(eta_pp_pool):.3f} "
+          f"median={np.nanmedian(eta_pp_pool):.3f} "
+          f"max={np.nanmax(eta_pp_pool):.3f} (η>1: {n_gt1}/{len(eta_pp_pool)})")
+    print(f"\n  {'form':<16s}  {'RMSE':>7s}  {'LOO':>7s}  {'R²':>6s}  params")
+
+    joint_results: Dict[str, Dict] = {}
+    for name, form in FORMS.items():
+        res = fit_form(form, Ds, Dps, Ns, Ls, E_eff_arr, B_joint, beta_joint)
+        loo = leave_one_out(form, Ds, Dps, Ns, Ls, E_eff_arr, B_joint, beta_joint,
+                            warm_init=res["params"])
+        res["loo_rmse"] = float(np.sqrt(np.mean(loo ** 2)))
+        joint_results[name] = res
+        pstr = "  ".join(f"{k}={v:.3g}" for k, v in res["params"].items())
+        print(f"  {name:<16s}  {res['rmse']:>7.4f}  {res['loo_rmse']:>7.4f}  "
+              f"{res['r2']:>6.3f}  {pstr}")
+
+    best_joint = min(joint_results, key=lambda k: joint_results[k]["loo_rmse"])
+    print(f"\nBest joint form: {best_joint}   ({FORMS[best_joint]['desc']})")
+
+    # ── 4) Per-point diagnostic for 190M ──────────────────────────────
+    diagnose_size(per_size, joint_results, anchor, "190m")
+
+    # Plots
+    plot_per_size_eta(
+        per_size, path=os.path.join(SCRIPT_DIR, "fit_eta_per_size.pdf"),
+        title=f"η fit per size (δ={DELTA}, scale ≥ {SCALE_MIN}×)")
+
+    plot_joint_eta(tags, Ds, Dps, Ns, Ls, eta_pp_pool,
+                   joint_results[best_joint], best_joint,
+                   path=os.path.join(SCRIPT_DIR, "fit_eta_joint.pdf"))
+
+    return per_size, joint_results
+
+
+if __name__ == "__main__":
+    main()
