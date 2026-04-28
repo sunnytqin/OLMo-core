@@ -6,14 +6,20 @@ Each SLURM array job runs this script with a different --shard-id.
 The script:
 1. Loads the tokenized .npy and extracts its shard of documents
 2. Decodes tokens to text (dolma2 tokenizer)
-3. Paraphrases using vLLM (OLMo-3-7B-Instruct) in batches
+3. Paraphrases using vLLM (SmolLM2-1.7B-Instruct, with suffix speculative
+   decoding) in batches. Four task-oriented prompt styles (faq, math,
+   table, tutorial) can be used individually, or in "mixed" mode where
+   each doc gets a deterministically-selected style from (seed, doc_idx).
 4. Re-tokenizes paraphrased text (dolma2 tokenizer)
 5. Saves as a shard .npy file
 """
 
 import argparse
+import hashlib
 import json
 import os
+import random
+import re
 import time
 from pathlib import Path
 
@@ -26,37 +32,150 @@ from vllm import LLM, SamplingParams
 os.environ["HF_HOME"] = "/n/netscratch/barak_lab/Lab/sqin/cache"
 
 EOS_TOKEN_ID = 100257
-MODEL_NAME = "allenai/OLMo-3-7B-Instruct"
+MODEL_NAME = "HuggingFaceTB/SmolLM2-1.7B-Instruct"
 
-SYSTEM_PROMPT = (
-    "You paraphrase documents faithfully and at the same length as the input. "
-    "You are NOT a summarizer. Every fact, number, name, date, URL, equation, "
-    "and technical detail in the source must appear in the output. Never add "
-    "information not in the source. Only change wording and sentence structure.\n\n"
-    "Output ONLY the rephrased text itself. Do not include any preamble, "
-    "acknowledgement, meta-commentary about the process, word counts, "
-    "explanations of what you did, or wrapper headings like 'Paraphrased "
-    "version:' or 'Here is...'. Start your response directly with the first "
-    "sentence of the paraphrase."
+# User-only prompt templates. Each ends with "Output only X, nothing else." so
+# no system prompt is necessary. Placeholder: {text}.
+FAQ_PROMPT = (
+    "Rewrite the document as a comprehensive FAQ (Frequently Asked Questions). "
+    "Extract or infer the key questions a reader would have about this topic, "
+    "then provide clear, direct answers. Order questions logically—from "
+    "foundational to advanced, or by topic area. Each answer should be "
+    "self-contained and understandable without reference to other answers. "
+    "Ensure the FAQ works as a standalone document. Output only the FAQ, "
+    "nothing else.\n\n"
+    "Document:\n\n{text}"
 )
 
-USER_PROMPT_TEMPLATE = (
-    "Rephrase the following document in the clear, encyclopedic prose style of "
-    "Wikipedia. You are PARAPHRASING, not summarizing — the output MUST be "
-    "approximately the same length as the input (aim for 90–110% of the original "
-    "length; do NOT shorten or compress).\n\n"
-    "Strict rules:\n"
-    "- Preserve every fact, claim, number, name, date, URL, equation, code "
-    "snippet, and technical detail from the source.\n"
-    "- Do not add any information (no invented URLs, dates, names, "
-    "interpretations, transitions, or context).\n"
-    "- Do not drop information. If the source contains equations, code, tables, "
-    "or lists, preserve them.\n"
-    "- Only change phrasing and sentence structure. Length and information "
-    "content must match the original.\n\n"
-    "Original document (~{n_words} words):\n{text}\n\n"
-    "Rephrased version (same length, same information, new phrasing):"
+MATH_PROMPT = (
+    "Rewrite the document to create a mathematical word problem based on the "
+    "numerical data or relationships in the text. Provide a step-by-step "
+    "solution that shows the calculation process clearly. Create a problem "
+    "that requires multi-step reasoning and basic arithmetic operations. It "
+    "should include the question followed by a detailed solution showing each "
+    "calculation step. Output only the problem and solution, nothing else.\n\n"
+    "Document:\n\n{text}"
 )
+
+TABLE_PROMPT = (
+    "Rewrite the document as a structured table that organizes the key "
+    "information, then generate one question-answer pair based on the table. "
+    "First extract the main data points and organize them into a clear table "
+    "format with appropriate headers using markdown table syntax with proper "
+    "alignment. After the table, generate one insightful question that can be "
+    "answered using the table data. Provide a clear, concise answer to the "
+    "question based on the information in the table. Output only the table "
+    "followed by the question-answer pair, nothing else.\n\n"
+    "Document:\n\n{text}"
+)
+
+TUTORIAL_PROMPT = (
+    "Rewrite the document as a clear, step-by-step tutorial or instructional "
+    "guide. Use numbered steps or bullet points where appropriate to enhance "
+    "clarity. Preserve all essential information while ensuring the style "
+    "feels didactic and easy to follow. Output only the tutorial, nothing "
+    "else.\n\n"
+    "Document:\n\n{text}"
+)
+
+# Wikipedia fallback: used when the selected style is "math" but the source
+# contains no numerical content (math prompt on non-numeric docs produces
+# fabricated word problems; Wikipedia-style paraphrase is a safer fallback).
+WIKI_PROMPT = (
+    "Rephrase the following document in the clear, encyclopedic prose style "
+    "of Wikipedia. Preserve every fact, number, name, date, URL, equation, "
+    "code snippet, and technical detail from the source — do not invent any "
+    "information. Keep the output length close to the original (aim for "
+    "90–110% of the original length). Only change phrasing and sentence "
+    "structure. Output only the rephrased text, nothing else.\n\n"
+    "Document:\n\n{text}"
+)
+
+PROMPT_STYLES = {
+    "faq":       FAQ_PROMPT,
+    "math":      MATH_PROMPT,
+    "table":     TABLE_PROMPT,
+    "tutorial":  TUTORIAL_PROMPT,
+    "wikipedia": WIKI_PROMPT,  # fallback only; not sampled in "mixed" mode
+}
+
+# Canonical ordering used for deterministic per-doc style selection in "mixed" mode
+# (intentionally excludes "wikipedia" — that style is reserved as a fallback
+# when the sampled style doesn't fit the content, e.g. math on non-numeric docs).
+MIXED_STYLES = ("faq", "math", "table", "tutorial")
+
+# Minimum count of numeric tokens in a doc required for the "math" prompt to
+# be applied; below this, fall back to "wikipedia" style.
+MATH_MIN_NUMBERS = 2
+_NUMBER_RE = re.compile(r"\d+")
+
+
+def has_numerical_content(text: str, min_numbers: int = MATH_MIN_NUMBERS) -> bool:
+    """True if the text has >= min_numbers digit-sequences (crude but robust)."""
+    return len(_NUMBER_RE.findall(text)) >= min_numbers
+
+
+def pick_style_for_doc(doc_idx: int, seed: int) -> str:
+    """Deterministically choose one of MIXED_STYLES from (seed, doc_idx).
+
+    Uses SHA-256 rather than Python's built-in hash() because the latter is
+    salted per-process and would produce different assignments across shards.
+    """
+    h = hashlib.sha256(f"{seed}:{doc_idx}".encode()).digest()
+    return MIXED_STYLES[int.from_bytes(h[:4], "big") % len(MIXED_STYLES)]
+
+
+def resolve_style(style: str, text: str) -> str:
+    """Apply content-aware fallbacks to the chosen style.
+
+    Currently only: "math" on a doc without numerical content → "wikipedia".
+    """
+    if style == "math" and not has_numerical_content(text):
+        return "wikipedia"
+    return style
+
+
+def truncate_to_budget(
+    text: str, model_tokenizer, prompt_style: str,
+    budget_tokens: int, doc_idx: int, seed: int,
+) -> str:
+    """Randomly select a contiguous subsection of `text` whose chat-templated
+    prompt fits within `budget_tokens`. Deterministic on (seed, doc_idx).
+
+    Returns the possibly-truncated text (unchanged if it already fits).
+    """
+    # Fast path: check full text first
+    full_prompt = format_prompt(text, model_tokenizer, prompt_style=prompt_style)
+    if len(model_tokenizer.encode(full_prompt)) <= budget_tokens:
+        return text
+
+    rng = random.Random(f"trunc:{seed}:{doc_idx}")
+    # Iteratively shrink; we trust tokenization is roughly linear in text length
+    truncated = text
+    while len(truncated) > 200:  # give up if we've already reduced a lot
+        full_prompt = format_prompt(truncated, model_tokenizer, prompt_style=prompt_style)
+        n_tokens = len(model_tokenizer.encode(full_prompt))
+        if n_tokens <= budget_tokens:
+            return truncated
+        # Shrink by ~20% of text and pick a random window; at boundaries,
+        # align to whitespace to avoid cutting mid-word.
+        target_chars = int(len(truncated) * (budget_tokens / n_tokens) * 0.85)
+        if target_chars < 200:
+            target_chars = 200
+        max_start = max(0, len(truncated) - target_chars)
+        start = rng.randint(0, max_start) if max_start > 0 else 0
+        end = start + target_chars
+        # Align start/end to whitespace boundaries when possible
+        if start > 0:
+            ws = truncated.rfind(" ", 0, start + 50)
+            if ws != -1 and ws > start - 50:
+                start = ws + 1
+        if end < len(truncated):
+            ws = truncated.find(" ", end - 50)
+            if ws != -1 and ws < end + 50:
+                end = ws
+        truncated = truncated[start:end].strip()
+    return truncated
 
 
 def load_dolma2_tokenizer():
@@ -99,14 +218,15 @@ def extract_shard_documents(arr, shard_id, num_shards, subsample=1):
     return documents
 
 
-def format_prompt(text, model_tokenizer):
-    """Format a single chat prompt for paraphrasing."""
-    n_words = len(text.split())
-    user_msg = USER_PROMPT_TEMPLATE.format(text=text, n_words=n_words)
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": user_msg},
-    ]
+def format_prompt(text, model_tokenizer, prompt_style):
+    """Format a single-user-message chat prompt for paraphrasing.
+
+    The four task-oriented prompts each contain their own preamble-preventer
+    ("Output only X, nothing else"), so no system message is used.
+    """
+    user_template = PROMPT_STYLES[prompt_style]
+    user_msg = user_template.format(text=text)
+    messages = [{"role": "user", "content": user_msg}]
     return model_tokenizer.apply_chat_template(
         messages, tokenize=False, add_generation_prompt=True,
     )
@@ -174,21 +294,26 @@ def tokenize_to_npy(texts, dolma2_tok, output_path):
 
 
 def load_checkpoint(checkpoint_path):
-    """Load paraphrased texts from checkpoint JSONL."""
+    """Load paraphrased texts from checkpoint JSONL.
+
+    Returns dict[int, tuple[str, str | None]] — (text, prompt_style). Legacy
+    entries (seed-0 Wikipedia) lack `prompt_style`; those get style=None and
+    are treated as completed (we keep whatever output already exists).
+    """
     results = {}
     if checkpoint_path.exists():
         with open(checkpoint_path) as f:
             for line in f:
                 entry = json.loads(line)
-                results[entry["idx"]] = entry["text"]
+                results[entry["idx"]] = (entry["text"], entry.get("prompt_style"))
     return results
 
 
 def save_checkpoint_batch(checkpoint_path, batch_results):
-    """Append a batch of results to the checkpoint JSONL."""
+    """Append a batch of (idx, text, prompt_style) tuples to the JSONL."""
     with open(checkpoint_path, "a") as f:
-        for idx, text in batch_results:
-            f.write(json.dumps({"idx": idx, "text": text}) + "\n")
+        for idx, text, style in batch_results:
+            f.write(json.dumps({"idx": idx, "text": text, "prompt_style": style}) + "\n")
 
 
 def main():
@@ -208,6 +333,10 @@ def main():
     parser.add_argument("--top-p", type=float, default=0.95, help="Top-p (nucleus) sampling cutoff")
     parser.add_argument("--max-output-tokens", type=int, default=None, help="Max generation tokens (default: max_model_len)")
     parser.add_argument("--resume", action="store_true", help="Resume from checkpoint")
+    parser.add_argument("--prompt-style", type=str, default="mixed",
+                        choices=sorted(PROMPT_STYLES.keys()) + ["mixed"],
+                        help="Prompt style (faq/math/table/tutorial) or 'mixed' "
+                             "(deterministic per-doc sampling from all four)")
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -243,17 +372,27 @@ def main():
 
     if not remaining_indices:
         print("All documents already paraphrased. Tokenizing and saving...")
-        paraphrased_texts = [completed[i] for i in range(len(doc_texts))]
+        paraphrased_texts = [completed[i][0] for i in range(len(doc_texts))]
         tokenize_to_npy(paraphrased_texts, dolma2_tok, output_npy_path)
         return
 
     # --- 3. Initialize vLLM ---
     print(f"\nLoading model: {MODEL_NAME}")
     model_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    # NOTE: user originally specified speculative_config={"method":"suffix",...}
+    # but that method was added in vLLM >= 0.11; our env has vLLM 0.10.1. The
+    # "ngram" fallback triggers a "Cannot bitcast data-type" error on this
+    # vLLM version, so we run without speculative decoding. SmolLM2-1.7B is
+    # already ~4x smaller than OLMo-3-7B, so throughput remains healthy.
+    # Re-enable speculative_config when vLLM is upgraded.
     llm = LLM(
         model=MODEL_NAME,
-        trust_remote_code=True,
+        tensor_parallel_size=1,
+        max_num_seqs=2048,
+        max_num_batched_tokens=16384,
+        gpu_memory_utilization=0.90,
         max_model_len=args.max_model_len,
+        trust_remote_code=True,
     )
     sampling_params = SamplingParams(
         temperature=args.temperature,
@@ -267,22 +406,40 @@ def main():
     total_processed = 0
     skipped = 0
 
+    # Reserve room in the budget for the generated output (min of 1024 tokens,
+    # or 25% of max_model_len) so the prompt gate leaves space for generation.
+    prompt_budget = args.max_model_len - max(1024, args.max_model_len // 4)
+
     for batch_start in range(0, len(remaining_indices), args.batch_size):
         batch_indices = remaining_indices[batch_start : batch_start + args.batch_size]
         batch_texts = [doc_texts[i] for i in batch_indices]
 
-        # Format prompts, skip docs whose prompt exceeds max_model_len
+        # Format prompts per-doc:
+        #   1. Pick style (mixed → deterministic hash, else fixed)
+        #   2. Apply content-aware fallback (math on non-numeric doc → wikipedia)
+        #   3. Truncate to budget if doc is too long (random contiguous window)
         prompts = []
         valid_indices = []
+        valid_styles = []
         for idx, text in zip(batch_indices, batch_texts):
-            prompt = format_prompt(text, model_tokenizer)
+            picked = (pick_style_for_doc(idx, args.seed)
+                      if args.prompt_style == "mixed" else args.prompt_style)
+            style = resolve_style(picked, text)
+            # Truncate if needed so the prompt fits within prompt_budget
+            use_text = truncate_to_budget(
+                text, model_tokenizer, style,
+                prompt_budget, doc_idx=idx, seed=args.seed,
+            )
+            prompt = format_prompt(use_text, model_tokenizer, prompt_style=style)
             prompt_tokens = len(model_tokenizer.encode(prompt))
             if prompt_tokens >= args.max_model_len:
-                print(f"  Skipping doc {idx} (prompt={prompt_tokens:,} tokens >= max_model_len)")
+                # Truncation couldn't bring it below budget — skip as last resort
+                print(f"  Skipping doc {idx} (prompt={prompt_tokens:,} still >= max_model_len after truncation, style={style})")
                 skipped += 1
                 continue
             prompts.append(prompt)
             valid_indices.append(idx)
+            valid_styles.append(style)
 
         if not prompts:
             continue
@@ -290,11 +447,11 @@ def main():
         # Generate
         outputs = llm.generate(prompts, sampling_params)
 
-        # Collect results
+        # Collect results — include prompt style for each doc
         batch_results = []
-        for idx, output in zip(valid_indices, outputs):
+        for idx, style, output in zip(valid_indices, valid_styles, outputs):
             paraphrased = output.outputs[0].text
-            batch_results.append((idx, paraphrased))
+            batch_results.append((idx, paraphrased, style))
 
         # Save checkpoint
         save_checkpoint_batch(checkpoint_path, batch_results)
@@ -313,7 +470,7 @@ def main():
     # --- 5. Tokenize and save final .npy ---
     print(f"\nLoading all paraphrased texts from checkpoint...")
     completed = load_checkpoint(checkpoint_path)
-    paraphrased_texts = [completed[i] for i in range(len(doc_texts)) if i in completed]
+    paraphrased_texts = [completed[i][0] for i in range(len(doc_texts)) if i in completed]
 
     print(f"  {len(paraphrased_texts):,} paraphrased, {len(doc_texts) - len(paraphrased_texts):,} skipped (too long)")
     print(f"Re-tokenizing and saving to {output_npy_path}...")
