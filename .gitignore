@@ -65,3 +65,4 @@ logs/
 random_plots/
 **/deprecated/
 .claude/
+*fonts*/

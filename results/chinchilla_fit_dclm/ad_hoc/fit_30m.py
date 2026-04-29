@@ -58,6 +58,7 @@ import sys
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 from matplotlib.ticker import FuncFormatter
 from scipy.optimize import curve_fit, least_squares, minimize
 
@@ -74,6 +75,23 @@ FONT_LEGEND = 13
 FONT_TITLE = 20
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# ── Font setup (Palatino Linotype) ─────────────────────────────────────
+_FONT_DIR = os.path.join(os.path.dirname(SCRIPT_DIR), "fonts")
+for _fname in ("palatinolinotype_roman.ttf",
+               "palatinolinotype_italic.ttf",
+               "palatinolinotype_bold.ttf",
+               "palatinolinotype_bolditalic.ttf"):
+    _fpath = os.path.join(_FONT_DIR, _fname)
+    if os.path.exists(_fpath):
+        fm.fontManager.addfont(_fpath)
+_PALATINO_NAME = fm.FontProperties(
+    fname=os.path.join(_FONT_DIR, "palatinolinotype_roman.ttf")
+).get_name()
+plt.rcParams["font.family"] = _PALATINO_NAME
+plt.rcParams["mathtext.fontset"] = "stix"
+plt.rcParams["pdf.fonttype"] = 42
+plt.rcParams["ps.fonttype"] = 42
 
 
 def fmt_tokens(x, pos=None):
