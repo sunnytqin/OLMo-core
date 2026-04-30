@@ -570,8 +570,115 @@ have their own implicit anchors).
    <!-- $N$ (0.009–0.020). Both already beat the corresponding joint form. -->
 
 ---
+
+## 4. Sanity checks: one-step joint fit & ΔL-based per-point $\eta$
+
+### 4.1 One-step joint fit (one optimization for everything)
+
+The default pipeline fits in two stages: (i) joint Chinchilla on 1-epoch
+data with residual drop, then (ii) η on multi-epoch data using the
+fixed anchors. The one-step alternative fits
+
+$$\log L \;=\; \mathrm{logsumexp}\!\left(e,\; a-\alpha\log N,\; b-\beta\log\!\bigl(D + \eta(\cdot)\,D'\bigr)\right)$$
+
+**simultaneously** for $(e, a, b, \alpha, \beta) + \eta\text{-params}$
+on the full pooled dataset (1-epoch + multi-epoch, 1-epoch points have
+$D'=0$ so $\eta$ has no effect).
+
+Code: [fit_joint_all.py](fit_joint_all.py). Iterative greedy residual
+drop, $k$ swept on the pooled fit; canonical $k$ is where $|\Delta\beta|<0.01$.
+
+**Joint Muennighoff form, $k$ sweep:**
+
+| $k$ | $E$ | $A$ | $B$ | $\alpha$ | $\beta$ | $R_0$ | $\rho$ | RMSE 1ep | RMSE multi |
+|---|---|---|---|---|---|---|---|---|---|
+| 0  | 0.15 | 27.1 | 1 917 | 0.143 | 0.320 | 50.1 | $-0.52$ | 0.076 | 0.047 |
+| 10 | 0.16 | 22.8 | 12 740 | 0.124 | 0.419 | 50.1 | $-0.52$ | 0.052 | 0.038 |
+| 15 | 0.25 | 28.3 | 15 614 | 0.137 | 0.432 | 42.8 | $-0.40$ | 0.043 | 0.036 |
+| 20 | 0.45 | 36.2 | 19 045 | 0.153 | 0.444 | 42.1 | $-0.33$ | 0.039 | 0.033 |
+| **25** | **0.91** | **62.3** | **21 979** | **0.195** | **0.452** | **41.2** | **$-0.31$** | **0.035** | **0.031** |
+| 30 | 1.02 | 75.9 | 28 969 | 0.208 | 0.467 | 36.8 | $-0.22$ | 0.034 | 0.028 |
+
+Canonical $k=25$ ($\beta$ stops moving). Joint-fit values are roughly
+consistent with the two-stage pipeline:
+
+| | two-stage (joint Chinch + Muennighoff) | one-step joint, $k=25$ |
+|---|---|---|
+| $E$ | 1.72 | 0.91 |
+| $A$ | 1115 | 62 |
+| $B$ | 20 828 | 21 979 |
+| $\alpha$ | 0.390 | 0.195 |
+| $\beta$ | 0.451 | 0.452 |
+| $R_0$ | 207 | 41 |
+| $\rho$ | $-0.83$ | $-0.31$ |
+
+$\beta$ and $B$ are essentially identical (the data range pins these
+down). $E + A/N^\alpha$ — the irreducible-loss sum — also agrees within
+~10% across the $N$ range. But the (E vs A) and ($R_0$ vs $\rho$)
+splits differ between the two pipelines: under one-step, multi-epoch
+data informs $E_{\text{eff}}(N)$ directly, which lets $E$ stay smaller
+and $A$ smaller (less aggressive $N$-dependence in the irreducible
+loss). Joint multi-epoch RMSE is comparable (0.031 vs ~0.027 for
+the two-stage at canonical $k$). **Sanity check passed**: the two
+pipelines produce models with very similar predictions across the
+data range, differing primarily in the irreducible-loss decomposition.
+
+Plot: [fit_joint_all_Muennighoff.pdf](fit_joint_all_Muennighoff.pdf).
+
+### 4.2 ΔL-based per-point $\eta$ (cancels $E_{\text{eff}}$)
+
+The original per-point $\eta$ was defined by inverting
+
+$$L \;=\; E_{\text{eff}}(N) + \frac{B}{(D + \eta\,D')^{\beta}},$$
+
+which depends on $E_{\text{eff}}(N)$ — and therefore inherits any
+per-size error in the joint fit (this is the source of the $\eta>1$ /
+$\eta<0$ artefact at 190M, §3.4). A cleaner formula uses the *empirical
+loss difference* between 1-epoch and multi-epoch at the same scale:
+
+$$\Delta L \;=\; L(1\text{ep}) - L(\text{multi-ep}) \;=\; \frac{B}{D^{\beta}} - \frac{B}{(D + \eta\,D')^{\beta}}$$
+
+so that
+
+$$\frac{1}{D_{\text{eff}}^{\beta}} = \frac{1}{D^{\beta}} - \frac{\Delta L}{B},\qquad \eta \;=\; \frac{D_{\text{eff}} - D}{D'}.$$
+
+$E_{\text{eff}}$ cancels — only $B$ and $\beta$ enter. Implemented as
+`per_point_eta_diff` in [fit_eta.py](fit_eta.py).
+
+**Per-size comparison** of the two solvers (joint anchors as before,
+multi-epoch points at scale $\ge 0.5\times$):
+
+| size | $n$ | ΔL form: range, η>1 | $E_{\text{eff}}$ form: range, η>1 |
+|---|---|---|---|
+| 14M  | 23 | $[0.36,\;1.79]$, 14/23 | $[0.58,\;1.59]$, 11/23 |
+| 30M  | 28 | $[0.09,\;4.03]$, 13/28 | $[0.08,\;1.32]$, 4/28 |
+| 60M  | 19 | $[0.12,\;\sim 10^5]$, 9/19 | $[0.09,\;1.00]$, 0/19 |
+| 190M | 16 | $[0.22,\;2.10]$, 5/16 | $[-0.21,\;1.51]$, 5/16 |
+| 370M | 12 | $[0.16,\;1.21]$, 1/12 | $[0.19,\;1.37]$, 3/12 |
+
+**Two trade-offs visible:**
+
+1. **190M / 370M improve**: ΔL eliminates the $\eta < 0$ artefact at
+   190M (was $-0.21$, now $0.22$). The non-physical excursion at large
+   $D$ was driven by joint-anchor mis-extrapolation in $E_{\text{eff}}$,
+   which the ΔL form cancels. 370M $\eta>1$ count drops from 3 to 1.
+2. **Saturation instability appears at small $N$ / high epochs.** The
+   ΔL form is unstable when $\Delta L \to B/D^{\beta}$ (multi-epoch loss
+   approaching $E_{\text{eff}}$): then $1/D^{\beta} - \Delta L/B \to 0^+$
+   and $D_{\text{eff}}, \eta \to \infty$. The 60M outlier ($\eta \sim
+   10^5$) is a single point near saturation. The instability is real —
+   not noise — but it makes the ΔL solver unhelpful for visualization
+   right at the saturation tail.
+
+**Recommendation:** prefer the ΔL form for the *bulk* of the per-point
+diagnostic and at large $N$ (where $E_{\text{eff}}$ residuals matter
+most), and trim or annotate the saturation tail. The parametric η fit
+itself is unchanged either way — it works directly on $L_{\text{obs}}$
+vs $L_{\text{pred}}$ and never uses per-point $\eta$.
+
+---
 <!-- 
-## 4. Dolma-30M data summary
+## A. Dolma-30M data summary
 
 Per-scale data availability (excluding u-shape overfit points):
 

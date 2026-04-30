@@ -81,15 +81,24 @@ def extract_1epoch(datasets, N: float, scale_min: float = 0.0):
 def extract_multi_epoch(datasets, N: float, *,
                         scale_min: float = DEFAULT_SCALE_MIN,
                         exclude_overfit: Optional[Set[Tuple[float, int]]] = None):
-    """Return (scale, D, epochs, D', L) for multi-epoch (e>1) points.
+    """Return (scale, D, epochs, D', L, L_1ep) for multi-epoch (e>1) points.
+
+    L_1ep is the observed 1-epoch loss at the same (size, scale) — used by
+    the loss-difference η solver (which avoids E_eff dependence).
 
     exclude_overfit: set of (scale, epoch) pairs to drop (default: empty).
+    Multi-epoch rows are skipped if no 1-epoch loss exists at that scale.
     """
     exclude_overfit = exclude_overfit or set()
     rows = []
     for ds in datasets:
         scale = ds["chinchilla_scale"][0]
         if scale < scale_min:
+            continue
+        if 1 not in ds["epochs"]:
+            continue
+        L_1ep = ds["validation_loss"][ds["epochs"].index(1)]
+        if np.isnan(L_1ep):
             continue
         D = scale * TTP_RATIO * N
         for i, ep in enumerate(ds["epochs"]):
@@ -100,12 +109,12 @@ def extract_multi_epoch(datasets, N: float, *,
             loss = ds["validation_loss"][i]
             if np.isnan(loss):
                 continue
-            rows.append((scale, D, ep, (ep - 1) * D, loss))
+            rows.append((scale, D, ep, (ep - 1) * D, loss, L_1ep))
     if not rows:
         empty = np.array([], dtype=np.float64)
-        return empty, empty, empty, empty, empty
+        return empty, empty, empty, empty, empty, empty
     a = np.array(rows, dtype=np.float64)
-    return a[:, 0], a[:, 1], a[:, 2], a[:, 3], a[:, 4]
+    return a[:, 0], a[:, 1], a[:, 2], a[:, 3], a[:, 4], a[:, 5]
 
 
 def all_sizes() -> Iterable[str]:

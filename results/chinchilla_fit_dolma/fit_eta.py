@@ -211,11 +211,44 @@ def _make_forward(eta_fn, D_np, Dp_np, N_np, E_eff_np, B, beta):
 
 
 def per_point_eta(D, Dp, L, E_eff, B, beta):
-    """Invert L = E_eff + B/D_eff^β to solve η per point."""
+    """Invert L = E_eff + B/D_eff^β to solve η per point.
+
+    LEGACY: depends on E_eff(N), so per-size 1-epoch fit residuals
+    propagate into per-point η.  Prefer per_point_eta_diff below.
+    """
     denom = L - E_eff
     eta = np.full_like(D, np.nan)
     v = denom > 0
     eta[v] = ((B / denom[v]) ** (1.0 / beta) - D[v]) / Dp[v]
+    return eta
+
+
+def per_point_eta_diff(D, Dp, L, L_1ep, B, beta):
+    """Solve η from the *empirical* loss difference between multi-epoch and
+    1-epoch at the same (size, scale).
+
+        ΔL = L(1ep) − L(multi-ep) = B/D^β − B/(D + η·D')^β
+
+    so that
+
+        1/D_eff^β = 1/D^β − ΔL/B,   D_eff = (1/D^β − ΔL/B)^(−1/β),
+        η = (D_eff − D) / D'.
+
+    Cancels E_eff(N) entirely → cleaner per-point η, free of the
+    1-epoch fit's per-size residuals.  Only B and β enter.
+
+    Returns NaN where 1/D^β − ΔL/B ≤ 0 (unphysical: would require
+    η·D' < 0 to explain the loss drop, i.e. multi-epoch is too good
+    for the assumed β).
+    """
+    delta_L = L_1ep - L  # > 0 if multi-ep improves over 1-ep
+    inv_Db = 1.0 / D ** beta
+    inv_Deff_b = inv_Db - delta_L / B
+    eta = np.full_like(D, np.nan)
+    v = inv_Deff_b > 0
+    D_eff = np.full_like(D, np.nan)
+    D_eff[v] = inv_Deff_b[v] ** (-1.0 / beta)
+    eta[v] = (D_eff[v] - D[v]) / Dp[v]
     return eta
 
 
@@ -290,12 +323,12 @@ def leave_one_out(form: dict, D, Dp, N_arr, L, E_eff, B, beta,
 # ──────────────────────────────────────────────────────────────────────
 
 def collect_multi_epoch_all_sizes(scale_min=SCALE_MIN):
-    """Return (size_tag, N, scale, D, epochs, D', L) arrays across all sizes
-    that have multi-epoch data, with per-size overfit exclusions applied."""
-    tags, Ns, scales, Ds, eps, Dps, Ls = [], [], [], [], [], [], []
+    """Return (size_tag, N, scale, D, epochs, D', L, L_1ep) arrays across
+    all sizes with multi-epoch data, with per-size overfit exclusions."""
+    tags, Ns, scales, Ds, eps, Dps, Ls, L_1eps = [], [], [], [], [], [], [], []
     for size in SIZES:
         N, datasets = load(size)
-        s, D, ep, Dp, L = extract_multi_epoch(
+        s, D, ep, Dp, L, L_1ep = extract_multi_epoch(
             datasets, N, scale_min=scale_min,
             exclude_overfit=OVERFIT_EXCLUDE.get(size, set()))
         if len(D) == 0:
@@ -307,9 +340,10 @@ def collect_multi_epoch_all_sizes(scale_min=SCALE_MIN):
         eps.extend(ep)
         Dps.extend(Dp)
         Ls.extend(L)
+        L_1eps.extend(L_1ep)
     return (np.array(tags), np.array(Ns, dtype=np.float64),
             np.array(scales), np.array(Ds), np.array(eps),
-            np.array(Dps), np.array(Ls))
+            np.array(Dps), np.array(Ls), np.array(L_1eps))
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -659,21 +693,29 @@ def main():
     per_size: Dict[str, Dict] = {}
     for size in SIZES:
         N, datasets = load(size)
-        s, D, ep, Dp, L = extract_multi_epoch(
+        s, D, ep, Dp, L, L_1ep = extract_multi_epoch(
             datasets, N, scale_min=eta_scale_min,
             exclude_overfit=OVERFIT_EXCLUDE.get(size, set()))
         if len(D) < 5:
             print(f"  {size}: only {len(D)} multi-epoch points — skipping per-size fit")
             continue
         E_size = E_eff(N)
-        eta_pp = per_point_eta(D, Dp, L, E_size, B_joint, beta_joint)
+        # Two per-point η solvers — report both for comparison.
+        eta_pp = per_point_eta_diff(D, Dp, L, L_1ep, B_joint, beta_joint)
+        eta_pp_legacy = per_point_eta(D, Dp, L, E_size, B_joint, beta_joint)
         n_gt1 = int(np.sum(eta_pp > 1))
         print(f"\n  {size}  (N={N/1e6:.0f}M, n={len(D)}, E_eff={E_size:.3f}):")
-        print(f"    per-point η: min={np.nanmin(eta_pp):.3f} "
+        valid = ~np.isnan(eta_pp)
+        print(f"    per-point η (ΔL form):    min={np.nanmin(eta_pp):.3f} "
               f"median={np.nanmedian(eta_pp):.3f} max={np.nanmax(eta_pp):.3f} "
-              f"(η>1: {n_gt1}/{len(eta_pp)})")
+              f"(η>1: {n_gt1}/{int(valid.sum())})")
+        print(f"    per-point η (E_eff form): min={np.nanmin(eta_pp_legacy):.3f} "
+              f"median={np.nanmedian(eta_pp_legacy):.3f} "
+              f"max={np.nanmax(eta_pp_legacy):.3f}  (legacy)")
         print(f"    {'form':<16s}  {'RMSE':>7s}  {'LOO':>7s}  {'R²':>6s}  params")
-        per_size[size] = {"D": D, "Dp": Dp, "eta_pp": eta_pp, "L": L, "ep": ep}
+        per_size[size] = {"D": D, "Dp": Dp, "eta_pp": eta_pp,
+                          "eta_pp_legacy": eta_pp_legacy,
+                          "L": L, "L_1ep": L_1ep, "ep": ep}
         for name, form in FORMS.items():
             res = fit_form(form, D, Dp, N, L, E_size, B_joint, beta_joint)
             loo = leave_one_out(form, D, Dp, N, L, E_size, B_joint, beta_joint,
@@ -689,15 +731,22 @@ def main():
     print(f"\n{'='*100}")
     print("Joint η fit across all sizes  (pooled multi-epoch data)")
     print(f"{'='*100}")
-    tags, Ns, scales, Ds, eps, Dps, Ls = collect_multi_epoch_all_sizes(eta_scale_min)
+    tags, Ns, scales, Ds, eps, Dps, Ls, L_1eps = collect_multi_epoch_all_sizes(
+        eta_scale_min)
     E_eff_arr = np.array([E_eff(n) for n in Ns])
-    eta_pp_pool = per_point_eta(Ds, Dps, Ls, E_eff_arr, B_joint, beta_joint)
-    n_gt1 = int(np.sum(eta_pp_pool > 1))
+    eta_pp_pool = per_point_eta_diff(Ds, Dps, Ls, L_1eps, B_joint, beta_joint)
+    eta_pp_pool_legacy = per_point_eta(Ds, Dps, Ls, E_eff_arr, B_joint, beta_joint)
+    valid_pool = ~np.isnan(eta_pp_pool)
+    n_gt1 = int(np.sum(eta_pp_pool[valid_pool] > 1))
     print(f"  pooled n = {len(Ds)} across sizes: "
           f"{sorted(set(tags.tolist()))}")
-    print(f"  per-point η: min={np.nanmin(eta_pp_pool):.3f} "
+    print(f"  per-point η (ΔL):    min={np.nanmin(eta_pp_pool):.3f} "
           f"median={np.nanmedian(eta_pp_pool):.3f} "
-          f"max={np.nanmax(eta_pp_pool):.3f} (η>1: {n_gt1}/{len(eta_pp_pool)})")
+          f"max={np.nanmax(eta_pp_pool):.3f} "
+          f"(η>1: {n_gt1}/{int(valid_pool.sum())})")
+    print(f"  per-point η (E_eff): min={np.nanmin(eta_pp_pool_legacy):.3f} "
+          f"median={np.nanmedian(eta_pp_pool_legacy):.3f} "
+          f"max={np.nanmax(eta_pp_pool_legacy):.3f}  (legacy)")
     print(f"\n  {'form':<16s}  {'RMSE':>7s}  {'LOO':>7s}  {'R²':>6s}  params")
 
     joint_results: Dict[str, Dict] = {}
