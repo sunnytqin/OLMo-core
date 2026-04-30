@@ -40,8 +40,10 @@ OVERFIT_EXCLUDE = {
     "600m": set(),
 }
 
-# Small-scale outliers dropped from 1-epoch fits (k=3 cut: drop 0.05x/0.1x/0.25x)
-DEFAULT_SCALE_MIN = 0.5
+# Default scale cut.  We now use 0.0 (i.e. include all scales) and rely on
+# residual-based top-k dropping after the first fit, following the
+# Besiroglu approach.  Scale_min is kept as a parameter for legacy code paths.
+DEFAULT_SCALE_MIN = 0.0
 
 
 # ──────────────────────────────────────────────────────────────────────

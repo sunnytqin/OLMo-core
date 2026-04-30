@@ -27,7 +27,7 @@ from matplotlib.ticker import FuncFormatter
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from data import SIZES, DEFAULT_SCALE_MIN, load, extract_1epoch  # noqa: E402
+from data import SIZES, DEFAULT_SCALE_MIN, TTP_RATIO, load, extract_1epoch  # noqa: E402
 from fit_lse import expand_grid, fit_lse, logsumexp_stable  # noqa: E402
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -39,11 +39,11 @@ FONT_LABEL, FONT_TICK, FONT_LEGEND, FONT_TITLE = 16, 13, 11, 18
 # Log-spaced Hoffmann-style grid for (e, a, b, α, β)
 GRID = expand_grid({
     "e":     [-1.0, 0.0, 0.5, 1.0, 1.5],
-    "a":     [0.0, 5.0, 10.0, 15.0],
-    "b":     [0.0, 5.0, 10.0, 15.0],
-    "alpha": [0.1, 0.3, 0.5, 0.8],
-    "beta":  [0.1, 0.3, 0.5, 0.8],
-})   # 5·4·4·4·4 = 1280 inits
+    "a":     [0.0, 7.0, 14.0],
+    "b":     [0.0, 7.0, 14.0],
+    "alpha": [0.1, 0.3, 0.6],
+    "beta":  [0.1, 0.3, 0.6],
+})   # 5·3·3·3·3 = 405 inits
 
 
 def per_size_1ep_fit(datasets, N, tag, scale_min=SCALE_MIN, delta=DELTA):
@@ -210,7 +210,8 @@ def plot_joint(tags, N_arr, D_arr, L_arr, p, path):
 
 # ──────────────────────────────────────────────────────────────────────
 
-DELTA_SWEEP = [1.0, 0.1, 0.01, 1e-3]
+DELTA_SWEEP = [0.1, 1e-3]   # canonical + Besiroglu reference
+DROP_K_SWEEP = [0, 1, 2, 3, 5, 8, 12, 16, 20, 25]
 
 
 def fit_and_report(N_arr, D_arr, L_arr, tags, delta):
@@ -228,49 +229,169 @@ def fit_and_report(N_arr, D_arr, L_arr, tags, delta):
     return p, rmse, r2
 
 
+def topk_residual_drop_sweep(tags, N_arr, D_arr, L_arr, k_values=DROP_K_SWEEP,
+                              delta=DELTA, iterative=True):
+    """Besiroglu-style residual-based top-k dropping.
+
+    iterative=False (one-shot): rank by residual from a single full-data
+    fit, then drop top-k for each k.
+
+    iterative=True (greedy / IRLS-style): for each k, repeat
+        fit → compute residual → drop the worst → fit
+    k times, recomputing residuals after each removal. This handles the
+    case where many small-scale points coherently bias the fit (one-shot
+    can't see past the cluster).
+    """
+    mode = "iterative greedy" if iterative else "one-shot"
+    print(f"\n{'─'*92}")
+    print(f"Top-k residual drop sweep — {mode}  (δ={delta}, "
+          f"all {len(L_arr)} 1-ep points)")
+    print(f"{'─'*92}")
+
+    # Initial fit on everything
+    p0 = fit_joint(N_arr, D_arr, L_arr, delta=delta)
+    pred0 = predict(N_arr, D_arr, p0)
+    resid0 = np.log(L_arr) - np.log(pred0)
+
+    rows = {}
+    cumulative_dropped = []  # only used in iterative mode
+    print(f"  {'k':>3s}  {'n':>3s}  {'E':>7s}  {'A':>7s}  {'B':>9s}  "
+          f"{'α':>6s}  {'β':>6s}  {'RMSE':>7s}  {'max|Δ|':>8s}  {'R²':>6s}  "
+          f"{'last drop':<s}")
+
+    if not iterative:
+        # one-shot: rank once, drop top-k for each k
+        sort_idx_oneshot = np.argsort(-np.abs(resid0))
+    else:
+        sort_idx_oneshot = None
+
+    last_k = 0
+    for k in k_values:
+        if k >= len(L_arr) - 6:
+            continue
+        if iterative:
+            # extend cumulative_dropped to length k by greedy fit/drop
+            while len(cumulative_dropped) < k:
+                keep = np.ones(len(L_arr), dtype=bool)
+                keep[cumulative_dropped] = False
+                p_tmp = fit_joint(N_arr[keep], D_arr[keep], L_arr[keep],
+                                  delta=delta)
+                pred_tmp = predict(N_arr[keep], D_arr[keep], p_tmp)
+                resid_tmp = np.log(L_arr[keep]) - np.log(pred_tmp)
+                worst_local = int(np.argmax(np.abs(resid_tmp)))
+                # convert local index -> global index
+                kept_global = np.where(keep)[0]
+                cumulative_dropped.append(int(kept_global[worst_local]))
+            keep = np.ones(len(L_arr), dtype=bool)
+            keep[cumulative_dropped[:k]] = False
+            drops_so_far = list(cumulative_dropped[:k])
+        else:
+            keep = np.ones(len(L_arr), dtype=bool)
+            if k > 0:
+                keep[sort_idx_oneshot[:k]] = False
+            drops_so_far = list(sort_idx_oneshot[:k])
+
+        # final fit at this k
+        p = fit_joint(N_arr[keep], D_arr[keep], L_arr[keep], delta=delta)
+        pred_in = predict(N_arr[keep], D_arr[keep], p)
+        resid_in = np.log(L_arr[keep]) - np.log(pred_in)
+        rmse = float(np.sqrt(np.mean(resid_in ** 2)))
+        max_abs = float(np.max(np.abs(resid_in)))
+        r2 = (1 - np.sum(resid_in ** 2) /
+              np.sum((np.log(L_arr[keep]) - np.log(L_arr[keep]).mean()) ** 2))
+
+        if k > 0:
+            scales = D_arr / (TTP_RATIO * N_arr)
+            recent = drops_so_far[max(0, k - 3):k]
+            tag = ", ".join(f"{tags[i]}/{scales[i]:.2g}x" for i in recent)
+            if k > 3: tag = "...,  " + tag
+        else:
+            tag = "—"
+        print(f"  {k:>3d}  {keep.sum():>3d}  {p['E']:>7.3f}  {p['A']:>7.1f}  "
+              f"{p['B']:>9.0f}  {p['alpha']:>6.3f}  {p['beta']:>6.3f}  "
+              f"{rmse:>7.4f}  {max_abs:>8.4f}  {r2:>6.3f}  {tag}")
+        rows[k] = dict(p=p, rmse=rmse, r2=r2, max_abs=max_abs,
+                       dropped=drops_so_far, n_kept=int(keep.sum()))
+    sort_idx = np.array(cumulative_dropped if iterative
+                        else sort_idx_oneshot[:max(k_values)])
+    return rows, sort_idx, resid0
+
+
 def main():
-    tags, N_arr, scale_arr, D_arr, L_arr = collect_1epoch_all_sizes()
+    tags, N_arr, scale_arr, D_arr, L_arr = collect_1epoch_all_sizes(scale_min=0.0)
     n_by_size = {t: int(np.sum(tags == t)) for t in sorted(set(tags))}
 
     print(f"\n{'='*92}")
-    print(f"Joint Chinchilla fit  (1-epoch, scale ≥ {SCALE_MIN}×)")
+    print(f"Joint Chinchilla fit  (1-epoch, ALL scales — residual-based outlier drop)")
     print(f"{'='*92}")
     print(f"Total 1-epoch points: {len(L_arr)}  (grid: {len(GRID)} init points)")
     for tag, n in n_by_size.items():
         print(f"  {tag:<6s}  N={SIZES[tag][0]/1e6:5.0f}M   n={n}")
 
-    # δ sweep
+    # δ sweep on full data
     print(f"\n{'─'*92}")
-    print("δ sweep on joint Chinchilla:")
+    print("δ sweep on joint Chinchilla (all data, no drop):")
     print(f"{'─'*92}")
     by_delta = {}
     for delta in DELTA_SWEEP:
         p, _, _ = fit_and_report(N_arr, D_arr, L_arr, tags, delta)
         by_delta[delta] = p
 
-    # Canonical: δ=DELTA
-    p = by_delta[DELTA]
-    print(f"\nCanonical fit (δ={DELTA}):")
-    print(f"  E={p['E']:.4f}  A={p['A']:.2f}  B={p['B']:.2f}  "
-          f"α={p['alpha']:.4f}  β={p['beta']:.4f}")
+    # Top-k residual drop sweep at canonical δ
+    drop_sweep, sort_idx, resid_full = topk_residual_drop_sweep(
+        tags, N_arr, D_arr, L_arr, k_values=DROP_K_SWEEP, delta=DELTA)
 
-    # Per-size residuals + implied E_eff
-    print(f"\nPer-size residuals at canonical δ:")
+    # Pick canonical k as smallest k where β stabilizes between adjacent
+    # k values (|Δβ| < 0.01).  Rationale: when iterative drop has removed
+    # the systematic small-scale bias, β stops moving even as more points
+    # are dropped — that's the convergence point.
+    k_sorted = sorted(drop_sweep.keys())
+    betas = [drop_sweep[k]["p"]["beta"] for k in k_sorted]
+    canonical_k = k_sorted[-1]   # fallback: most-aggressive drop
+    for i in range(1, len(betas)):
+        if abs(betas[i] - betas[i - 1]) < 0.01:
+            canonical_k = k_sorted[i]
+            break
+    print(f"\nCanonical k (heuristic: smallest k with |Δβ|<0.01): k = {canonical_k}")
+    p = drop_sweep[canonical_k]["p"]
+    print(f"  E={p['E']:.4f}  A={p['A']:.2f}  B={p['B']:.2f}  "
+          f"α={p['alpha']:.4f}  β={p['beta']:.4f}  "
+          f"RMSE={drop_sweep[canonical_k]['rmse']:.4f}")
+
+    # For comparison: also report the legacy scale-based cut
+    print(f"\nFor comparison: legacy fit (scale ≥ 0.5x):")
+    keep_legacy = scale_arr >= 0.5
+    p_legacy = fit_joint(N_arr[keep_legacy], D_arr[keep_legacy],
+                         L_arr[keep_legacy], delta=DELTA)
+    pred_legacy = predict(N_arr[keep_legacy], D_arr[keep_legacy], p_legacy)
+    rmse_legacy = float(np.sqrt(np.mean(
+        (np.log(L_arr[keep_legacy]) - np.log(pred_legacy)) ** 2)))
+    print(f"  n={keep_legacy.sum()}  E={p_legacy['E']:.4f}  "
+          f"A={p_legacy['A']:.2f}  B={p_legacy['B']:.2f}  "
+          f"α={p_legacy['alpha']:.4f}  β={p_legacy['beta']:.4f}  "
+          f"RMSE={rmse_legacy:.4f}")
+
+    # Per-size residuals + implied E_eff at canonical-k fit
+    print(f"\nPer-size residuals at canonical k={canonical_k}:")
     print(f"  {'size':<6s}  {'n':>3s}  {'RMSE':>8s}  {'max|Δ|':>8s}  "
           f"{'E_eff(N)':>9s}")
-    for tag, n, rm, mx in per_size_score(tags, N_arr, D_arr, L_arr, p):
+    keep = np.ones(len(L_arr), dtype=bool)
+    if canonical_k > 0:
+        keep[sort_idx[:canonical_k]] = False
+    for tag, n, rm, mx in per_size_score(
+            tags[keep], N_arr[keep], D_arr[keep], L_arr[keep], p):
         Nt = SIZES[tag][0]
         E_eff = p["E"] + p["A"] / Nt ** p["alpha"]
         print(f"  {tag:<6s}  {n:>3d}  {rm:>8.4f}  {mx:>8.4f}  "
               f"{E_eff:>9.4f}")
 
     # Per-size standalone 3-param fits (for comparison with joint-implied E_eff)
-    print(f"\nPer-size 3-param 1-epoch fits  (each size fit independently):")
+    print(f"\nPer-size 3-param 1-epoch fits  (each size fit independently, all scales):")
     print(f"  {'size':<6s}  {'n':>3s}  {'E':>8s}  {'B':>11s}  "
           f"{'β':>7s}  {'RMSE':>8s}")
     for tag in sorted(set(tags), key=lambda t: SIZES[t][0]):
-        N, ds = load(tag)
-        fit = per_size_1ep_fit(ds, N, tag, scale_min=SCALE_MIN, delta=DELTA)
+        Nt, ds = load(tag)
+        fit = per_size_1ep_fit(ds, Nt, tag, scale_min=0.0, delta=DELTA)
         if fit is None:
             print(f"  {tag:<6s}  (<3 pts — skipped)")
             continue
@@ -278,10 +399,10 @@ def main():
               f"{fit['B']:>11.2f}  {fit['beta']:>7.4f}  "
               f"{fit['rmse']:>8.4f}")
 
-    plot_joint(tags, N_arr, D_arr, L_arr, p,
+    plot_joint(tags[keep], N_arr[keep], D_arr[keep], L_arr[keep], p,
                path=os.path.join(SCRIPT_DIR, "fit_chinchilla_joint.pdf"))
 
-    return p
+    return p, drop_sweep, sort_idx
 
 
 if __name__ == "__main__":

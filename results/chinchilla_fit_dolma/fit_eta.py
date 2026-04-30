@@ -37,7 +37,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from data import (DEFAULT_SCALE_MIN, OVERFIT_EXCLUDE, SIZES, TTP_RATIO,  # noqa: E402
                   extract_multi_epoch, load)
-from fit_chinchilla_joint import fit_joint, collect_1epoch_all_sizes  # noqa: E402
+from fit_chinchilla_joint import (collect_1epoch_all_sizes, fit_joint,  # noqa: E402
+                                   predict, topk_residual_drop_sweep)
 from fit_lse import expand_grid, fit_lse, logsumexp_stable  # noqa: E402
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -72,6 +73,31 @@ def _eta_sat_Nb(p, D, Dp, N):
     N_ref = torch.tensor(_N_REF, dtype=N.dtype)
     b_eff = p["b0"] * (N / N_ref) ** p["kappa"]
     return p["c"] * (D / N) ** (-p["gamma"]) / (1.0 + b_eff * (Dp / D))
+
+
+# ── Exponential decay forms (Muennighoff-inspired) ─────────────────────
+# At D'/D → 0 the multiplier approaches η₀; saturation scale R sets where
+# η drops to η₀/e.  If η₀ ≤ 1, η ≤ 1 everywhere automatically.
+
+def _eta_exp(p, D, Dp, N):
+    """η = η₀ · exp(−(D'/D) / R)."""
+    return p["eta0"] * torch.exp(-(Dp / D) / p["R"])
+
+
+def _eta_exp_DoverN(p, D, Dp, N):
+    """η = η₀ · exp(−(D'/D) / R(D/N)),  R = R₀ · (D/N)^ρ."""
+    R = p["R0"] * (D / N) ** p["rho"]
+    return p["eta0"] * torch.exp(-(Dp / D) / R)
+
+
+def _eta_muennighoff(p, D, Dp, N):
+    """Muennighoff '23 Eq 5 (exact form, derived from D'_eff = U_D + U_D · R*·(1 − e^{−R/R*})):
+        η = R*·(1 − exp(−x/R*)) / x,   x = D'/D,   R* = R₀ · (D/N)^ρ.
+    Algebraically forces η→1 as x→0 (first repeated token = fresh) and
+    η → 0 as x → ∞ (full saturation)."""
+    R = p["R0"] * (D / N) ** p["rho"]
+    x = Dp / D
+    return R * (1.0 - torch.exp(-x / R)) / x
 
 
 FORMS: Dict[str, dict] = {
@@ -131,6 +157,31 @@ FORMS: Dict[str, dict] = {
             "kappa": [0.0, 0.5, 1.0, 1.5],
         }),
         desc=f"η = c · (D/N)^(−γ) / (1 + b₀·(N/{_N_REF:.0e})^κ · D'/D)",
+    ),
+    "exp(D'/D)": dict(
+        fn=_eta_exp,
+        grid=expand_grid({
+            "eta0": [0.3, 0.5, 0.7, 1.0],
+            "R":    [0.5, 2.0, 5.0, 20.0, 100.0],
+        }),
+        desc="η = η₀ · exp(−(D'/D) / R)",
+    ),
+    "exp(D'/D), R(D/N)": dict(
+        fn=_eta_exp_DoverN,
+        grid=expand_grid({
+            "eta0": [0.3, 0.6, 1.0],
+            "R0":   [1.0, 5.0, 20.0, 100.0],
+            "rho":  [-1.0, -0.3, 0.0, 0.5],
+        }),
+        desc="η = η₀ · exp(−(D'/D) / (R₀·(D/N)^ρ))",
+    ),
+    "Muennighoff Eq 5": dict(
+        fn=_eta_muennighoff,
+        grid=expand_grid({
+            "R0":  [0.5, 2.0, 5.0, 20.0, 100.0],
+            "rho": [-1.0, -0.3, 0.0, 0.5],
+        }),
+        desc="η = R*·(1−e^(−x/R*))/x  with R* = R₀·(D/N)^ρ ; x=D'/D",
     ),
 }
 
@@ -273,11 +324,17 @@ def fmt_tokens(x, pos=None):
 
 
 def plot_per_size_eta(results, path, title):
-    """One column per size × one row per form — showing η vs D'/D on log-log."""
+    """One column per size × one row per form — showing η vs D'/D on log-log.
+    Rows are the four top-performing forms, sorted by joint LOO."""
     sizes = sorted(results.keys(), key=lambda t: SIZES[t][0])
-    forms = ["const", "power(D'/D)", "sat(D'/D)", "sat × (D/N)"]
+    forms = [
+        "sat × (D/N)",
+        "sat × (D/N), b(N)",
+        "exp(D'/D), R(D/N)",
+        "Muennighoff Eq 5",
+    ]
     fig, axes = plt.subplots(len(forms), len(sizes),
-                             figsize=(3.2 * len(sizes), 2.6 * len(forms)),
+                             figsize=(3.4 * len(sizes), 2.7 * len(forms)),
                              squeeze=False)
     for row, form_name in enumerate(forms):
         for col, size in enumerate(sizes):
@@ -311,6 +368,148 @@ def plot_per_size_eta(results, path, title):
                         bbox=dict(boxstyle="round,pad=0.2",
                                   facecolor="white", alpha=0.8))
     fig.suptitle(title, fontsize=FONT_TITLE + 1, y=1.00)
+    fig.tight_layout()
+    fig.savefig(path, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved {path}")
+
+
+def plot_AvsB_per_size(per_size, path):
+    """One panel per size; both Muennighoff (A) and sat-x-(D/N)-b(N) (B)
+    fitted η curves overlaid on the per-point η scatter."""
+    sizes = sorted(per_size.keys(), key=lambda t: SIZES[t][0])
+    nrows, ncols = 1, len(sizes)
+    fig, axes = plt.subplots(nrows, ncols,
+                             figsize=(3.6 * ncols, 4.0),
+                             squeeze=False)
+    A_name = "Muennighoff Eq 5"
+    B_name = "sat × (D/N), b(N)"
+
+    for col, size in enumerate(sizes):
+        ax = axes[0, col]
+        d = per_size[size]
+        N = SIZES[size][0]
+
+        # per-point η
+        v = ~np.isnan(d["eta_pp"])
+        ax.scatter(d["Dp"][v] / d["D"][v], d["eta_pp"][v], s=35,
+                   color="gray", edgecolors="k", linewidths=0.3, alpha=0.7,
+                   zorder=4, label="per-point η")
+        ax.axhline(1.0, color="gray", linestyle="--", linewidth=0.8, alpha=0.5)
+
+        # Smooth curve grid for plotting fits — we span the data D'/D range
+        # for the typical scale at this size
+        scales = sorted(set((d["D"] / (TTP_RATIO * N)).tolist()))
+        for j, scale in enumerate(scales):
+            D_val = scale * TTP_RATIO * N
+            mask = np.isclose(d["D"], D_val)
+            if not mask.any():
+                continue
+            x_min = max(d["Dp"][mask].min() * 0.7, D_val * 0.1) / D_val
+            x_max = (d["Dp"][mask].max() * 1.4) / D_val
+            x_range = np.geomspace(x_min, x_max, 80)
+            Dp_range = x_range * D_val
+            D_arr = torch.full((len(x_range),), float(D_val), dtype=torch.float64)
+            Dp_arr = torch.tensor(Dp_range, dtype=torch.float64)
+            N_t = torch.full_like(D_arr, float(N))
+
+            for form_name, color, ls in [(A_name, "tab:red", "-"),
+                                          (B_name, "tab:blue", "--")]:
+                if form_name not in d:
+                    continue
+                p = d[form_name]["params"]
+                p_t = {k: torch.tensor(v_, dtype=torch.float64) for k, v_ in p.items()}
+                with torch.no_grad():
+                    eta_curve = FORMS[form_name]["fn"](p_t, D_arr, Dp_arr, N_t).numpy()
+                # Only label on first scale to avoid legend explosion
+                lbl = (f"A. Muennighoff" if (form_name == A_name and j == 0)
+                       else (f"B. sat × (D/N), b(N)" if (form_name == B_name and j == 0)
+                             else None))
+                ax.plot(x_range, eta_curve, ls, color=color, linewidth=1.6,
+                        alpha=0.85, label=lbl)
+
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel("D'/D", fontsize=FONT_LABEL - 1)
+        if col == 0:
+            ax.set_ylabel("η", fontsize=FONT_LABEL)
+        loo_A = d.get(A_name, {}).get("loo_rmse", float("nan"))
+        loo_B = d.get(B_name, {}).get("loo_rmse", float("nan"))
+        ax.set_title(f"{size}  (N={N/1e6:.0f}M)\n"
+                     f"LOO  A={loo_A:.3f}  B={loo_B:.3f}",
+                     fontsize=FONT_LEGEND + 1)
+        ax.tick_params(labelsize=FONT_TICK - 2)
+        ax.grid(alpha=0.3, which="both")
+        if col == 0:
+            ax.legend(fontsize=FONT_LEGEND - 1, loc="best")
+
+    fig.suptitle("η fit: Form A (Muennighoff) vs Form B (sat × (D/N), b(N))  "
+                 "— per-point η as background dots",
+                 fontsize=FONT_TITLE, y=1.05)
+    fig.tight_layout()
+    fig.savefig(path, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved {path}")
+
+
+def plot_joint_AvsB(tags, D, Dp, N_arr, L, eta_pp, results_joint, path):
+    """Two-panel figure: form A fit and form B fit, both on the pooled data,
+    coloured by size. Lets the reader see where each form deviates."""
+    sizes = sorted(set(tags), key=lambda t: SIZES[t][0])
+    cmap = plt.cm.viridis
+    cnorm = plt.Normalize(vmin=0, vmax=len(sizes) - 1)
+    A_name, B_name = "Muennighoff Eq 5", "sat × (D/N), b(N)"
+
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    fig.suptitle("Joint η fit — A vs B, residuals coloured by size",
+                 fontsize=FONT_TITLE + 1, y=0.995)
+
+    for col, (form_name, label) in enumerate(
+            [(A_name, "A. Muennighoff Eq 5"),
+             (B_name, "B. sat × (D/N), b(N)")]):
+        if form_name not in results_joint:
+            continue
+        r = results_joint[form_name]
+        ax_eta = axes[0, col]
+        ax_res = axes[1, col]
+
+        for i, size in enumerate(sizes):
+            m = tags == size
+            color = cmap(cnorm(i))
+            # per-point η
+            valid = m & ~np.isnan(eta_pp)
+            ax_eta.scatter(Dp[valid] / D[valid], eta_pp[valid], s=42,
+                           color=color, edgecolors="k", linewidths=0.3,
+                           alpha=0.55, zorder=4,
+                           label=size if col == 0 else None)
+            # parametric η at fitted params
+            ax_eta.scatter(Dp[m] / D[m], r["eta_pred"][m], s=42,
+                           color=color, marker="x", linewidths=1.6, zorder=6)
+            ax_res.scatter(Dp[m] / D[m], r["resid"][m], s=50, color=color,
+                           edgecolors="k", linewidths=0.3,
+                           label=size if col == 0 else None)
+        ax_eta.axhline(1.0, color="gray", linestyle="--", linewidth=1, alpha=0.6)
+        ax_eta.set_xscale("log"); ax_eta.set_yscale("log")
+        ax_eta.set_xlabel("D'/D", fontsize=FONT_LABEL)
+        ax_eta.set_ylabel("η", fontsize=FONT_LABEL)
+        ax_eta.set_title(f"{label}\n(dots = per-point, × = fitted)",
+                         fontsize=FONT_TITLE - 1)
+        ax_eta.tick_params(labelsize=FONT_TICK)
+        if col == 0:
+            ax_eta.legend(fontsize=FONT_LEGEND, loc="best", ncol=2)
+        ax_eta.grid(alpha=0.3, which="both")
+
+        ax_res.axhline(0, color="gray", linestyle="--", linewidth=1, alpha=0.6)
+        ax_res.set_xscale("log")
+        ax_res.set_xlabel("D'/D", fontsize=FONT_LABEL)
+        ax_res.set_ylabel("log-loss residual (obs − pred)", fontsize=FONT_LABEL)
+        ax_res.set_title(f"residuals  (RMSE={r['rmse']:.4f},  LOO={r['loo_rmse']:.4f})",
+                         fontsize=FONT_TITLE - 1)
+        ax_res.tick_params(labelsize=FONT_TICK)
+        if col == 0:
+            ax_res.legend(fontsize=FONT_LEGEND, loc="best", ncol=2)
+        ax_res.grid(alpha=0.3)
+
     fig.tight_layout()
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
@@ -421,29 +620,47 @@ def diagnose_size(per_size, joint_results, anchor, size: str):
 
 
 def main():
-    # 1) Joint 5-param Chinchilla anchors
+    # 1) Joint 5-param Chinchilla anchors via residual-based outlier drop
     print(f"\n{'='*100}")
-    print("Fitting joint Chinchilla anchors (E, A, B, α, β) across all sizes ...")
+    print("Fitting joint Chinchilla anchors (E, A, B, α, β) — iterative "
+          "residual drop on all 1-epoch points")
     print(f"{'='*100}")
-    tags_1ep, N_1ep, _, D_1ep, L_1ep = collect_1epoch_all_sizes(scale_min=SCALE_MIN)
-    anchor = fit_joint(N_1ep, D_1ep, L_1ep)
+    tags_1ep, N_1ep, _, D_1ep, L_1ep = collect_1epoch_all_sizes(scale_min=0.0)
+    drop_sweep, _, _ = topk_residual_drop_sweep(
+        tags_1ep, N_1ep, D_1ep, L_1ep,
+        k_values=[0, 5, 10, 15, 20, 25], delta=0.1, iterative=True)
+    # Pick smallest k where β stabilizes
+    k_sorted = sorted(drop_sweep.keys())
+    betas_seq = [drop_sweep[k]["p"]["beta"] for k in k_sorted]
+    canonical_k = k_sorted[-1]
+    for i in range(1, len(betas_seq)):
+        if abs(betas_seq[i] - betas_seq[i - 1]) < 0.01:
+            canonical_k = k_sorted[i]
+            break
+    anchor = drop_sweep[canonical_k]["p"]
     E_joint, A_joint = anchor["E"], anchor["A"]
     B_joint, alpha_joint, beta_joint = anchor["B"], anchor["alpha"], anchor["beta"]
+    print(f"\nUsing canonical k={canonical_k} anchors:")
     print(f"  E={E_joint:.4f}  A={A_joint:.2f}  B={B_joint:.2f}  "
           f"α={alpha_joint:.4f}  β={beta_joint:.4f}")
 
     def E_eff(N):
         return E_joint + A_joint / N ** alpha_joint
 
-    # 2) Per-size η fits (for sizes with multi-epoch data)
+    # 2) Per-size η fits (for sizes with multi-epoch data).
+    #    We keep scale_min=0.5x for the η fit because including small-scale
+    #    multi-epoch points pollutes per-point η (the joint anchors miss
+    #    those scales the most, even after residual drop on 1-epoch data).
+    #    The "no scale cut" change applies to the 1-epoch fit only.
+    eta_scale_min = 0.5
     print(f"\n{'='*100}")
-    print(f"Per-size η fits  (scale ≥ {SCALE_MIN}×, δ={DELTA})")
+    print(f"Per-size η fits  (scale ≥ {eta_scale_min}×, δ={DELTA})")
     print(f"{'='*100}")
     per_size: Dict[str, Dict] = {}
     for size in SIZES:
         N, datasets = load(size)
         s, D, ep, Dp, L = extract_multi_epoch(
-            datasets, N, scale_min=SCALE_MIN,
+            datasets, N, scale_min=eta_scale_min,
             exclude_overfit=OVERFIT_EXCLUDE.get(size, set()))
         if len(D) < 5:
             print(f"  {size}: only {len(D)} multi-epoch points — skipping per-size fit")
@@ -472,7 +689,7 @@ def main():
     print(f"\n{'='*100}")
     print("Joint η fit across all sizes  (pooled multi-epoch data)")
     print(f"{'='*100}")
-    tags, Ns, scales, Ds, eps, Dps, Ls = collect_multi_epoch_all_sizes(SCALE_MIN)
+    tags, Ns, scales, Ds, eps, Dps, Ls = collect_multi_epoch_all_sizes(eta_scale_min)
     E_eff_arr = np.array([E_eff(n) for n in Ns])
     eta_pp_pool = per_point_eta(Ds, Dps, Ls, E_eff_arr, B_joint, beta_joint)
     n_gt1 = int(np.sum(eta_pp_pool > 1))
@@ -508,6 +725,14 @@ def main():
     plot_joint_eta(tags, Ds, Dps, Ns, Ls, eta_pp_pool,
                    joint_results[best_joint], best_joint,
                    path=os.path.join(SCRIPT_DIR, "fit_eta_joint.pdf"))
+
+    # New: A vs B head-to-head plots
+    plot_AvsB_per_size(
+        per_size, path=os.path.join(SCRIPT_DIR, "fit_eta_AvsB_per_size.pdf"))
+
+    plot_joint_AvsB(
+        tags, Ds, Dps, Ns, Ls, eta_pp_pool, joint_results,
+        path=os.path.join(SCRIPT_DIR, "fit_eta_AvsB_joint.pdf"))
 
     return per_size, joint_results
 

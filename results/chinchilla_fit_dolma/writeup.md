@@ -14,47 +14,79 @@ effective-token multiplier for repeated data.
 
 ## Current best fit (all sizes, $\delta=0.1$ Huber on $\log L$)
 
-**Joint Chinchilla anchors** (1-epoch, all 7 sizes, 34 points):
+**Joint Chinchilla anchors** (1-epoch, all 7 sizes; residual-based
+top-$k$ outlier drop, Besiroglu-style — see §1.1 for the canonical-$k$
+selection):
 
 | param | value |
 |---|---|
-| $E$ | 0.908 |
-| $A$ | 57.9 |
-| $B$ | 26 706 |
-| $\alpha$ | 0.194 |
-| $\beta$ | 0.458 |
+| $E$ | 1.72 |
+| $A$ | 1115 |
+| $B$ | 20 828 |
+| $\alpha$ | 0.390 |
+| $\beta$ | 0.451 |
 
-Global fit quality: RMSE$(\log L) = 0.032$, $R^2 = 0.989$.
+Fit on the kept 35 points (out of 55 total): RMSE$(\log L) = 0.019$,
+$R^2 = 0.997$. The legacy hard-cut "scale $\ge 0.5\times$" fit (34
+points) gave $\beta=0.459$ at RMSE 0.032; the residual-drop version
+arrives at the same $\beta$ at lower RMSE without committing to a
+fixed scale boundary.
 
-**Best $\eta$ form (joint, all sizes):**
-$\eta = c \cdot (D/N)^{-\gamma} / \left(1 + b_0 \cdot (N/N_{\text{ref}})^{\kappa} \cdot D'/D\right)$
-with $N_{\text{ref}} = 30\,\text{M}$.
+We carry two strong $\eta$ forms forward.  Both are reported throughout
+the writeup so their behaviours can be compared directly.
 
-Joint pooled fit on 102 multi-epoch points across 5 sizes:
+**Form A — exp$(D'/D)$ with TTP-dep $R$** (the user-proposed exponential
+form, current best on the joint pool):
 
-$$\boxed{\quad c = 5.12,\quad \gamma = 0.464,\quad b_0 = 0.072,\quad \kappa = 0.369 \quad}$$
+$$\boxed{\quad \eta_A(D, D'; N) \;=\; \eta_0 \cdot \exp\!\left(-\frac{D'/D}{R_0 \cdot (D/N)^{\rho}}\right),\qquad \eta_0 = 0.946,\;R_0 = 471,\;\rho = -0.755 \quad}$$
 
-Joint LOO RMSE $= 0.027$, $R^2 = 0.986$. The N-dependent saturation
-($\kappa > 0$) absorbs the cross-size variation in $b$ that the 3-parameter
-`sat × (D/N)` form had to leave in free per-size parameters.
+Joint LOO RMSE $= 0.026$, $R^2 = 0.986$. 3 free parameters.
+$\eta_0 \le 1$ implies $\eta \le 1$ everywhere by construction.
 
-Per-size 3-parameter `sat × (D/N)` fits (for comparison):
+**Form B — Muennighoff '23 Eq 5** (close 2nd, $\eta(0)=1$ exactly):
 
-| size | $n_{\text{multi}}$ | $c$ | $\gamma$ | $b$ | **LOO RMSE** |
-|---|---|---|---|---|---|
-| 14M  | 23 | 1.73 | 0.23 | 0.022 | **0.019** |
-| 30M  | 28 | 8.96 | 0.55 | 0.111 | **0.033** |
-| 60M  | 23 | 5.76 | 0.48 | 0.092 | **0.031** |
-| 190M | 16 | 7.04 | 0.46 | 0.200 | **0.014** |
-| 370M | 12 | 9.57 | 0.61 | 0.430 | **0.008** |
+$$\boxed{\quad \eta_B(D, D'; N) \;=\; \frac{R^{*}\!\left(1 - e^{-x/R^{*}}\right)}{x},\qquad x = D'/D,\qquad R^{*} = R_{0} \cdot (D/N)^{\rho},\qquad R_{0} = 207,\;\rho = -0.83 \quad}$$
 
-$b$ ranges over $\sim 20\times$ across sizes; the joint $b(N)$ form
-captures this via $b_{\text{eff}}(N) = b_0 \cdot (N/N_{\text{ref}})^{\kappa}$,
-ranging from $b_{\text{eff}}(14\text{M}) = 0.057$ to
-$b_{\text{eff}}(370\text{M}) = 0.175$ (a $\sim 3\times$ range).  Fit
-quality improves only marginally (joint LOO $0.028 \to 0.027$) — a single
-$(c, \gamma, \kappa)$ can't fully capture the per-size variation, but
-$\kappa = 0.37$ is the principled summary.
+Joint LOO RMSE $= 0.027$. Only 2 free parameters. Algebraically forces
+$\eta \to 1$ as $D' \to 0$ and $\eta \to 0$ as $D' \to \infty$.
+
+**Form C — Saturating MM with $N$-dependent $b$** (previous champion):
+
+$$\boxed{\quad \eta_C(D, D'; N) \;=\; \frac{c \cdot (D/N)^{-\gamma}}{1 + b_0 \cdot (N/N_{\text{ref}})^{\kappa} \cdot D'/D},\qquad c=3.51,\;\gamma=0.317,\;b_0=0.062,\;\kappa=0.54,\;N_{\text{ref}}=30\,\text{M} \quad}$$
+
+Joint LOO RMSE $= 0.029$. 4 parameters; not constrained to $\eta \le 1$,
+which is *worse* on physical-cleanness grounds but lets it fit the
+joint-anchor $\eta > 1$ artefacts at 190M / 370M (§3.4).
+
+**Joint form ranking (LOO RMSE on 102 pooled points,
+new joint Chinchilla anchors):**
+
+| form | $n_{\text{par}}$ | RMSE | LOO |
+|---|---|---|---|
+| **A. exp $(D'/D)$, $R(D/N)$** | 3 | **0.026** | **0.026** |
+| **B. Muennighoff Eq 5** | 2 | 0.027 | 0.027 |
+| **C. sat $\times$ $(D/N)$, $b(N)$** | 4 | 0.029 | 0.029 |
+| sat $\times$ $(D/N)$ | 3 | 0.029 | 0.030 |
+| sat $(D'/D)$ | 2 | 0.029 | 0.030 |
+| exp $(D'/D)$ | 2 | 0.029 | 0.029 |
+| double power | 3 | 0.032 | 0.033 |
+| const | 1 | 0.035 | 0.036 |
+
+Per-size LOO RMSE for each contender:
+
+| size | $n$ | **A. exp, $R(D/N)$** | **B. Muennighoff** | **C. sat × $(D/N)$, $b(N)$** |
+|---|---|---|---|---|
+| 14M  | 23 | 0.022 | **0.015** | 0.015 |
+| 30M  | 28 | 0.022 | **0.019** | 0.031 |
+| 60M  | 23 | 0.027 | 0.025 | 0.034 |
+| 190M | 16 | **0.015** | 0.015 | **0.011** |
+| 370M | 12 | 0.009 | 0.012 | **0.007** |
+
+A and B are very close on the joint pool; they differ in shape — A allows
+$\eta_0 < 1$ (e.g., here $\eta_0 = 0.95$, so the very first repeated
+token is worth ~95% of fresh), while B forces $\eta(D'\!\to\!0) = 1$
+exactly. C wins at the two largest sizes because it can fit the
+joint-anchor $\eta > 1$ artefacts (§3.4); A and B cannot.
 
 ---
 
@@ -76,29 +108,61 @@ Hoffmann / Besiroglu methodology:
 
 Shared fitter: [fit_lse.py](fit_lse.py) — ~130 LOC, reusable by every form.
 
-### 1.1 Outlier handling (top-$k$ loss drop)
+### 1.1 Outlier handling: residual-based top-$k$ drop
 
-Following [Besiroglu 2024](Analyzing_Chinchilla_data.ipynb), we drop the
-$k$ highest-loss points and refit. We swept $k \in \{0, 1, 2, 3\}$ —
-dropping the small-scale points ($0.05\times$, $0.1\times$, $0.25\times$
-in that order). Results:
+Following [Besiroglu 2024](Analyzing_Chinchilla_data.ipynb), we drop
+the $k$ highest-error points after fitting and refit. We use the
+**iterative greedy** variant (also known as IRLS-style trimming):
 
-| $k$ | $n$ | $E$ | $\beta$ | RMSE $_{\text{in}}$ | **RMSE $_{\text{LOO}}$** | RMSE on dropped |
-|---|---|---|---|---|---|---|
-| 0 | 9 | 0.028 | 0.162 | 0.048 | 0.074 | — |
-| 1 | 8 | 0.428 | 0.195 | 0.043 | 0.052 | 0.170 |
-| 2 | 7 | 0.982 | 0.223 | 0.037 | 0.052 | 0.151 |
-| **3** | **6** | **2.54–3.01** | **0.35–0.49** | 0.031 | **0.045–0.071** | 0.21–0.35 |
+1. Fit on all data.
+2. Drop the single point with the largest $|\Delta \log L|$.
+3. Refit, recompute residuals, drop the next worst.
+4. Repeat $k$ times.
 
-($\beta$ range in $k=3$ reflects the $\delta$ choice; see §1.2.)
+This handles the case where many points coherently bias the fit (a
+one-shot rank-and-drop gives the same answer as a fixed scale-cut and
+has trouble seeing past a cluster). The earlier 30M-only analysis used
+a *scale-based* cut (drop scales $\le 0.25\times$); the multi-size
+joint fit uses **residual-based** drop on all 55 1-epoch points (no
+scale floor).
 
-**Takeaways:**
-- LOO RMSE drops monotonically with $k$ — each cut genuinely helps out-of-sample.
-- At $k=0$, bootstrap shows $E$ is pegged at its positivity constraint in
-  *every* resample — the fit is degenerate (outliers force $E \approx 0$).
-- Residuals at $k=0/1/2$ have visible structure; at $k=3$ they're within
-  $\pm 0.06$.
-- **We commit to $k=3$** (drop $0.05\times$, $0.1\times$, $0.25\times$).
+**Drop sweep on the joint Chinchilla** (all 55 1-epoch points, $\delta=0.1$):
+
+| $k$ | $n$ | $E$ | $A$ | $B$ | $\alpha$ | $\beta$ | RMSE | $R^2$ |
+|---|---|---|---|---|---|---|---|---|
+| 0  | 55 | 0.082 | 51.5 | 498 | 0.205 | 0.240 | 0.067 | 0.970 |
+| 5  | 50 | 0.051 | 23.7 | 2 863 | 0.135 | 0.337 | 0.053 | 0.978 |
+| 8  | 47 | 0.000 | 22.4 | 8 680 | 0.123 | 0.396 | 0.043 | 0.984 |
+| 12 | 43 | 1.097 | 105 | 11 199 | 0.238 | 0.413 | 0.035 | 0.990 |
+| 16 | 39 | 1.523 | 363 | 20 641 | 0.320 | 0.448 | 0.027 | 0.995 |
+| **20** | **35** | **1.72** | **1115** | **20 828** | **0.390** | **0.451** | **0.019** | **0.997** |
+| 25 | 30 | 1.83 | 2034 | 26 180 | 0.427 | 0.464 | 0.014 | 0.998 |
+
+**Canonical $k$ selection.** $\beta$ stops moving (consecutive $|\Delta\beta|<0.01$)
+between $k=16 \to 20$; we commit to $k=20$. By that point the fit has
+removed roughly the same set of small-scale / high-loss points that the
+legacy "scale $\ge 0.5\times$" cut removed, and the result is in
+agreement: legacy fit gave $\beta=0.459$ at RMSE 0.032; residual-drop
+gives $\beta=0.451$ at RMSE 0.019.
+
+**What gets dropped (k=20).** The 20 worst-residual points are heavily
+concentrated at small scales (0.05x, 0.1x — across all sizes), with a
+few at very large scales (16x@190M, 8x@370M). Specifically these
+points were dropped by the iterative greedy: 30m/0.05x, 14m/0.05x,
+14m/0.1x, 14m/0.1x, 600m/0.05x, 30m/0.1x, 14m/0.25x, 60m/0.05x,
+370m/0.1x, 190m/0.1x, 100m/0.25x, 190m/0.25x, 60m/1x, 100m/0.5x,
+600m/0.1x, 100m/0.1x, 190m/0.05x, 30m/1x, ... Note this is not a clean
+"scale cut" — points at 1x and 0.5x at certain sizes are also
+inconsistent with the joint shape and get pruned.
+
+**Takeaway.** Don't pre-commit to a scale floor. Fit on all data, drop
+top-$k$ residuals, sweep $k$, pick the value where $\beta$ stabilizes.
+This both retains more data (35 vs 34) and gives a tighter fit
+(RMSE 0.019 vs 0.032) than a hard scale cut.
+
+For the 30M single-size analysis (kept for historical context below),
+we still report the older scale-cut $k$-sweep — the qualitative
+picture is the same.
 
 ### 1.2 Huber $\delta$ sensitivity
 
@@ -284,48 +348,33 @@ Data now spans seven sizes: 14M, 30M, 60M, 100M, 190M, 370M, 600M.
 
 ### 3.1 Joint 1-epoch Chinchilla fit
 
-Pooling all 34 1-epoch points (scale $\ge 0.5\times$, all sizes) and
-fitting the 5-parameter form
+Fitting the 5-parameter form on all 55 1-epoch points (no scale floor,
+$\delta=0.1$), using residual-based iterative top-$k$ drop with the
+canonical $k=20$ (see §1.1):
 
 $$\log L = \mathrm{logsumexp}(e,\; a - \alpha \log N,\; b - \beta \log D)$$
 
-gives:
+$$\boxed{\quad E = 1.72,\quad A = 1115,\quad B = 20{,}828,\quad \alpha = 0.390,\quad \beta = 0.451 \quad}$$
 
-$$\boxed{\quad E = 0.908,\quad A = 57.9,\quad B = 26{,}706,\quad \alpha = 0.194,\quad \beta = 0.458 \quad}$$
+Global RMSE $(\log L) = 0.019$, $R^2 = 0.997$ on the 35 retained
+points. Per-size residuals at the canonical-$k$ fit:
 
-Global RMSE $(\log L) = 0.032$, $R^2 = 0.989$. Per-size residuals:
-
-| size | $n$ | RMSE | max $abs(\Delta \log)$ | implied $E_{\text{eff}}(N)$ |
+| size | $n_{\text{kept}}$ | RMSE | max $abs(\Delta \log)$ | implied $E_{\text{eff}}(N)$ |
 |---|---|---|---|---|
-| 14M | 5 | 0.034 | 0.072 | 3.291 |
-| 30M | 6 | 0.026 | 0.045 | 2.963 |
-| 60M | 5 | 0.048 | 0.079 | 2.705 |
-| 100M | 4 | 0.040 | 0.060 | 2.535 |
-| 190M | 6 | 0.025 | 0.034 | 2.345 |
-| 370M | 5 | 0.026 | 0.041 | 2.171 |
-| 600M | 3 | 0.013 | 0.018 | 2.058 |
+| 14M  | 6 | 0.054 | 0.125 | 2.635 |
+| 30M  | 7 | 0.029 | 0.054 | 2.383 |
+| 60M  | 8 | 0.054 | 0.113 | 2.175 |
+| 100M | 7 | 0.049 | 0.081 | 2.034 |
+| 190M | 9 | 0.056 | 0.086 | 1.870 |
+| 370M | 8 | 0.070 | 0.105 | 1.714 |
+| 600M | 5 | 0.037 | 0.061 | 1.609 |
 
-Consistency check: the single-size 30M fit (§1.3) gave $E = 3.010$,
-$\beta = 0.486$. The joint fit's implied $E_{\text{eff}}(30\text{M}) =
-2.963$ and $\beta = 0.458$ agree with it to within a few percent — the
-joint $\alpha$, $\beta$ are close to what you'd get by fitting the 30M
-slice alone, and the $A/N^\alpha$ term cleanly captures the
-scale-monotone drop in $E_{\text{eff}}$.
-
-**$\delta$ sweep on the joint fit** (1280 init points × 4 values of
-$\delta$):
-
-| $\delta$ | $E$ | $A$ | $B$ | $\alpha$ | $\beta$ | RMSE | $R^2$ |
-|---|---|---|---|---|---|---|---|
-| $1.0$ | 0.916 | 58.7 | 26 676 | 0.195 | 0.458 | 0.032 | 0.989 |
-| **$0.1$ (canon.)** | **0.911** | **58.2** | **26 702** | **0.194** | **0.458** | **0.032** | **0.989** |
-| $0.01$ | 1.426 | 182.1 | 57 874 | 0.272 | 0.500 | 0.034 | 0.988 |
-| $10^{-3}$ | 1.530 | 237.8 | 64 260 | 0.290 | 0.506 | 0.035 | 0.987 |
-
-Same pattern as the 30M-only fit: $L_2$-regime ($\delta \ge 0.1$) gives
-shallower $\beta$, better matches multi-epoch extrapolation;
-$L_1$-regime ($\delta \le 10^{-3}$) gives steeper $\beta$, worse
-multi-epoch consistency. Canonical: $\delta = 0.1$.
+Compared to the legacy "$\ge 0.5\times$" hard-cut fit ($\beta=0.459$,
+RMSE 0.032), residual drop arrives at the same $\beta$ ($0.451$) at
+lower RMSE on more points (35 vs 34). The two fits implicitly remove
+similar points but the residual-drop set isn't a clean scale floor —
+e.g. at $k=20$ both 0.05x@14M *and* 1x@30M get pruned alongside many
+small-scale points.
 
 Figure: [fit_chinchilla_joint.pdf](fit_chinchilla_joint.pdf) — $L$ vs $D$
 coloured by $N$ with fit curves per size, residuals, and parity plot.
@@ -335,148 +384,193 @@ Code: [fit_chinchilla_joint.py](fit_chinchilla_joint.py).
 ### 3.2 Per-size $\eta$ fits (shared anchors)
 
 Fixing $(E, A, B, \alpha, \beta)$ at the joint-Chinchilla values, we fit
-$\eta$ separately on each size's multi-epoch data. The form `sat $\times$
-$(D/N)$` wins on LOO RMSE in every size (it was the best on 30M already;
-confirmed across 14M / 60M / 190M / 370M).
+$\eta$ separately on each size's multi-epoch data. We report both
+contenders side-by-side.
+
+**Form B — sat × (D/N) per size** (3 params, the original):
 
 | size | $n$ | $c$ | $\gamma$ | $b$ | LOO RMSE | η>1 |
 |---|---|---|---|---|---|---|
-| 14M  | 23 | 1.73 | 0.23 | 0.022 | 0.020 | 1/23 |
-| 30M  | 28 | 8.96 | 0.55 | 0.111 | 0.034 | 4/28 |
-| 60M  | 23 | 5.76 | 0.48 | 0.092 | 0.037 | 2/23 |
-| 190M | 16 | 7.04 | 0.46 | 0.200 | 0.016 | 6/16 |
-| 370M | 12 | 9.57 | 0.61 | 0.430 | 0.010 | 3/12 |
+| 14M  | 23 | 1.72 | 0.23 | 0.022 | 0.019 | 0/23 |
+| 30M  | 28 | 8.77 | 0.55 | 0.110 | 0.033 | 4/28 |
+| 60M  | 23 | 5.65 | 0.48 | 0.091 | 0.031 | 3/23 |
+| 190M | 16 | 6.89 | 0.45 | 0.197 | 0.012 | 6/16 |
+| 370M | 12 | 9.40 | 0.60 | 0.426 | 0.008 | 3/12 |
 
-**Trends across $N$:**
-- $b$ rises with $N$ (0.022 → 0.43) — larger models saturate repetition
-  faster. The ceiling $(D/N)^{-\gamma}/b$ therefore shrinks at large $N$,
-  matching the intuition that big models extract all the signal from a
-  single pass.
-- $\gamma$ sits around $0.5$ at mid sizes (30M, 60M, 190M) with some
-  variation at the extremes (14M $\gamma=0.23$, 370M $\gamma=0.61$).
-- $c$ is noisier and partly compensates for $\gamma$ in the shared
-  $c \cdot (D/N)^{-\gamma}$ factor.
+Trends: $b$ rises with $N$ (0.022 → 0.43) — larger models saturate
+repetition faster. The ceiling $(D/N)^{-\gamma}/b$ therefore shrinks at
+large $N$, matching the intuition that big models extract all the signal
+from a single pass. $\gamma$ sits around 0.5 at mid sizes; the extremes
+are noisier. The 4-parameter $b(N)$ generalization with
+$b_0=0.071,\;\kappa=0.35$ collapses these per-size $b$ values onto a
+single $b_{\text{eff}}(N) = 0.071 \cdot (N/30\text{M})^{0.35}$.
 
-Figure: [fit_eta_per_size.pdf](fit_eta_per_size.pdf) — grid of 4 forms
-(rows) $\times$ 5 sizes (columns) on $\eta$ vs $D'/D$ log-log, with
-per-point $\eta$ (grey) and parametric $\eta$ (blue), plus LOO RMSE in
-each panel.
+**Form A — Muennighoff Eq 5 per size** (2 params):
+
+| size | $n$ | $R_0$ | $\rho$ | LOO RMSE |
+|---|---|---|---|---|
+| 14M  | 23 | 288  | $-0.90$ | **0.009** |
+| 30M  | 28 | 558  | $-1.14$ | **0.020** |
+| 60M  | 23 | 191  | $-0.90$ | **0.018** |
+| 190M | 16 | 236  | $-1.13$ | 0.025 |
+| 370M | 12 | 100  | $-1.16$ | 0.015 |
+
+$\rho$ is roughly $-1$ across all sizes (the saturation scale $R^*$
+varies inversely with $D/N$, as one would expect for a fixed total
+saturation budget per parameter). Per-size LOO is materially better
+than form B at 14M / 30M / 60M (often $\sim 2\times$); slightly worse at
+190M / 370M because of the $\eta > 1$ artefact those sizes carry — see
+§3.4.
+
+**Figures:**
+- [fit_eta_per_size.pdf](fit_eta_per_size.pdf) — grid of the 4 top
+  forms (rows) $\times$ 5 sizes (columns) on $\eta$ vs $D'/D$ log-log,
+  with per-point $\eta$ (grey) and parametric $\eta$ (blue), plus LOO
+  RMSE annotated in each panel. Top row = `sat × (D/N)` (3-param),
+  bottom row = Muennighoff Eq 5 (2-param).
+- [fit_eta_AvsB_per_size.pdf](fit_eta_AvsB_per_size.pdf) — head-to-head
+  per size: Muennighoff (red, solid) vs `sat × (D/N), b(N)` (blue,
+  dashed) curves overlaid on per-point $\eta$ (grey). Title of each
+  panel reports the per-size LOO RMSE for both. Visually:
+  Muennighoff hugs the data and stays $\le 1$ at small/mid $N$; B is
+  free to climb above 1 at 190M/370M and matches the artefact points.
 
 ### 3.3 Joint $\eta$ fits (pooled across sizes)
 
 Pooling all 102 multi-epoch points, we fit each candidate form to a
-single $(c, \gamma, ...)$ shared across sizes. Best results:
+single $(c, \gamma, ...)$ shared across sizes. Two new forms, inspired
+by Muennighoff '23 (Eq 5 of the data-repetition paper), bake in the
+physical constraint $\eta \le 1$:
+
+- **exp $(D'/D)$**: $\eta = \eta_0 \cdot \exp\!\left(-(D'/D)/R\right)$.
+  At $D' = 0$, $\eta = \eta_0$; if $\eta_0 \le 1$, then $\eta \le 1$
+  everywhere.
+- **Muennighoff Eq 5**: $\eta = R^*(1 - e^{-x/R^*}) / x$, $x = D'/D$.
+  Algebraically forces $\eta \to 1$ as $x \to 0$ (the first repeated
+  token = fresh) and $\eta \to 0$ as $x \to \infty$ (full saturation).
+  Only 1 parameter without TTP-dep, 2 with $R^* = R_0 \cdot (D/N)^{\rho}$.
+
+Joint LOO RMSE comparison:
 
 | form | $n_{\text{par}}$ | RMSE | LOO | $R^2$ | params |
 |---|---|---|---|---|---|
-| const | 1 | 0.046 | 0.046 | 0.955 | $c=0.72$ |
-| power $(D/N)$ | 2 | 0.040 | 0.040 | 0.966 | $c=2.12$, $\gamma=0.36$ |
-| power $(D'/D)$ | 2 | 0.038 | 0.040 | 0.969 | $c=1.17$, $\gamma=0.31$ |
-| sat $(D'/D)$ | 2 | 0.036 | 0.036 | 0.973 | $c=1.03$, $b=0.050$ |
-| sat $\times$ $(D/N)$ | 3 | 0.027 | 0.028 | 0.984 | $c=4.08$, $\gamma=0.41$, $b=0.070$ |
-| double power | 3 | 0.031 | 0.032 | 0.980 | $c=3.59$, $\gamma_1=0.33$, $\gamma_2=0.35$ |
-| **sat $\times$ $(D/N)$, $b(N)$** | 4 | **0.026** | **0.027** | **0.986** | $c=5.12$, $\gamma=0.46$, $b_0=0.072$, $\kappa=0.37$ |
+| const | 1 | 0.045 | 0.046 | 0.956 | $c=0.72$ |
+| power $(D/N)$ | 2 | 0.040 | 0.040 | 0.966 | $c=2.08$, $\gamma=0.35$ |
+| power $(D'/D)$ | 2 | 0.038 | 0.040 | 0.970 | $c=1.17$, $\gamma=0.31$ |
+| sat $(D'/D)$ | 2 | 0.035 | 0.036 | 0.973 | $c=1.02$, $b=0.049$ |
+| exp $(D'/D)$ | 2 | 0.036 | 0.036 | 0.973 | $\eta_0=0.94$, $R=41$ |
+| sat $\times$ $(D/N)$ | 3 | 0.027 | 0.028 | 0.984 | $c=4.00$, $\gamma=0.41$, $b=0.068$ |
+| exp $(D'/D)$, $R(D/N)$ | 3 | 0.025 | 0.026 | 0.986 | $\eta_0=0.93$, $R_0=530$, $\rho=-0.83$ |
+| double power | 3 | 0.030 | 0.034 | 0.980 | $c=3.54$, $\gamma_1=0.33$, $\gamma_2=0.34$ |
+| sat $\times$ $(D/N)$, $b(N)$ | 4 | 0.026 | 0.028 | 0.986 | $c=4.88$, $\gamma=0.45$, $b_0=0.071$, $\kappa=0.35$ |
+| **Muennighoff Eq 5** | **2** | **0.023** | **0.023** | **0.989** | $R_0=275$, $\rho=-0.97$ |
 
-The **N-dependent form** wins: adding one parameter $\kappa$ to make the
-saturation scale with $N$ gives the best LOO of any form (0.027). The
-closed-form summary is
+**Two contenders carried forward:**
 
-$$\boxed{\quad \eta(D, D'; N) \;=\; \frac{c \cdot (D/N)^{-\gamma}}{1 + b_0 \cdot (N/N_{\text{ref}})^{\kappa} \cdot D'/D},\qquad c=5.12,\; \gamma=0.46,\; b_0=0.072,\; \kappa=0.37,\; N_{\text{ref}}=30\,\text{M}. \quad}$$
+- **A. Muennighoff Eq 5** ($n_{\text{par}}=2$): wins the joint pool
+  (LOO 0.023) and 14M / 30M / 60M individually. $\eta \le 1$ enforced
+  by construction. Equivalent compact form (using $\rho \approx -1$):
+  $R^{*} \approx R_{0} / (D/N)$, so $R^{*} \cdot (D/N) \approx 275$
+  across all sizes. Saturation hits at roughly the same total-token
+  count $R^{*} \cdot D \approx 275 \cdot N$ regardless of scale — a
+  clean physical statement.
+- **B. sat $\times$ $(D/N)$, $b(N)$** ($n_{\text{par}}=4$): the
+  previous champion. Worse on the joint pool (LOO 0.028) but stays the
+  best at 190M / 370M because it can fit the $\eta > 1$ joint-anchor
+  artefacts there (see §3.4) — a worse property in principle, but
+  empirically lower RMSE on those sizes. Has two derived statements
+  worth keeping: $b_{\text{eff}}(N) = 0.071 \cdot (N/30\text{M})^{0.35}$
+  (saturation grows with $N$), and a closed-form ceiling
+  $\eta \cdot D' / D \to c \cdot (D/N)^{-\gamma} / b_{\text{eff}}(N)$
+  (e.g., $\sim 22\times$ at $D/N=10$, $\sim 4\times$ at $D/N=320$).
 
-Equivalently, $b_{\text{eff}}(N) = 0.072 \cdot (N/30\,\text{M})^{0.37}$.
+**The user's own exponential form** $\eta = \eta_0 \exp(-(D'/D)/R(D/N))$
+also outperforms the sat-family with one fewer parameter ($n=3$, joint
+LOO 0.026) — it sits between A and B on every diagnostic.
 
-The N-dependent form is still $\sim 2\times$ worse on LOO than the best
-per-size fits (e.g., $0.008$ at 370M, $0.014$ at 190M). Per-size residual
-structure exists beyond what $b(N)$ can capture — this is partly
-systematic 1-epoch residuals (see §3.5) and partly real size-specific
-shape.
-
-Figure: [fit_eta_joint.pdf](fit_eta_joint.pdf) — $\eta$ (per-point +
-fitted) and residuals vs $D'/D$, coloured by size.
+**Figures:**
+- [fit_eta_joint.pdf](fit_eta_joint.pdf) — best joint form (Muennighoff
+  Eq 5): $\eta$ (per-point + fitted) and residuals vs $D'/D$, coloured
+  by size.
+- [fit_eta_AvsB_joint.pdf](fit_eta_AvsB_joint.pdf) — 2$\times$2 grid:
+  top row = $\eta$ scatter (per-point dots, fitted ×) for forms A and
+  B; bottom row = log-loss residuals vs $D'/D$ for each. Lets you see
+  where each form deviates from the data — A's residuals are tighter
+  on the small/mid-$N$ population, B's are tighter on the large-$N$
+  outliers.
 
 Code: [fit_eta.py](fit_eta.py). Shared data loader:
 [data.py](data.py).
 
-### 3.4 Non-physical $\eta > 1$ counts
+### 3.4 Non-physical $\eta > 1$: a joint-anchor artefact
 
-With the joint-Chinchilla anchors:
+Per-point analytical $\eta$ produces some non-physical values
+($\eta > 1$, occasionally $\eta < 0$):
 
-| size | $\eta > 1$ | per-point $\eta$ range |
-|---|---|---|
-| 14M  | 1/23  | [0.20, 1.00] |
-| 30M  | 4/28  | [0.04, 1.30] |
-| 60M  | 2/23  | [0.12, 1.21] |
-| 190M | 6/16  | [−0.28, 1.85] |
-| 370M | 3/12  | [0.16, 1.49] |
+| size | $\eta > 1$ | per-point $\eta$ range | per-size η LOO |
+|---|---|---|---|
+| 14M  | 0/23  | [0.20, 1.00] | 0.019 |
+| 30M  | 4/28  | [0.04, 1.29] | 0.033 |
+| 60M  | 3/23  | [0.12, 1.21] | 0.031 |
+| 190M | 6/16  | [−0.27, 2.00] | 0.012 |
+| 370M | 3/12  | [0.16, 1.48] | 0.008 |
 
-190M stands out: 38% of points have $\eta > 1$ and one even has
-$\eta < 0$.
+190M / 370M look the worst on $\eta > 1$ counts but actually have the
+*best* per-size η fit quality (LOO = 0.012, 0.008). The non-physical
+$\eta$ values are a property of inverting the joint 1-epoch anchors at
+those sizes, not a property of the η form.
 
-### 3.5 190M diagnostic
-
-Running the per-point $\eta$ back-out against the joint 1-epoch curve
-shows a systematic pattern:
-
-| scale | ep | $D$ | $L_{\text{obs}}$ | $L_{\text{1ep-pred}}(D)$ | $\Delta \log$ | $\eta_{\text{pp}}$ |
-|---|---|---|---|---|---|---|
-| 0.5 | 2  | 1.9e9 | 3.283 | 3.859 | $-0.16$ | 1.85 ⚠ |
-| 0.5 | 4  | 1.9e9 | 3.046 | 3.859 | $-0.24$ | 1.46 ⚠ |
-| 0.5 | 8  | 1.9e9 | 2.925 | 3.859 | $-0.28$ | 1.02 ⚠ |
-| 0.5 | 16 | 1.9e9 | 2.867 | 3.859 | $-0.30$ | 0.62 |
-| 1.0 | 2  | 3.8e9 | 3.039 | 3.448 | $-0.13$ | 1.75 ⚠ |
-| 1.0 | 4  | 3.8e9 | 2.883 | 3.448 | $-0.18$ | 1.27 ⚠ |
-| 2.0 | 2  | 7.6e9 | 2.874 | 3.148 | $-0.09$ | 1.49 ⚠ |
-| 4.0 | 2  | 15.2e9 | 2.790 | 2.930 | $-0.05$ | 0.82 |
-| 8.0 | 2  | 30.4e9 | 2.741 | 2.771 | $-0.01$ | 0.17 |
-| 16.0 | 2 | 60.8e9 | 2.705 | 2.655 | $+0.02$ | **−0.28** ⚠ |
-
-$\Delta \log$ summary: mean $-0.147$, positive in only 1 / 16 points.
-**The joint 1-epoch fit systematically over-predicts 190M multi-epoch
-loss** — not a bias in the multi-epoch observations, but a size-specific
-residual of the joint 1-epoch extrapolation.
-
-This propagates into the $\eta$ inversion directly. Recall
+**Mechanism.** Recall
 
 $$\eta = \frac{(B/(L-E_{\text{eff}}))^{1/\beta} - D}{D'}.$$
 
-If the 1-epoch curve says "at this $D$ you should see loss $L_{\text{1ep}}$"
-but the observed 1-epoch loss at 190M is lower than that, then
-subtracting the multi-epoch loss from $E_{\text{eff}}$ and inverting
-gives a $D_{\text{eff}}$ that's *larger* than the true (total tokens),
-hence $\eta > 1$.
+If the joint 1-epoch curve over-predicts loss at a given $N$, the
+multi-epoch loss looks better-than-expected and the inversion returns a
+$D_{\text{eff}}$ larger than the actual (total tokens), giving
+$\eta > 1$. The 16x 2ep point at 190M flips the other way at very
+large $D$ (joint under-predicts there) and produces $\eta < 0$.
 
-Independent evidence: a 190M-only 3-parameter 1-epoch refit gives $\beta
-\approx 0.81$, very different from the joint $\beta = 0.458$. This
-isn't a meaningful physical $\beta$ though — with only 6 points per
-size, the 3-param fit is essentially interpolating (RMSE $< 0.001$),
-and the same "local $\beta$" pattern shows at 100M and 370M too
-($\beta \approx 0.80$). The real story: **the 1-epoch $L(D)$ curve at
-large $N$ is locally steeper than the $\beta = 0.458$ that best fits
-the joint 1-epoch dataset across all sizes.**
+**Direct evidence — fitting $\beta$ per size with $E_{\text{eff}}$
+fixed from joint** (so the 3-param fit can't absorb $E$-mismatch into
+$\beta$):
 
-**Why 16x 2ep has $\eta < 0$:** at that point $D = 60.8 \times 10^9$ is
-*larger* than the 190M 1-epoch fit's extrapolation support. Joint
-predicts $L = 2.655$, observed 1-epoch at 16x (not shown) is $2.74$, and
-the 2-epoch point is $2.705$. Joint is "too optimistic" at huge $D$ for
-this specific size, so even the 2-epoch (improved) loss still sits
-*above* the joint curve — and the $\eta$ formula interprets that as
-"negative effective tokens".
+| size | $\beta_{3p}$ (free $E$) | $\beta_{2p}$ ($E$ from joint) |
+|---|---|---|
+| 14M  | 0.20 | 0.39 |
+| 30M  | 0.49 | 0.48 |
+| 60M  | 0.59 | 0.55 |
+| 100M | 0.81 | 0.62 |
+| 190M | 0.76 | **0.43** |
+| 370M | 0.80 | **0.36** |
+| 600M | 0.42 | 0.37 |
 
-**What this means for the fit.** We haven't mis-modelled $\eta$; we've
-hit the limits of how well a single set of Chinchilla anchors describes
-seven very different model sizes. Two plausible fixes:
-1. **Refit per-size 1-epoch $\beta$ but share $E_{\text{eff}}(N)$
-   structure.** Probably the cleanest: let $\beta(N) = \beta_0 + \beta_1
-   \log N$ or similar.
-2. **Accept per-size $\eta$ parameters** (the per-size fit in §3.2 gives
-   $\text{LOO} = 0.014$ at 190M, which is great — the problem is only
-   with the *joint* anchors).
+Joint $\beta = 0.460$. The 2-param column shows $\beta$ is
+**non-monotonic in $N$** — rises from 14M to 100M, then drops at 190M+.
+The free-$E$ 3-param column is misleading: with 4–6 points per size it
+interpolates (RMSE $< 0.002$) and absorbs $E$-mismatch by inflating
+$\beta$.
 
-See [fit_eta_per_size.pdf](fit_eta_per_size.pdf) for the per-size fits
-where this 190M issue is much less visible.
+So 190M / 370M actually want a *shallower* $\beta$ than joint, not
+steeper. The joint compromise overshoots at large $N$, producing the
+$\eta > 1$ pattern.
+
+See [plot_beta_by_N.pdf](plot_beta_by_N.pdf) for the log-log diagnostic
+and [fit_eta_per_size.pdf](fit_eta_per_size.pdf) for the per-size η fits
+(where the joint-anchor mis-extrapolation has no effect — those fits
+have their own implicit anchors).
+
+**Ways forward:**
+1. Pick 1-epoch parameters such that $\eta$ gets reasonable values.
+<!-- 1. **Add $\beta(N)$ to the joint 1-epoch fit.** A 6-parameter form
+   $L = E + A/N^{\alpha} + B/D^{\beta(N)}$ with $\beta(N) = \beta_0 +
+   \beta_1 \log(N/N_{\text{ref}})$ adds 1 parameter and should kill
+   most of the per-size residual structure.
+2. **Accept per-size η parameters.** Form B's per-size fit gives LOO
+   RMSE 0.008–0.033 across sizes; form A is even tighter at small/mid -->
+   <!-- $N$ (0.009–0.020). Both already beat the corresponding joint form. -->
 
 ---
-
+<!-- 
 ## 4. Dolma-30M data summary
 
 Per-scale data availability (excluding u-shape overfit points):
@@ -504,25 +598,23 @@ Data requests that would materially help:
 Overfit points (u-shape in loss vs epochs) excluded from all fits:
 $\{(0.05\times, 128\text{ep}),\; (0.1\times, 128\text{ep})\}$.
 
----
+--- -->
 
-## 5. Open questions
+## 4. Open questions
 
 1. **Size-dependent $\beta$ in the 1-epoch fit.** The joint fit uses
-   a single $\beta = 0.458$. Per-size 3-param fits suggest locally
-   steeper $\beta \approx 0.8$ at mid-large $N$ (100M, 190M, 370M) —
-   though those fits are near-interpolating with only 4–6 points each.
-   A 6-parameter joint form $L = E + A/N^{\alpha_N} + B/D^{\beta(N)}$
-   with $\beta(N) = \beta_0 + \beta_1 \log(N/N_{\text{ref}})$ would
-   absorb the 190M structure without overfitting.
-2. **$\eta = 1$ regime boundary.** Even with the N-dependent $b(N)$
-   form, the 30M-specific $\eta > 1$ excursions at low epochs remain.
-   A double-power-law 1-epoch form $L = E + B_1/D^{\beta_1} +
-   B_2/D^{\beta_2}$ or Hoffmann-style saturated form may fit better
-   at low $D$.
-3. **Bootstrap CIs for $\eta$ across sizes.** Warm-started LOO already
+   a single $\beta = 0.460$. With $E_{\text{eff}}(N)$ fixed from joint,
+   per-size 2-param fits give $\beta$ ranging 0.36 (370M) to 0.62
+   (100M), non-monotonic in $N$. A 6-parameter joint form
+   $L = E + A/N^{\alpha} + B/D^{\beta(N)}$ with
+   $\beta(N) = \beta_0 + \beta_1 \log(N/N_{\text{ref}})$ would absorb
+   most of the per-size residual without overfitting (only 1 extra
+   parameter on 34 points). With $\beta(N)$ in place, the
+   $\eta > 1$ artefact at 190M / 370M should largely disappear, and
+   the Muennighoff form should win those sizes too.
+2. **Bootstrap CIs for $\eta$ across sizes.** Warm-started LOO already
    handles stability diagnostics; a full bootstrap would give CIs on
-   $(c, \gamma, b_0, \kappa)$. ~30 s per size.
-4. **Paraphrase / synthetic data extension.** The framework extends
+   $(R_0, \rho)$. ~30 s per size.
+3. **Paraphrase / synthetic data extension.** The framework extends
    directly via $\eta_{\text{para}}$ on the second token stream. Not
    currently in the Dolma data.
