@@ -45,7 +45,7 @@ $\eta_0 \le 1$ implies $\eta \le 1$ everywhere by construction.
 
 **Form B — Muennighoff '23 Eq 5** (close 2nd, $\eta(0)=1$ exactly):
 
-$$\boxed{\eta_A(D, D'; N) = \eta_0 \cdot \exp\left(-\frac{D'/D}{R_0 \cdot (D/N)^{\rho}}\right), \qquad \eta_0 = 0.946,\; R_0 = 471,\; \rho = -0.755}$$
+$$\boxed{\quad \eta_B(D, D'; N) \;=\; \frac{R^{*}\!\left(1 - e^{-x/R^{*}}\right)}{x},\qquad x = D'/D,\qquad R^{*} = R_{0} \cdot (D/N)^{\rho},\qquad R_{0} = 207,\;\rho = -0.834 \quad}$$
 
 Joint LOO RMSE $= 0.027$. Only 2 free parameters. Algebraically forces
 $\eta \to 1$ as $D' \to 0$ and $\eta \to 0$ as $D' \to \infty$.
@@ -383,44 +383,56 @@ Code: [fit_chinchilla_joint.py](fit_chinchilla_joint.py).
 
 ### 3.2 Per-size $\eta$ fits (shared anchors)
 
-Fixing $(E, A, B, \alpha, \beta)$ at the joint-Chinchilla values, we fit
-$\eta$ separately on each size's multi-epoch data. We report both
-contenders side-by-side.
+Fixing $(E, A, B, \alpha, \beta)$ at the joint Chinchilla anchors from
+§3.1 (residual-drop $k=20$), we fit $\eta$ separately on each size's
+multi-epoch data (scale $\ge 0.5\times$).  All three contenders below.
 
-**Form B — sat × (D/N) per size** (3 params, the original):
+**Form A — exp $(D'/D)$, $R(D/N)$ per size** (3 params,
+$\eta_0 \le 1$ implies $\eta \le 1$):
 
-| size | $n$ | $c$ | $\gamma$ | $b$ | LOO RMSE | η>1 |
-|---|---|---|---|---|---|---|
-| 14M  | 23 | 1.72 | 0.23 | 0.022 | 0.019 | 0/23 |
-| 30M  | 28 | 8.77 | 0.55 | 0.110 | 0.033 | 4/28 |
-| 60M  | 23 | 5.65 | 0.48 | 0.091 | 0.031 | 3/23 |
-| 190M | 16 | 6.89 | 0.45 | 0.197 | 0.012 | 6/16 |
-| 370M | 12 | 9.40 | 0.60 | 0.426 | 0.008 | 3/12 |
+| size | $n$ | $\eta_0$ | $R_0$ | $\rho$ | LOO RMSE |
+|---|---|---|---|---|---|
+| 14M  | 23 | 0.92 | 535 | $-0.79$ | **0.009** |
+| 30M  | 28 | 0.92 | 501 | $-0.77$ | 0.022 |
+| 60M  | 23 | 0.78 | 281 | $-0.64$ | 0.027 |
+| 190M | 16 | 1.41 | 322 | $-1.08$ | 0.015 |
+| 370M | 12 | 1.21 | 128 | $-0.89$ | 0.009 |
 
-Trends: $b$ rises with $N$ (0.022 → 0.43) — larger models saturate
-repetition faster. The ceiling $(D/N)^{-\gamma}/b$ therefore shrinks at
-large $N$, matching the intuition that big models extract all the signal
-from a single pass. $\gamma$ sits around 0.5 at mid sizes; the extremes
-are noisier. The 4-parameter $b(N)$ generalization with
-$b_0=0.071,\;\kappa=0.35$ collapses these per-size $b$ values onto a
-single $b_{\text{eff}}(N) = 0.071 \cdot (N/30\text{M})^{0.35}$.
+Note $\eta_0 > 1$ at 190M / 370M — the unconstrained fit is reading off
+the joint-anchor artefact (§3.4); the data wants $\eta > 1$ at low
+$D'/D$ at those sizes.
 
-**Form A — Muennighoff Eq 5 per size** (2 params):
+**Form B — Muennighoff Eq 5 per size** (2 params, $\eta(D'\to 0) = 1$
+exactly):
 
 | size | $n$ | $R_0$ | $\rho$ | LOO RMSE |
 |---|---|---|---|---|
 | 14M  | 23 | 288  | $-0.90$ | **0.009** |
-| 30M  | 28 | 558  | $-1.14$ | **0.020** |
-| 60M  | 23 | 191  | $-0.90$ | **0.018** |
-| 190M | 16 | 236  | $-1.13$ | 0.025 |
-| 370M | 12 | 100  | $-1.16$ | 0.015 |
+| 30M  | 28 | 465  | $-1.02$ | 0.019 |
+| 60M  | 23 | 140  | $-0.81$ | 0.025 |
+| 190M | 16 | 229  | $-1.12$ | 0.015 |
+| 370M | 12 | 13.7 | $-0.37$ | 0.012 |
 
-$\rho$ is roughly $-1$ across all sizes (the saturation scale $R^*$
-varies inversely with $D/N$, as one would expect for a fixed total
-saturation budget per parameter). Per-size LOO is materially better
-than form B at 14M / 30M / 60M (often $\sim 2\times$); slightly worse at
-190M / 370M because of the $\eta > 1$ artefact those sizes carry — see
-§3.4.
+$\rho$ clusters near $-1$ (so $R^{*} \cdot (D/N) \approx R_0$), except
+370M where the small sample (12 points) and the joint-anchor mismatch
+push the fit to a different local optimum.
+
+**Form C — sat × (D/N), $b(N)$ per size** (4 params; we report the
+3-param sat × (D/N) since $b(N)$ is the joint formulation):
+
+| size | $n$ | $c$ | $\gamma$ | $b$ | LOO RMSE | η>1 (legacy) |
+|---|---|---|---|---|---|---|
+| 14M  | 23 | 0.70 | $-0.11$ | 0.002 | 0.015 | 11/23 |
+| 30M  | 28 | 5.04 | 0.41 | 0.076 | 0.031 | 4/28 |
+| 60M  | 23 | 3.74 | 0.39 | 0.078 | 0.034 | 0/23 |
+| 190M | 16 | 4.45 | 0.37 | 0.156 | **0.011** | 5/16 |
+| 370M | 12 | 5.05 | 0.37 | 0.332 | **0.007** | 3/12 |
+
+(η>1 column uses the legacy $E_{\text{eff}}$-based per-point η; with the
+ΔL solver introduced in §4.2, the η>1 fraction shifts — see §3.4.)
+
+Form A and B win on small/mid $N$; Form C wins on the two largest sizes
+because it can fit non-physical $\eta > 1$ artefacts at low $D'/D$.
 
 **Figures:**
 - [fit_eta_per_size.pdf](fit_eta_per_size.pdf) — grid of the 4 top
@@ -437,56 +449,43 @@ than form B at 14M / 30M / 60M (often $\sim 2\times$); slightly worse at
 
 ### 3.3 Joint $\eta$ fits (pooled across sizes)
 
-Pooling all 102 multi-epoch points, we fit each candidate form to a
-single $(c, \gamma, ...)$ shared across sizes. Two new forms, inspired
-by Muennighoff '23 (Eq 5 of the data-repetition paper), bake in the
-physical constraint $\eta \le 1$:
-
-- **exp $(D'/D)$**: $\eta = \eta_0 \cdot \exp\!\left(-(D'/D)/R\right)$.
-  At $D' = 0$, $\eta = \eta_0$; if $\eta_0 \le 1$, then $\eta \le 1$
-  everywhere.
-- **Muennighoff Eq 5**: $\eta = R^*(1 - e^{-x/R^*}) / x$, $x = D'/D$.
-  Algebraically forces $\eta \to 1$ as $x \to 0$ (the first repeated
-  token = fresh) and $\eta \to 0$ as $x \to \infty$ (full saturation).
-  Only 1 parameter without TTP-dep, 2 with $R^* = R_0 \cdot (D/N)^{\rho}$.
-
-Joint LOO RMSE comparison:
+Pooling all 102 multi-epoch points (scale $\ge 0.5\times$, joint
+Chinchilla anchors from §3.1), we fit each candidate form to a single
+parameter set shared across sizes.  Three labelled contenders are
+carried forward (A, B, C above); the table below also includes the
+intermediate sat / power forms for context.
 
 | form | $n_{\text{par}}$ | RMSE | LOO | $R^2$ | params |
 |---|---|---|---|---|---|
-| const | 1 | 0.045 | 0.046 | 0.956 | $c=0.72$ |
-| power $(D/N)$ | 2 | 0.040 | 0.040 | 0.966 | $c=2.08$, $\gamma=0.35$ |
-| power $(D'/D)$ | 2 | 0.038 | 0.040 | 0.970 | $c=1.17$, $\gamma=0.31$ |
-| sat $(D'/D)$ | 2 | 0.035 | 0.036 | 0.973 | $c=1.02$, $b=0.049$ |
-| exp $(D'/D)$ | 2 | 0.036 | 0.036 | 0.973 | $\eta_0=0.94$, $R=41$ |
-| sat $\times$ $(D/N)$ | 3 | 0.027 | 0.028 | 0.984 | $c=4.00$, $\gamma=0.41$, $b=0.068$ |
-| exp $(D'/D)$, $R(D/N)$ | 3 | 0.025 | 0.026 | 0.986 | $\eta_0=0.93$, $R_0=530$, $\rho=-0.83$ |
-| double power | 3 | 0.030 | 0.034 | 0.980 | $c=3.54$, $\gamma_1=0.33$, $\gamma_2=0.34$ |
-| sat $\times$ $(D/N)$, $b(N)$ | 4 | 0.026 | 0.028 | 0.986 | $c=4.88$, $\gamma=0.45$, $b_0=0.071$, $\kappa=0.35$ |
-| **Muennighoff Eq 5** | **2** | **0.023** | **0.023** | **0.989** | $R_0=275$, $\rho=-0.97$ |
+| const | 1 | 0.035 | 0.036 | 0.973 | $c=0.82$ |
+| power $(D/N)$ | 2 | 0.035 | 0.035 | 0.975 | $c=1.19$, $\gamma=0.14$ |
+| power $(D'/D)$ | 2 | 0.032 | 0.033 | 0.978 | $c=1.18$, $\gamma=0.27$ |
+| sat $(D'/D)$ | 2 | 0.029 | 0.030 | 0.982 | $c=0.99$, $b=0.037$ |
+| sat $\times$ $(D/N)$ | 3 | 0.029 | 0.030 | 0.982 | $c=1.99$, $\gamma=0.20$, $b=0.054$ |
+| exp $(D'/D)$ | 2 | 0.029 | 0.029 | 0.982 | $\eta_0=0.95$, $R=48$ |
+| double power | 3 | 0.032 | 0.033 | 0.978 | $c=2.46$, $\gamma_1=0.22$, $\gamma_2=0.27$ |
+| **C. sat $\times$ $(D/N)$, $b(N)$** | 4 | 0.029 | 0.029 | 0.982 | $c=3.51$, $\gamma=0.32$, $b_0=0.062$, $\kappa=0.54$ |
+| **B. Muennighoff Eq 5** | 2 | 0.027 | 0.027 | 0.985 | $R_0=207$, $\rho=-0.83$ |
+| **A. exp $(D'/D)$, $R(D/N)$** | 3 | **0.026** | **0.026** | **0.986** | $\eta_0=0.95$, $R_0=471$, $\rho=-0.76$ |
 
-**Two contenders carried forward:**
+**Three contenders carried forward (highest joint $R^2$ ↦ A → B → C):**
 
-- **A. Muennighoff Eq 5** ($n_{\text{par}}=2$): wins the joint pool
-  (LOO 0.023) and 14M / 30M / 60M individually. $\eta \le 1$ enforced
-  by construction. Equivalent compact form (using $\rho \approx -1$):
-  $R^{*} \approx R_{0} / (D/N)$, so $R^{*} \cdot (D/N) \approx 275$
-  across all sizes. Saturation hits at roughly the same total-token
-  count $R^{*} \cdot D \approx 275 \cdot N$ regardless of scale — a
-  clean physical statement.
-- **B. sat $\times$ $(D/N)$, $b(N)$** ($n_{\text{par}}=4$): the
-  previous champion. Worse on the joint pool (LOO 0.028) but stays the
-  best at 190M / 370M because it can fit the $\eta > 1$ joint-anchor
-  artefacts there (see §3.4) — a worse property in principle, but
-  empirically lower RMSE on those sizes. Has two derived statements
-  worth keeping: $b_{\text{eff}}(N) = 0.071 \cdot (N/30\text{M})^{0.35}$
-  (saturation grows with $N$), and a closed-form ceiling
-  $\eta \cdot D' / D \to c \cdot (D/N)^{-\gamma} / b_{\text{eff}}(N)$
-  (e.g., $\sim 22\times$ at $D/N=10$, $\sim 4\times$ at $D/N=320$).
-
-**The user's own exponential form** $\eta = \eta_0 \exp(-(D'/D)/R(D/N))$
-also outperforms the sat-family with one fewer parameter ($n=3$, joint
-LOO 0.026) — it sits between A and B on every diagnostic.
+- **A. exp $(D'/D)$, $R(D/N)$** — the user-proposed form. Best on the
+  joint pool (LOO 0.026). $\eta_0 \le 1$ ⇒ $\eta \le 1$ everywhere by
+  construction.  At $D' \to 0$, $\eta \to \eta_0 = 0.95$, so the very
+  first repeated token is worth ~95% of fresh.
+- **B. Muennighoff '23 Eq 5** — close 2nd (LOO 0.027) with one fewer
+  parameter.  Fitted $\rho \approx -0.83$ (close to $-1$), so
+  $R^{*} \cdot (D/N) \approx R_0 = 207$ across sizes — saturation hits
+  at roughly the same total-token count $R^{*} \cdot D \approx 207 N$
+  regardless of scale.  Algebraically forces $\eta(D' \to 0) = 1$.
+- **C. sat $\times$ $(D/N)$, $b(N)$** — previous champion.  Worse on
+  the joint pool (LOO 0.029) but still wins at 190M / 370M because it
+  can fit the $\eta > 1$ joint-anchor artefacts there (§3.4) — a
+  property A and B reject by construction.  Two useful derived
+  statements: $b_{\text{eff}}(N) = 0.062 \cdot (N/30\text{M})^{0.54}$
+  (saturation accelerates with $N$), and a closed-form ceiling
+  $\eta \cdot D' / D \to c \cdot (D/N)^{-\gamma} / b_{\text{eff}}(N)$.
 
 **Figures:**
 - [fit_eta_joint.pdf](fit_eta_joint.pdf) — best joint form (Muennighoff
@@ -504,21 +503,27 @@ Code: [fit_eta.py](fit_eta.py). Shared data loader:
 
 ### 3.4 Non-physical $\eta > 1$: a joint-anchor artefact
 
-Per-point analytical $\eta$ produces some non-physical values
-($\eta > 1$, occasionally $\eta < 0$):
+Per-point analytical $\eta$ (legacy $E_{\text{eff}}$ inversion, with
+the new joint-anchor $E_{\text{eff}}(N)$ from §3.1) produces some
+non-physical values:
 
-| size | $\eta > 1$ | per-point $\eta$ range | per-size η LOO |
-|---|---|---|---|
-| 14M  | 0/23  | [0.20, 1.00] | 0.019 |
-| 30M  | 4/28  | [0.04, 1.29] | 0.033 |
-| 60M  | 3/23  | [0.12, 1.21] | 0.031 |
-| 190M | 6/16  | [−0.27, 2.00] | 0.012 |
-| 370M | 3/12  | [0.16, 1.48] | 0.008 |
+| size | $n$ | $\eta > 1$ | per-point $\eta$ range | best per-size η LOO |
+|---|---|---|---|---|
+| 14M  | 23 | 11/23 | $[0.58, 1.59]$ | 0.009 (A, B) |
+| 30M  | 28 | 4/28  | $[0.08, 1.32]$ | 0.019 (B) |
+| 60M  | 23 | 0/23  | $[0.09, 1.00]$ | 0.025 (B) |
+| 190M | 16 | 5/16  | $[-0.21, 1.51]$ | 0.011 (C) |
+| 370M | 12 | 3/12  | $[0.19, 1.37]$ | 0.007 (C) |
 
 190M / 370M look the worst on $\eta > 1$ counts but actually have the
-*best* per-size η fit quality (LOO = 0.012, 0.008). The non-physical
-$\eta$ values are a property of inverting the joint 1-epoch anchors at
-those sizes, not a property of the η form.
+best per-size η fit quality (LOO = 0.011, 0.007 for Form C). The
+non-physical $\eta$ values are a property of inverting the joint
+1-epoch anchors at those sizes, not a property of the η form.
+
+(See §4.2 for an alternative per-point η solver based on the empirical
+loss difference $\Delta L = L(1\text{ep}) - L(\text{multi-ep})$ that
+cancels $E_{\text{eff}}$. With the ΔL solver, 190M's $\eta < 0$
+artefact disappears.)
 
 **Mechanism.** Recall
 
