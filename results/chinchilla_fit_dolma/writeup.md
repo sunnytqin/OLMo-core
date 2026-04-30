@@ -45,7 +45,7 @@ $\eta_0 \le 1$ implies $\eta \le 1$ everywhere by construction.
 
 **Form B — Muennighoff '23 Eq 5** (close 2nd, $\eta(0)=1$ exactly):
 
-$$\boxed{\quad \eta_B(D, D'; N) \;=\; \frac{R^{*}\!\left(1 - e^{-x/R^{*}}\right)}{x},\qquad x = D'/D,\qquad R^{*} = R_{0} \cdot (D/N)^{\rho},\qquad R_{0} = 207,\;\rho = -0.83 \quad}$$
+$$\boxed{\eta_A(D, D'; N) = \eta_0 \cdot \exp\left(-\frac{D'/D}{R_0 \cdot (D/N)^{\rho}}\right), \qquad \eta_0 = 0.946,\; R_0 = 471,\; \rho = -0.755}$$
 
 Joint LOO RMSE $= 0.027$. Only 2 free parameters. Algebraically forces
 $\eta \to 1$ as $D' \to 0$ and $\eta \to 0$ as $D' \to \infty$.
