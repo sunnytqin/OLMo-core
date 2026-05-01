@@ -11,42 +11,27 @@ MODEL_SIZE = 'dolma_30m'
 
 if MODEL_SIZE == '30m':
     import dclm_30m as model_data
-    self_distill_data = model_data.self_distill_data
-    parap_datasets = getattr(model_data, 'parap_datasets', None)
 elif MODEL_SIZE == '370m':
     import data_370m as model_data
-    self_distill_data = None
-    parap_datasets = None
 elif MODEL_SIZE == 'dolma_14m':
     import dolma_14m as model_data
-    self_distill_data = None
-    parap_datasets = None
 elif MODEL_SIZE == 'dolma_30m':
     import dolma_30m as model_data
-    self_distill_data = None
-    parap_datasets = None
 elif MODEL_SIZE == 'dolma_60m':
     import dolma_60m as model_data
-    self_distill_data = None
-    parap_datasets = None
 elif MODEL_SIZE == 'dolma_100m':
     import dolma_100m as model_data
-    self_distill_data = None
-    parap_datasets = None
 elif MODEL_SIZE == 'dolma_190m':
     import dolma_190m as model_data
-    self_distill_data = None
-    parap_datasets = None
 elif MODEL_SIZE == 'dolma_370m':
     import dolma_370m as model_data
-    self_distill_data = None
-    parap_datasets = None
 elif MODEL_SIZE == 'dolma_600m':
     import dolma_600m as model_data
-    self_distill_data = None
-    parap_datasets = None
 else:
     raise ValueError(f'Unknown MODEL_SIZE: {MODEL_SIZE}')
+
+self_distill_data = getattr(model_data, 'self_distill_data', None)
+parap_datasets = getattr(model_data, 'parap_datasets', None)
 
 all_datasets = model_data.ALL_DATASETS
 
