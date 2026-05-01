@@ -100,6 +100,23 @@ def _eta_muennighoff(p, D, Dp, N):
     return R * (1.0 - torch.exp(-x / R)) / x
 
 
+# Form B with explicit N-dependence in the saturation parameter.
+# Rather than R_0 (an opaque renormalization), the fitted parameter is
+# R*_ref = R* at the reference (D/N=20, N=N_ref) point — i.e., the
+# saturation asymptote itself, which is what we converge to as D'/D → ∞.
+def _eta_muennighoff_Nb(p, D, Dp, N):
+    """η = R*(1 − e^{−x/R*})/x  with
+        R* = R*_ref · (D/N / 20)^ρ · (N/N_ref)^σ.
+    R*_ref is R* at scale 1× (D/N=20) at N=N_ref=30M.
+    σ captures additional N-dependence beyond what (D/N)^ρ provides."""
+    N_ref = torch.tensor(_N_REF, dtype=N.dtype)
+    DoverN_ref = torch.tensor(20.0, dtype=N.dtype)
+    R = (p["Rstar"] * (D / N / DoverN_ref) ** p["rho"]
+                    * (N / N_ref) ** p["sigma"])
+    x = Dp / D
+    return R * (1.0 - torch.exp(-x / R)) / x
+
+
 FORMS: Dict[str, dict] = {
     "const": dict(
         fn=_eta_const,
@@ -182,6 +199,16 @@ FORMS: Dict[str, dict] = {
             "rho": [-1.0, -0.3, 0.0, 0.5],
         }),
         desc="η = R*·(1−e^(−x/R*))/x  with R* = R₀·(D/N)^ρ ; x=D'/D",
+    ),
+    "Muennighoff R*(N)": dict(
+        fn=_eta_muennighoff_Nb,
+        grid=expand_grid({
+            "Rstar": [5.0, 12.0, 22.0, 50.0],          # R* at 1× scale, 30M
+            "rho":   [-1.5, -1.0, -0.5, 0.0],
+            "sigma": [-1.0, -0.5, 0.0],
+        }),
+        desc=("η = R*·(1−e^(−x/R*))/x  with "
+              "R* = R*_ref·(D/N/20)^ρ·(N/30M)^σ"),
     ),
 }
 

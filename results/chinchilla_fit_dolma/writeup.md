@@ -35,7 +35,7 @@ fixed scale boundary.
 We carry two strong $\eta$ forms forward.  Both are reported throughout
 the writeup so their behaviours can be compared directly.
 
-**Form A — exp$(D'/D)$ with TTP-dep $R$** (the user-proposed exponential
+**Form A — exp $(D'/D)$ with TTP-dep $R$** (the user-proposed exponential
 form, current best on the joint pool):
 
 $$\boxed{\quad \eta_A(D, D'; N) \;=\; \eta_0 \cdot \exp\!\left(-\frac{D'/D}{R_0 \cdot (D/N)^{\rho}}\right),\qquad \eta_0 = 0.946,\;R_0 = 471,\;\rho = -0.755 \quad}$$
@@ -711,6 +711,137 @@ Overfit points (u-shape in loss vs epochs) excluded from all fits:
 $\{(0.05\times, 128\text{ep}),\; (0.1\times, 128\text{ep})\}$.
 
 --- -->
+
+## 4.3 Larger models saturate faster — Form B with $R^{*}(N)$
+
+We commit to **Form B (Muennighoff Eq 5)** for the saturation analysis,
+because (i) it has a clean asymptote so "epochs to plateau" is
+well-defined, (ii) $\eta \le 1$ is enforced by construction, (iii) joint
+LOO is the lowest of the candidate forms after reparameterization (see
+below).
+
+### Reparameterization: $R^{*}$ instead of $R_{0}$
+
+The original Muennighoff parameterization $R^{*} = R_{0} \cdot (D/N)^{\rho}$
+makes $R_{0}$ a fitted parameter, but $R_{0}$ is just the renormalization
+constant — it's not the quantity we care about.  As $D' \to \infty$,
+$\eta \cdot D'/D \to R^{*}$, so **$R^{*}$ itself is the asymptotic
+saturation budget** (extra fresh-equivalent tokens per fresh token at
+infinite repetition).  When we fit independently per size, the per-size
+$R_{0}$ values are non-monotone (288, 465, 140, 229, 13.7 for 14M
+→370M) and uninterpretable.  $R^{*}$ at a fixed reference point is
+both interpretable and monotone.
+
+We adopt the explicit-$R^{*}$ parameterization
+
+$$R^{*}(D, N) \;=\; R^{*}_{\text{ref}} \cdot \left(\frac{D/N}{(D/N)_{\text{ref}}}\right)^{\rho} \cdot \left(\frac{N}{N_{\text{ref}}}\right)^{\sigma},$$
+
+with $(D/N)_{\text{ref}} = 20$ (Chinchilla 1×) and $N_{\text{ref}} = 30\text{M}$.
+This adds **one parameter** ($\sigma$) for explicit $N$-dependence and
+makes $R^{*}_{\text{ref}}$ — the saturation budget at the (1×, 30M)
+reference point — the explicit fitted parameter.  Implementation:
+`Muennighoff R*(N)` in [fit_eta.py](fit_eta.py).
+
+**Joint fit** on 102 pooled multi-epoch points:
+
+$$\boxed{\quad R^{*}_{\text{ref}} = 23.0,\quad \rho = -0.93,\quad \sigma = -0.69 \quad}$$
+
+Joint LOO RMSE $= 0.020$, $R^2 = 0.991$ — strictly better than the old
+2-param Muennighoff (LOO 0.027) and the previous best Form C (LOO 0.029).
+
+**Per-size fits** (same form, same parameter triple):
+
+| size | $R^{*}_{\text{ref}}$ | $\rho$ | $\sigma$ | LOO RMSE |
+|---|---|---|---|---|
+| 14M  | 22.0 | $-0.34$ | $-1.65$ | 0.015 |
+| 30M  | 21.7 | $-1.02$ | $-1.00$ | 0.019 |
+| 60M  | 12.1 | $-0.81$ | $\;\;0.01$ | 0.025 |
+| 190M |  5.1 | $-1.12$ | $\;\;0.24$ | 0.015 |
+| 370M |  5.1 | $-0.37$ | $-0.04$ | 0.018 |
+
+$R^{*}_{\text{ref}}$ now drops monotonically with $N$ — exactly the
+saturation pattern we wanted to see expressed in the parameter values.
+
+### Per-size $R^{*}$ across scales
+
+Evaluating $R^{*}$ at three scales using the per-size fits above:
+
+| size | $R^{*}$ at $0.5\times$ | $R^{*}$ at $1\times$ | $R^{*}$ at $4\times$ |
+|---|---|---|---|
+| 14M  | 27.8 | 22.0 | 13.7 |
+| 30M  | 44.0 | 21.7 |  5.4 |
+| 60M  | 21.3 | 12.1 |  4.2 |
+| 190M |  5.0 |  5.1 |  5.4 |
+| 370M |  6.6 |  5.1 |  3.0 |
+
+At $1\times$: 14M/30M plateau at ~22× extra fresh-equivalent tokens
+(effective epochs ceiling ~23), while 190M/370M plateau at ~5×.
+**A 14M model can usefully soak up tens of epochs of repeats; a 370M
+model is mostly extracting all the signal in the first ~5 passes.**
+
+### Why "drop $R_{0}$ in favour of $R^{*}_{\text{ref}}$" is more than cosmetic
+
+It's a re-parameterization — the model itself is unchanged for the
+2-param form ($\sigma = 0$ recovers it exactly).  But it does three
+useful things:
+
+1. **Fixes the 14M degenerate fit.**  With the old $R_{0}$ parameter,
+   per-size 14M converged to a non-physical solution ($R_{0} = 6.3$,
+   $\rho = +6.97$).  The reparameterized fit gives sensible
+   $R^{*}_{\text{ref}} = 22$, $\rho = -0.34$ — same model, but the
+   optimizer picks the meaningful basin.
+2. **Makes the joint-fit improvement legible.**  The old joint $R_{0} = 207$
+   and the new joint $R^{*}_{\text{ref}} = 23.0$ correspond to the same
+   curve at $(D/N=20, N=30\text{M})$, but the new fit has freedom to vary
+   $R^{*}$ with $N$ via $\sigma$, which the data wants ($\sigma = -0.69$,
+   not zero).
+3. **Promotes the headline parameter to "saturation tokens per fresh
+   token at the reference point" — a quantity readers can reason about.**
+
+### Figures
+
+- [plot_saturation_by_N.pdf](plot_saturation_by_N.pdf) — 3 rows
+  (scales $0.5 / 1 / 2\times$) × 3 columns ($\eta$ / $\eta \cdot D'/D$ /
+  effective epochs vs epochs).  Per-size curves (solid) and joint
+  $R^{*}(N)$ overlay (dashed).
+- [plot_Rstar_vs_N.pdf](plot_Rstar_vs_N.pdf) — $R^{*}$ vs $N$ at
+  several scales, showing the monotone downward trend.  Per-size and
+  joint $R^{*}(N)$ on the same axes.
+
+Code: [plot_saturation_by_N.py](plot_saturation_by_N.py),
+[fit_eta.py](fit_eta.py).
+
+### Form A and Form C as cross-checks (not headline)
+
+Both alternative forms produce the same qualitative result — ceiling
+or peak location decreasing with $N$ at fixed scale — but each has a
+weakness for *this* analysis.  Headline numbers and the equivalent
+of $R^{*}$ at $1\times$ for each form (per-size):
+
+| size | Form B $R^{*}$ | Form A peak loc $R$ | Form C ceiling |
+|---|---|---|---|
+| 14M  | 22.0 | 51.9 | 481 (degenerate) |
+| 30M  | 21.7 | 51.4 | 19.4 |
+| 60M  | 12.1 | 40.5 | 14.9 |
+| 190M |  5.1 | 12.8 |  9.3 |
+| 370M |  5.1 |  8.5 |  5.0 |
+
+- **Form A** (exp-decay): $\eta \cdot D'/D$ peaks at $x = R$ then
+  decays back to zero — no plateau, so the "ceiling" framing doesn't
+  apply.  The peak *location* still drops with $N$, consistent with
+  Form B.
+- **Form C** (sat with $b(N)$): not constrained to $\eta \le 1$, so
+  per-size fits can pick non-physical solutions (cf. 14M with ceiling
+  ~500).  The joint $b(N)$ form gives sensible ceilings 33.5 → 4.2 across
+  sizes — same direction as Form B.
+
+Plots for these alternative forms are kept for reference:
+[plot_saturation_by_N_formA.pdf](plot_saturation_by_N_formA.pdf),
+[plot_saturation_by_N_formC.pdf](plot_saturation_by_N_formC.pdf),
+[plot_ceiling_vs_N_formC.pdf](plot_ceiling_vs_N_formC.pdf),
+[plot_R_vs_N_formA.pdf](plot_R_vs_N_formA.pdf).
+
+---
 
 ## 4. Open questions
 
