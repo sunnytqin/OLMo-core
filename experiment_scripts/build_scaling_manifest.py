@@ -2,8 +2,17 @@
 """
 Build a manifest of ALL complete runs across 30M, 60M, 370M for scaling law fitting.
 Checks actual training progress against expected steps to determine completion.
-Skips runs that already have eval results in dolma_val_loss.
+Skips runs that already have eval results.
+
+Two modes:
+  --mode multi_epoch (default): runs named <size>_seed42_case4_dolma_epoch<N>_wd<W>_lr<L>
+                                eval results live in results/dolma_val_loss
+                                manifests written to results/chinchilla_fit_dolma/
+  --mode paraphrase           : runs named <size>_seed42_dolma_para_K<N>_wd<W>_lr<L>
+                                eval results live in results/dolma_para_val_loss
+                                manifests written to results/chinchilla_fit_dolma_para/
 """
+import argparse
 import json
 import os
 import re
@@ -11,7 +20,7 @@ import glob
 from pathlib import Path
 
 CHECKPOINT_BASE = "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints"
-RESULTS_BASE = "/n/home05/sqin/OLMo-core/results/dolma_val_loss"
+REPO_RESULTS = "/n/home05/sqin/OLMo-core/results"
 BATCH_SIZE = 2097152  # tokens per step
 
 CHINCHILLA_DIRS = [
@@ -20,9 +29,24 @@ CHINCHILLA_DIRS = [
 ]
 MODEL_SIZES = ["14M", "30M", "60M", "100M", "190M", "370M", "600M"]
 
-RUN_PATTERN = re.compile(
-    r"(?P<size>\d+M)_seed42_case4_dolma_epoch(?P<epoch>\d+)_wd(?P<wd>[\d.]+)_lr(?P<lr>[\de.-]+)"
-)
+MODE_CONFIG = {
+    "multi_epoch": {
+        "run_pattern": re.compile(
+            r"(?P<size>\d+M)_seed42_case4_dolma_epoch(?P<axis>\d+)_wd(?P<wd>[\d.]+)_lr(?P<lr>[\de.-]+)"
+        ),
+        "axis_field": "epoch",
+        "results_base": f"{REPO_RESULTS}/dolma_val_loss",
+        "manifest_dir": f"{REPO_RESULTS}/chinchilla_fit_dolma",
+    },
+    "paraphrase": {
+        "run_pattern": re.compile(
+            r"(?P<size>\d+M)_seed42_dolma_para_K(?P<axis>\d+)_wd(?P<wd>[\d.]+)_lr(?P<lr>[\de.-]+)"
+        ),
+        "axis_field": "K",
+        "results_base": f"{REPO_RESULTS}/dolma_para_val_loss",
+        "manifest_dir": f"{REPO_RESULTS}/chinchilla_fit_dolma_para",
+    },
+}
 
 
 def get_max_step_dir(run_path: str):
@@ -75,9 +99,9 @@ def is_complete(run_path: str) -> tuple:
     return True, max_step, f"step {max_step} (no target, has model)"
 
 
-def has_eval_result(chin_dir: str, model_size: str, run_name: str) -> bool:
+def has_eval_result(results_base: str, chin_dir: str, model_size: str, run_name: str) -> bool:
     """Check if eval result already exists."""
-    out_file = Path(RESULTS_BASE) / chin_dir / model_size / f"{run_name}.json"
+    out_file = Path(results_base) / chin_dir / model_size / f"{run_name}.json"
     if not out_file.exists():
         return False
     try:
@@ -89,6 +113,23 @@ def has_eval_result(chin_dir: str, model_size: str, run_name: str) -> bool:
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--mode",
+        choices=list(MODE_CONFIG.keys()),
+        default="multi_epoch",
+        help="multi_epoch: epoch<N> runs → dolma_val_loss; paraphrase: para_K<N> runs → dolma_para_val_loss",
+    )
+    args = parser.parse_args()
+
+    cfg = MODE_CONFIG[args.mode]
+    run_pattern = cfg["run_pattern"]
+    axis_field = cfg["axis_field"]
+    results_base = cfg["results_base"]
+    manifest_dir = cfg["manifest_dir"]
+
+    print(f"Mode: {args.mode} (axis={axis_field}, results→{results_base})")
+
     all_complete = []
     all_incomplete = []
     already_evaled = 0
@@ -103,7 +144,7 @@ def main():
             runs = sorted(glob.glob(os.path.join(base, f"{model_size}_*")))
             for run_path in runs:
                 run_name = os.path.basename(run_path)
-                m = RUN_PATTERN.match(run_name)
+                m = run_pattern.match(run_name)
                 if not m:
                     continue
 
@@ -113,7 +154,7 @@ def main():
                     "run_name": run_name,
                     "chinchilla_dir": chin_dir,
                     "model_size": model_size,
-                    "epoch": int(m.group("epoch")),
+                    axis_field: int(m.group("axis")),
                     "wd": m.group("wd"),
                     "lr": m.group("lr"),
                     "checkpoint_path": os.path.join(run_path, f"step{max_step}"),
@@ -122,7 +163,7 @@ def main():
                 }
 
                 if complete:
-                    evaled = has_eval_result(chin_dir, model_size, run_name)
+                    evaled = has_eval_result(results_base, chin_dir, model_size, run_name)
                     entry["has_eval"] = evaled
                     all_complete.append(entry)
                     if evaled:
@@ -162,7 +203,7 @@ def main():
         print()
 
     # Write manifests
-    out_dir = Path("/n/home05/sqin/OLMo-core/results/chinchilla_fit_dolma")
+    out_dir = Path(manifest_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Full manifest (all complete runs)

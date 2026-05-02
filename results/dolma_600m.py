@@ -54,6 +54,15 @@ data_2x = {
     'weight_decay': [0.1],
 }
 
+data_4x = {
+    'chinchilla_scale': [4],
+    'epochs': [1],
+    'flops_multiplier': [4],
+    'validation_loss': [2.5021],
+    'learning_rate': [3e-3],
+    'weight_decay': [0.1],
+}
+
 ALL_DATASETS = [
     data_0_05x,
     data_0_1x,
@@ -61,4 +70,7 @@ ALL_DATASETS = [
     data_0_5x,
     data_1x,
     data_2x,
+    data_4x,
 ]
+
+parap_datasets = None

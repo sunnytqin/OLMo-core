@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
 Generate combined heatmap figures: one per model size.
-Rows = chinchilla multiplier (fresh data size), columns = epoch.
+Rows = chinchilla multiplier (fresh data size), columns = the setting's
+"third axis" (epoch for multi_epoch, paraphrase factor K for para).
 Each subplot has its own colorbar for local optimal visibility.
 
 Usage:
-    python chinchilla_heatmaps.py [--merged-dir ../results/hparam/merged] [--output-dir ../results/hparam/heatmaps]
+    python chinchilla_heatmaps.py --setting multi_epoch
+    python chinchilla_heatmaps.py --setting para
 """
 import argparse
 import json
@@ -19,21 +21,38 @@ import seaborn as sns
 
 MODEL_SIZES = ["14M", "30M", "60M", "190M", "370M"]
 
-# Hyperparameter grids per model size. All sizes share the same sweep axes
-# currently; extend here if a size ever uses different axes.
-DEFAULT_GRID = {
-    "weight_decays": [0.1, 0.2, 0.4, 0.8, 1.6],
-    "learning_rates": [1e-4, 3e-4, 1e-3, 3e-3],
+# Per-setting config. Each setting differs in:
+#   - run name regex / third-axis variable name (epoch vs K)
+#   - hparam grid axes
+#   - default input/output directories
+SETTINGS = {
+    "multi_epoch": {
+        "run_pattern": re.compile(
+            r'(14M|30M|60M|190M|370M)_seed\d+_case4_dolma_epoch(\d+)_wd([\d.]+)_lr([\d.e-]+)'
+        ),
+        "third_axis_label": "Epoch",
+        "third_axis_short": "ep",
+        "weight_decays": [0.1, 0.2, 0.4, 0.8, 1.6],
+        "learning_rates": [1e-4, 3e-4, 1e-3, 3e-3],
+        "merged_subdir": "merged/multi_epoch",
+        "output_subdir": "heatmaps/multi_epoch",
+    },
+    "para": {
+        "run_pattern": re.compile(
+            r'(14M|30M|60M|190M|370M)_seed\d+_dolma_para_K(\d+)_wd([\d.]+)_lr([\d.e-]+)'
+        ),
+        "third_axis_label": "K (paraphrase factor)",
+        "third_axis_short": "K",
+        "weight_decays": [0.1, 0.2],
+        "learning_rates": [1e-3, 3e-3],
+        "merged_subdir": "merged/para",
+        "output_subdir": "heatmaps/para",
+    },
 }
-GRIDS = {size: DEFAULT_GRID for size in MODEL_SIZES}
-
-RUN_PATTERN = re.compile(
-    r'(14M|30M|60M|190M|370M)_seed\d+_case4_dolma_epoch(\d+)_wd([\d.]+)_lr([\d.e-]+)'
-)
 
 
-def parse_run_name(run_name: str):
-    m = RUN_PATTERN.search(run_name)
+def parse_run_name(run_name: str, pattern: re.Pattern):
+    m = pattern.search(run_name)
     if not m:
         return None
     return m.group(1), int(m.group(2)), float(m.group(3)), float(m.group(4))
@@ -53,8 +72,8 @@ def chin_scale(chin_dir: str) -> float:
     return float(chin_dir.replace("chinchilla_", ""))
 
 
-def load_all_data(merged_dir: Path):
-    """Returns dict of (chin_dir, model_size, epoch) -> {(wd, lr): val_loss}"""
+def load_all_data(merged_dir: Path, pattern: re.Pattern):
+    """Returns dict of (chin_dir, model_size, third_axis) -> {(wd, lr): val_loss}"""
     data = {}
     for json_file in sorted(merged_dir.glob("*.json")):
         chin, size = parse_merged_filename(json_file.stem)
@@ -62,42 +81,42 @@ def load_all_data(merged_dir: Path):
             continue
         with open(json_file) as f:
             results = json.load(f)
-        epoch_data = defaultdict(dict)
+        third_axis_data = defaultdict(dict)
         for run_name, metrics in results.items():
             if "error" in metrics:
                 continue
-            parsed = parse_run_name(run_name)
+            parsed = parse_run_name(run_name, pattern)
             if parsed is None:
                 continue
-            _, epoch, wd, lr = parsed
+            _, third, wd, lr = parsed
             val_loss = metrics.get("validation_loss")
             if val_loss is not None:
-                epoch_data[epoch][(wd, lr)] = val_loss
-        for epoch, grid_data in epoch_data.items():
-            data[(chin, size, epoch)] = grid_data
+                third_axis_data[third][(wd, lr)] = val_loss
+        for third, grid_data in third_axis_data.items():
+            data[(chin, size, third)] = grid_data
     return data
 
 
-def generate_combined_figure(data, model_size: str, output_path: str):
-    grid = GRIDS[model_size]
-    weight_decays = grid["weight_decays"]
-    learning_rates = grid["learning_rates"]
+def generate_combined_figure(data, model_size: str, output_path: str, cfg: dict):
+    weight_decays = cfg["weight_decays"]
+    learning_rates = cfg["learning_rates"]
+    short = cfg["third_axis_short"]
+    long_label = cfg["third_axis_label"]
     n_wd = len(weight_decays)
     n_lr = len(learning_rates)
 
-    # Find all chinchilla scales and epochs for this model size
     chin_dirs = sorted(
         set(chin for chin, size, _ in data if size == model_size),
-        key=chin_scale
+        key=chin_scale,
     )
-    epochs = sorted(set(epoch for _, size, epoch in data if size == model_size))
+    third_vals = sorted(set(t for _, size, t in data if size == model_size))
 
-    if not chin_dirs or not epochs:
+    if not chin_dirs or not third_vals:
         print(f"  No data for {model_size}, skipping")
         return
 
     n_rows = len(chin_dirs)
-    n_cols = len(epochs)
+    n_cols = len(third_vals)
 
     cell_w = 2.8 if model_size in ("14M", "30M") else 3.2
     cell_h = 2.2 if model_size in ("14M", "30M") else 2.6
@@ -108,13 +127,12 @@ def generate_combined_figure(data, model_size: str, output_path: str):
     )
 
     for r, chin in enumerate(chin_dirs):
-        for c, epoch in enumerate(epochs):
+        for c, third in enumerate(third_vals):
             ax = axes[r][c]
-            key = (chin, model_size, epoch)
+            key = (chin, model_size, third)
+            chin_label = chin.replace("chinchilla_", "")
 
             if key not in data or not data[key]:
-                # Leave axis visible with gray fill and "n/a" so the reader
-                # can still see which row/col existed.
                 ax.set_xticks([])
                 ax.set_yticks([])
                 for spine in ax.spines.values():
@@ -122,8 +140,7 @@ def generate_combined_figure(data, model_size: str, output_path: str):
                 ax.set_facecolor("#eeeeee")
                 ax.text(0.5, 0.5, "n/a", ha="center", va="center",
                         fontsize=9, color="#888888", transform=ax.transAxes)
-                chin_label = chin.replace("chinchilla_", "")
-                ax.set_title(f'{chin_label}x / ep{epoch}', fontsize=8, fontweight='bold')
+                ax.set_title(f'{chin_label}x / {short}{third}', fontsize=8, fontweight='bold')
                 continue
 
             grid_data = data[key]
@@ -134,8 +151,6 @@ def generate_combined_figure(data, model_size: str, output_path: str):
                         loss_grid[i, j] = grid_data[(wd, lr)]
 
             mask = np.isnan(loss_grid)
-
-            # Local colorbar per subplot
             valid = loss_grid[~mask]
             if len(valid) == 0:
                 ax.set_visible(False)
@@ -155,15 +170,13 @@ def generate_combined_figure(data, model_size: str, output_path: str):
                 annot_kws={'fontsize': 6},
             )
 
-            # Highlight the best (lowest loss) cell
             best_idx = np.unravel_index(np.nanargmin(loss_grid), loss_grid.shape)
             ax.add_patch(plt.Rectangle(
                 (best_idx[1], best_idx[0]), 1, 1,
-                fill=False, edgecolor='red', linewidth=2.5
+                fill=False, edgecolor='red', linewidth=2.5,
             ))
 
-            chin_label = chin.replace("chinchilla_", "")
-            ax.set_title(f'{chin_label}x / ep{epoch}', fontsize=8, fontweight='bold')
+            ax.set_title(f'{chin_label}x / {short}{third}', fontsize=8, fontweight='bold')
 
             if c == 0:
                 ax.set_ylabel('WD', fontsize=7)
@@ -180,7 +193,6 @@ def generate_combined_figure(data, model_size: str, output_path: str):
             ax.tick_params(labelsize=6)
             plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
 
-    # Row labels on the left
     for r, chin in enumerate(chin_dirs):
         chin_label = chin.replace("chinchilla_", "")
         axes[r][0].annotate(
@@ -190,17 +202,16 @@ def generate_combined_figure(data, model_size: str, output_path: str):
             rotation=90,
         )
 
-    # Column labels on top
-    for c, epoch in enumerate(epochs):
+    for c, third in enumerate(third_vals):
         axes[0][c].annotate(
-            f'Epoch {epoch}',
+            f'{long_label} {third}',
             xy=(0.5, 1.25), xycoords='axes fraction',
             fontsize=9, fontweight='bold', ha='center', va='bottom',
         )
 
     fig.suptitle(
         f'{model_size} — Validation Loss (WD vs LR)\n'
-        f'Rows: Chinchilla multiplier (fresh data size)  |  Columns: Epochs\n'
+        f'Rows: Chinchilla multiplier (fresh data size)  |  Columns: {long_label}\n'
         f'Red box = best hyperparams per setting  |  Gray = n/a',
         fontsize=12, fontweight='bold', y=1.02,
     )
@@ -214,21 +225,26 @@ def generate_combined_figure(data, model_size: str, output_path: str):
 
 def main():
     parser = argparse.ArgumentParser(description="Generate combined heatmap figures")
-    parser.add_argument("--merged-dir", type=str, default="merged")
-    parser.add_argument("--output-dir", type=str, default="heatmaps")
+    parser.add_argument("--setting", choices=list(SETTINGS), required=True,
+                        help="Which experiment setting to plot.")
+    parser.add_argument("--merged-dir", type=str, default=None,
+                        help="Override merged dir (default: merged/<setting>)")
+    parser.add_argument("--output-dir", type=str, default=None,
+                        help="Override output dir (default: heatmaps/<setting>)")
     args = parser.parse_args()
 
-    merged_path = Path(args.merged_dir)
-    output_path = Path(args.output_dir)
+    cfg = SETTINGS[args.setting]
+    merged_path = Path(args.merged_dir or cfg["merged_subdir"])
+    output_path = Path(args.output_dir or cfg["output_subdir"])
 
-    print("Loading all merged results...")
-    data = load_all_data(merged_path)
-    print(f"Found {len(data)} (chinchilla, size, epoch) combinations")
+    print(f"[setting={args.setting}] Loading from {merged_path}, writing to {output_path}")
+    data = load_all_data(merged_path, cfg["run_pattern"])
+    print(f"Found {len(data)} (chinchilla, size, third_axis) combinations")
 
     for model_size in MODEL_SIZES:
         print(f"\nGenerating {model_size} figure...")
         out_file = output_path / f"{model_size}_heatmap_grid.pdf"
-        generate_combined_figure(data, model_size, str(out_file))
+        generate_combined_figure(data, model_size, str(out_file), cfg)
 
     print("\nDone!")
 

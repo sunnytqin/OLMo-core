@@ -81,6 +81,56 @@ data_16x = {
     'weight_decay': [0.1, 0.1, 0.1, 0.1, 0.1],
 }
 
+data_0_5x_para = {
+    'chinchilla_scale': [0.5, 0.5, 0.5, 0.5],
+    'K': [1, 2, 4, 8],
+    'tokens_trained': [392229264, 492300911, 689387446, 1081094707],
+    'flops_multiplier': [0.6537, 0.8205, 1.149, 1.8018],
+    'validation_loss': [6.1489, 5.85, 5.575, 5.0603],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.1, 0.2, 0.1],
+}
+
+data_1x_para = {
+    'chinchilla_scale': [1, 1, 1, 1],
+    'K': [1, 2, 4, 8],
+    'tokens_trained': [785109027, 985803162, 1381771817, 2166836268],
+    'flops_multiplier': [1.3085, 1.643, 2.303, 3.6114],
+    'validation_loss': [5.388, 5.1273, 4.6489, 4.275],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.2, 0.2, 0.1],
+}
+
+data_2x_para = {
+    'chinchilla_scale': [2, 2, 2, 2],
+    'K': [1, 2, 4, 8],
+    'tokens_trained': [1570843038, 1971482440, 2765293587, 4336461741],
+    'flops_multiplier': [2.6181, 3.2858, 4.6088, 7.2274],
+    'validation_loss': [4.5164, 4.3329, 4.1125, 3.9939],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.1, 0.1, 0.2],
+}
+
+data_4x_para = {
+    'chinchilla_scale': [4, 4, 4, 4],
+    'K': [1, 2, 4, 8],
+    'tokens_trained': [3139428300, 3939920760, 5525520833, 8667602961],
+    'flops_multiplier': [5.2324, 6.5665, 9.2092, 14.446],
+    'validation_loss': [4.0514, 3.9715, 3.8848, 3.8209],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.1, 0.2, 0.1],
+}
+
+data_8x_para = {
+    'chinchilla_scale': [8, 8, 8, 8],
+    'K': [1, 2, 4, 8],
+    'tokens_trained': [6273079931, 7868567196, 11032447728, 17302500551],
+    'flops_multiplier': [10.4551, 13.1143, 18.3874, 28.8375],
+    'validation_loss': [3.8305, 3.8112, 3.7595, 3.723],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.2, 0.1, 0.1],
+}
+
 ALL_DATASETS = [
     data_0_05x,
     data_0_1x,
@@ -91,4 +141,12 @@ ALL_DATASETS = [
     data_4x,
     data_8x,
     data_16x,
+]
+
+parap_datasets = [
+    data_0_5x_para,
+    data_1x_para,
+    data_2x_para,
+    data_4x_para,
+    data_8x_para,
 ]

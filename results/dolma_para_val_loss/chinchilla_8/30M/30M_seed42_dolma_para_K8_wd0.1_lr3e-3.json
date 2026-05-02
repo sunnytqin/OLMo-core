@@ -1,0 +1,8 @@
+{
+  "30M_seed42_dolma_para_K8_wd0.1_lr3e-3": {
+    "validation_loss": 3.72301020830127,
+    "perplexity": 41.388797760009766,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  }
+}
