@@ -100,21 +100,65 @@ def _eta_muennighoff(p, D, Dp, N):
     return R * (1.0 - torch.exp(-x / R)) / x
 
 
-# Form B with explicit N-dependence in the saturation parameter.
-# Rather than R_0 (an opaque renormalization), the fitted parameter is
-# R*_ref = R* at the reference (D/N=20, N=N_ref) point — i.e., the
-# saturation asymptote itself, which is what we converge to as D'/D → ∞.
+# ── Saturating forms parameterized as log R* = log_K + ρ·log(D/N) + σ·log N
+#
+# All three forms below have η · D'/D → R* as D'/D → ∞.  R* is the
+# fundamental saturation budget; we drop the reference-point renormalization
+# (it can be absorbed into the prefactor).  Fitted parameters: log_K, ρ, σ.
+
+def _Rstar_KN(p, D, N):
+    """R* = exp(log_K) · (D/N)^ρ · N^σ."""
+    return torch.exp(p["log_K"]
+                     + p["rho"] * torch.log(D / N)
+                     + p["sigma"] * torch.log(N))
+
+
 def _eta_muennighoff_Nb(p, D, Dp, N):
-    """η = R*(1 − e^{−x/R*})/x  with
-        R* = R*_ref · (D/N / 20)^ρ · (N/N_ref)^σ.
-    R*_ref is R* at scale 1× (D/N=20) at N=N_ref=30M.
-    σ captures additional N-dependence beyond what (D/N)^ρ provides."""
-    N_ref = torch.tensor(_N_REF, dtype=N.dtype)
-    DoverN_ref = torch.tensor(20.0, dtype=N.dtype)
-    R = (p["Rstar"] * (D / N / DoverN_ref) ** p["rho"]
-                    * (N / N_ref) ** p["sigma"])
+    """Muennighoff:  η · D'/D = R*(1 − e^{−x/R*})  →  R* asymptote (exp)."""
+    R = _Rstar_KN(p, D, N)
     x = Dp / D
     return R * (1.0 - torch.exp(-x / R)) / x
+
+
+def _eta_hill_KN(p, D, Dp, N):
+    """Hill / Michaelis-Menten on the gain:
+       η · D'/D = R*·x / (R*+x)  →  R* asymptote (1/x decay).
+       Equivalently η = R*/(R*+x); η(0) = 1, η → 0 as x → ∞."""
+    R = _Rstar_KN(p, D, N)
+    x = Dp / D
+    return R / (R + x)
+
+
+def _eta_tanh_KN(p, D, Dp, N):
+    """tanh saturation:
+       η · D'/D = R*·tanh(x/R*)  →  R* asymptote (exp, like Muennighoff).
+       η(0) = 1, η → 0 as x → ∞."""
+    R = _Rstar_KN(p, D, N)
+    x = Dp / D
+    return R * torch.tanh(x / R) / x
+
+
+# ── Constant R* variants (no D/N or N dependence) ──────────────────────
+
+def _eta_muennighoff_const(p, D, Dp, N):
+    """exp-sat with constant R*: R* = exp(log_K)."""
+    R = torch.exp(p["log_K"]) * torch.ones_like(D)
+    x = Dp / D
+    return R * (1.0 - torch.exp(-x / R)) / x
+
+
+def _eta_hill_const(p, D, Dp, N):
+    """Hill with constant R*: η = R*/(R* + x)."""
+    R = torch.exp(p["log_K"]) * torch.ones_like(D)
+    x = Dp / D
+    return R / (R + x)
+
+
+def _eta_tanh_const(p, D, Dp, N):
+    """tanh with constant R*."""
+    R = torch.exp(p["log_K"]) * torch.ones_like(D)
+    x = Dp / D
+    return R * torch.tanh(x / R) / x
 
 
 FORMS: Dict[str, dict] = {
@@ -203,12 +247,45 @@ FORMS: Dict[str, dict] = {
     "Muennighoff R*(N)": dict(
         fn=_eta_muennighoff_Nb,
         grid=expand_grid({
-            "Rstar": [5.0, 12.0, 22.0, 50.0],          # R* at 1× scale, 30M
+            "log_K": [10.0, 14.0, 18.0, 22.0],
             "rho":   [-1.5, -1.0, -0.5, 0.0],
             "sigma": [-1.0, -0.5, 0.0],
         }),
-        desc=("η = R*·(1−e^(−x/R*))/x  with "
-              "R* = R*_ref·(D/N/20)^ρ·(N/30M)^σ"),
+        desc=("η = R*·(1−e^(−x/R*))/x  with  "
+              "log R* = log_K + ρ·log(D/N) + σ·log N"),
+    ),
+    "Hill R*(N)": dict(
+        fn=_eta_hill_KN,
+        grid=expand_grid({
+            "log_K": [10.0, 14.0, 18.0, 22.0],
+            "rho":   [-1.5, -1.0, -0.5, 0.0],
+            "sigma": [-1.0, -0.5, 0.0],
+        }),
+        desc=("η = R*/(R*+x);  η·x = R*·x/(R*+x);  same R*(D, N) form"),
+    ),
+    "tanh R*(N)": dict(
+        fn=_eta_tanh_KN,
+        grid=expand_grid({
+            "log_K": [10.0, 14.0, 18.0, 22.0],
+            "rho":   [-1.5, -1.0, -0.5, 0.0],
+            "sigma": [-1.0, -0.5, 0.0],
+        }),
+        desc=("η = R*·tanh(x/R*)/x;  same R*(D, N) form"),
+    ),
+    "exp-sat R* const": dict(
+        fn=_eta_muennighoff_const,
+        grid=expand_grid({"log_K": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0]}),
+        desc="η = R*·(1−e^(−x/R*))/x with R* = exp(log_K) (constant)",
+    ),
+    "Hill R* const": dict(
+        fn=_eta_hill_const,
+        grid=expand_grid({"log_K": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0]}),
+        desc="η = R*/(R*+x) with R* constant",
+    ),
+    "tanh R* const": dict(
+        fn=_eta_tanh_const,
+        grid=expand_grid({"log_K": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0]}),
+        desc="η = R*·tanh(x/R*)/x with R* constant",
     ),
 }
 

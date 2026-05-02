@@ -63,6 +63,20 @@ def _eta_exp_DoverN(p, D, Dp, N):
     return torch.where(Dp > 0, eta, torch.zeros_like(eta))
 
 
+def _eta_muennighoff_RstarN(p, D, Dp, N):
+    """exp-sat with explicit R*(D/N, N):
+        log R* = log_K + ρ·log(D/N) + σ·log N
+        η = R*(1 − e^{−x/R*})/x"""
+    log_R = (p["log_K"]
+             + p["rho"] * torch.log(D / N)
+             + p["sigma"] * torch.log(N))
+    R = torch.exp(log_R)
+    x = Dp / D.clamp(min=1.0)
+    safe_x = torch.where(Dp > 0, x, torch.ones_like(x))
+    eta = R * (1.0 - torch.exp(-safe_x / R)) / safe_x
+    return torch.where(Dp > 0, eta, torch.zeros_like(eta))
+
+
 ETA_FORMS: Dict[str, dict] = {
     "Muennighoff": dict(
         fn=_eta_muennighoff,
@@ -77,6 +91,14 @@ ETA_FORMS: Dict[str, dict] = {
             "eta0": [0.7, 1.0],
             "R0":   [50.0, 500.0],
             "rho":  [-1.0, 0.0],
+        },
+    ),
+    "Muennighoff R*(N)": dict(
+        fn=_eta_muennighoff_RstarN,
+        eta_param_grid={
+            "log_K": [10.0, 18.0],
+            "rho":   [-1.0, 0.0],
+            "sigma": [-1.0, 0.0],
         },
     ),
 }
