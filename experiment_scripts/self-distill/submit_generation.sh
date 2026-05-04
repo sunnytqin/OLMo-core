@@ -24,8 +24,8 @@
 #SBATCH --time=1-00:00
 #SBATCH --mem=64G
 #SBATCH --job-name=syn-gen
-#SBATCH -o /n/home05/sqin/OLMo-core/slurm_out/syn-gen-%j.out
-#SBATCH -e /n/home05/sqin/OLMo-core/slurm_out/syn-gen-%j.out
+#SBATCH -o /n/home05/sqin/OLMo-core/slurm_out/syn-gen-%A_%a.out
+#SBATCH -e /n/home05/sqin/OLMo-core/slurm_out/syn-gen-%A_%a.out
 
 set -eo pipefail
 

@@ -226,13 +226,16 @@ def main():
     if not args.dry_run:
         output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 14M has head_dim=16 so vLLM falls back to FlexAttention, whose triton
-    # kernel cannot index past ~16M KV-cache tokens. Cap memory so the cache
-    # stays well under that. 30M+ uses FLASH_ATTN and has no such limit.
-    # Also cap concurrent sequences for 14M -- vLLM's FlexAttention backend
-    # builds a (max_num_seqs * total_blocks) bookkeeping tensor that OOMs
-    # on H100 with default max_num_seqs.
-    is_flex = args.model_size == "14M"
+    # FlashAttention supports head_dim in {32, 64, 96, 128, 192, 256}.
+    # OLMo head_dim by size:
+    #   14M -> 16 (Flash NO -> FlexAttention)
+    #   30M -> 32 (Flash YES)
+    #   60M -> 48 (Flash NO -> FlexAttention)
+    #   190M -> 64 (Flash YES)
+    # FlexAttention's triton kernel cannot index past ~16M KV-cache tokens
+    # and OOMs the (max_num_seqs * total_blocks) bookkeeping tensor on H100
+    # at default settings. Cap both memory and concurrency for these sizes.
+    is_flex = args.model_size in ("14M", "60M")
     gpu_mem_util = 0.20 if is_flex else 0.9
 
     cmd = [

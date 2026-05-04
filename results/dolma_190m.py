@@ -92,13 +92,13 @@ data_0_5x_para = {
 }
 
 data_1x_para = {
-    'chinchilla_scale': [1, 1, 1],
-    'K': [1, 2, 4],
-    'tokens_trained': [4970147247, 6237612767, 8750277711],
-    'flops_multiplier': [1.3079, 1.6415, 2.3027],
-    'validation_loss': [3.232, 3.1645, 3.0883],
-    'learning_rate': [3e-3, 3e-3, 3e-3],
-    'weight_decay': [0.1, 0.2, 0.2],
+    'chinchilla_scale': [1, 1, 1, 1],
+    'K': [1, 2, 4, 8],
+    'tokens_trained': [4970147247, 6237612767, 8750277711, 13729915768],
+    'flops_multiplier': [1.3079, 1.6415, 2.3027, 3.6131],
+    'validation_loss': [3.232, 3.1645, 3.0883, 3.0305],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.2, 0.2, 0.2],
 }
 
 data_2x_para = {

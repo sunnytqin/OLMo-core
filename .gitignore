@@ -66,3 +66,5 @@ random_plots/
 **/deprecated/
 .claude/
 *fonts*/
+results/fonts.zip
+results/chinchilla_fit_dolma_para/
