@@ -31,6 +31,7 @@ else:
 
 all_datasets = model_data.ALL_DATASETS
 parap_datasets = getattr(model_data, 'parap_datasets', None)
+selfdistill_datasets = getattr(model_data, 'selfdistill_datasets', None)
 
 FONT_LABEL  = 18
 FONT_TITLE  = 20
@@ -129,28 +130,34 @@ def plot_panel(ax, datasets, baseline_xs, baseline_ys, title, axis_field='epochs
               fontsize=FONT_LEGEND, loc='lower left')
 
 
-# Baseline shared by both panels (1-epoch from multi-epoch data)
+# Baseline shared by all panels (1-epoch from multi-epoch data)
 baseline_xs, baseline_ys = compute_one_epoch_baseline(all_datasets)
 
+# Build the panel list dynamically: always multi-epoch, then paraphrase / self-distill if present.
+panels = [(all_datasets, 'Multi-epoch', 'epochs')]
 if parap_datasets:
-    fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(16, 6),
-                                             sharex=True, sharey=True)
-    plot_panel(ax_left, all_datasets, baseline_xs, baseline_ys,
-               title='Multi-epoch', axis_field='epochs')
-    plot_panel(ax_right, parap_datasets, baseline_xs, baseline_ys,
-               title='Paraphrase', axis_field='K')
-    # Shared x-limits derived from union of all flops on the figure
-    all_flops = list(baseline_xs)
-    for d in all_datasets: all_flops += list(d['flops_multiplier'])
-    for d in parap_datasets: all_flops += list(d['flops_multiplier'])
-    ax_left.set_xlim(min(all_flops) * 0.7, max(all_flops) * 1.3)
-else:
+    panels.append((parap_datasets, 'Paraphrase', 'K'))
+if selfdistill_datasets:
+    panels.append((selfdistill_datasets, 'Self-distillation', 'K'))
+
+n = len(panels)
+if n == 1:
     fig, ax = plt.subplots(figsize=(8, 6))
-    plot_panel(ax, all_datasets, baseline_xs, baseline_ys,
-               title=None, axis_field='epochs')
-    all_flops = list(baseline_xs)
-    for d in all_datasets: all_flops += list(d['flops_multiplier'])
-    ax.set_xlim(min(all_flops) * 0.7, max(all_flops) * 1.3)
+    axes = [ax]
+else:
+    fig, axes = plt.subplots(1, n, figsize=(8 * n, 6), sharex=True, sharey=True)
+    axes = list(axes)
+
+for ax, (datasets, title, axis_field) in zip(axes, panels):
+    plot_panel(ax, datasets, baseline_xs, baseline_ys,
+               title=(title if n > 1 else None), axis_field=axis_field)
+
+# Shared x-limits derived from union of all flops across every panel
+all_flops = list(baseline_xs)
+for datasets, _, _ in panels:
+    for d in datasets:
+        all_flops += list(d['flops_multiplier'])
+axes[0].set_xlim(min(all_flops) * 0.7, max(all_flops) * 1.3)
 
 plt.tight_layout()
 out_path = f'results/compute_optimal_scaling_{MODEL_SIZE}.pdf'

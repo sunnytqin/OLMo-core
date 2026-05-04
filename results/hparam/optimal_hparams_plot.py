@@ -29,7 +29,7 @@ MODEL_SIZES = ["14M", "30M", "60M", "190M", "370M"]
 # Per-setting config. `min_configs` is the threshold below which we gray
 # out a cell and label it "n/a". multi_epoch sweeps 5x4=20, so 5 is a
 # meaningful "explored enough" floor. para sweeps 2x2=4, so 4 means the
-# full grid was run.
+# full grid was run. selfdistill sweeps 3x2=6, so 6 means the full grid.
 SETTINGS = {
     "multi_epoch": {
         "run_pattern": re.compile(
@@ -48,6 +48,15 @@ SETTINGS = {
         "merged_subdir": "merged/para",
         "output_subdir": "heatmaps/para",
         "min_configs": 4,
+    },
+    "selfdistill": {
+        "run_pattern": re.compile(
+            r'(14M|30M|60M|190M|370M)_seed\d+_dolma_selfdistill_K(\d+)_wd([\d.]+)_lr([\d.e-]+)'
+        ),
+        "third_axis_label": "K (self-distill factor)",
+        "merged_subdir": "merged/selfdistill",
+        "output_subdir": "heatmaps/selfdistill",
+        "min_configs": 6,
     },
 }
 

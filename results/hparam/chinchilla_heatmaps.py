@@ -48,6 +48,17 @@ SETTINGS = {
         "merged_subdir": "merged/para",
         "output_subdir": "heatmaps/para",
     },
+    "selfdistill": {
+        "run_pattern": re.compile(
+            r'(14M|30M|60M|190M|370M)_seed\d+_dolma_selfdistill_K(\d+)_wd([\d.]+)_lr([\d.e-]+)'
+        ),
+        "third_axis_label": "K (self-distill factor)",
+        "third_axis_short": "K",
+        "weight_decays": [0.1, 0.2, 0.4],
+        "learning_rates": [1e-3, 3e-3],
+        "merged_subdir": "merged/selfdistill",
+        "output_subdir": "heatmaps/selfdistill",
+    },
 }
 
 

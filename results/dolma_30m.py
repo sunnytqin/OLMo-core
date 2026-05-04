@@ -161,6 +161,26 @@ data_8x_para = {
     'weight_decay': [0.1, 0.2, 0.1, 0.1],
 }
 
+data_0_25x_sd = {
+    'chinchilla_scale': [0.25, 0.25, 0.25, 0.25, 0.25],
+    'K': [1, 2, 4, 8, 16],
+    'tokens_trained': [300958261, 601916522, 1203833044, 2407666088, 4799423101],
+    'flops_multiplier': [0.5016, 1.0032, 2.0064, 4.0128, 7.999],
+    'validation_loss': [6.5545, 5.7342, 5.088, 4.3069, 4.0281],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.1, 0.2, 0.2, 0.1],
+}
+
+data_0_5x_sd = {
+    'chinchilla_scale': [0.5, 0.5, 0.5, 0.5, 0.5],
+    'K': [1, 2, 4, 8, 16],
+    'tokens_trained': [599930425, 1199860850, 2399721700, 4799443400, 9598886800],
+    'flops_multiplier': [0.9999, 1.9998, 3.9995, 7.9991, 15.9981],
+    'validation_loss': [5.7219, 5.0083, 4.3131, 3.9961, 3.8589],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.4, 0.2, 0.2, 0.1, 0.1],
+}
+
 ALL_DATASETS = [
     data_0_05x,
     data_0_1x,
@@ -182,4 +202,9 @@ parap_datasets = [
     data_2x_para,
     data_4x_para,
     data_8x_para,
+]
+
+selfdistill_datasets = [
+    data_0_25x_sd,
+    data_0_5x_sd,
 ]

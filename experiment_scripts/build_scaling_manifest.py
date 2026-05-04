@@ -4,13 +4,16 @@ Build a manifest of ALL complete runs across 30M, 60M, 370M for scaling law fitt
 Checks actual training progress against expected steps to determine completion.
 Skips runs that already have eval results.
 
-Two modes:
+Three modes:
   --mode multi_epoch (default): runs named <size>_seed42_case4_dolma_epoch<N>_wd<W>_lr<L>
                                 eval results live in results/dolma_val_loss
                                 manifests written to results/chinchilla_fit_dolma/
   --mode paraphrase           : runs named <size>_seed42_dolma_para_K<N>_wd<W>_lr<L>
                                 eval results live in results/dolma_para_val_loss
                                 manifests written to results/chinchilla_fit_dolma_para/
+  --mode selfdistill          : runs named <size>_seed42_dolma_selfdistill_K<N>_wd<W>_lr<L>
+                                eval results live in results/dolma_sd_val_loss
+                                manifests written to results/chinchilla_fit_dolma_sd/
 """
 import argparse
 import json
@@ -45,6 +48,14 @@ MODE_CONFIG = {
         "axis_field": "K",
         "results_base": f"{REPO_RESULTS}/dolma_para_val_loss",
         "manifest_dir": f"{REPO_RESULTS}/chinchilla_fit_dolma_para",
+    },
+    "selfdistill": {
+        "run_pattern": re.compile(
+            r"(?P<size>\d+M)_seed42_dolma_selfdistill_K(?P<axis>\d+)_wd(?P<wd>[\d.]+)_lr(?P<lr>[\de.-]+)"
+        ),
+        "axis_field": "K",
+        "results_base": f"{REPO_RESULTS}/dolma_sd_val_loss",
+        "manifest_dir": f"{REPO_RESULTS}/chinchilla_fit_dolma_sd",
     },
 }
 

@@ -5,19 +5,23 @@ Regenerate results/dolma_<size>.py from eval JSONs.
 Reads:
   - results/dolma_val_loss/{chin}/{size}/*.json       (multi-epoch)
   - results/dolma_para_val_loss/{chin}/{size}/*.json  (paraphrase)
-  - {checkpoint_base}/{chin}/{run_name}/step0/config.json  (paraphrase only — for tokens_trained)
+  - results/dolma_sd_val_loss/{chin}/{size}/*.json    (self-distill)
+  - {checkpoint_base}/{chin}/{run_name}/step0/config.json  (paraphrase + self-distill — for tokens_trained)
 
 Writes results/dolma_<size>.py with:
   - data_<S>x = {chinchilla_scale, epochs, flops_multiplier, validation_loss, learning_rate, weight_decay}
   - data_<S>x_para = {chinchilla_scale, K, tokens_trained, flops_multiplier, validation_loss, learning_rate, weight_decay}
+  - data_<S>x_sd   = {chinchilla_scale, K, tokens_trained, flops_multiplier, validation_loss, learning_rate, weight_decay}
   - ALL_DATASETS = [data_<S>x, ...]
-  - parap_datasets = [data_<S>x_para, ...]   (omitted if no paraphrase data)
+  - parap_datasets = [data_<S>x_para, ...]      (= None if no paraphrase data)
+  - selfdistill_datasets = [data_<S>x_sd, ...]  (= None if no self-distill data)
 
 Conventions:
   - N (non-embedding params) is parsed from size label: "30M" -> 30_000_000.
   - 1 chinchilla = 20 * N tokens.
   - Multi-epoch flops_multiplier = chinchilla_scale * epoch.
-  - Paraphrase flops_multiplier = tokens_trained / (20 * N) — paraphrase is always 1 epoch over (D + D'*K).
+  - Paraphrase / self-distill flops_multiplier = tokens_trained / (20 * N) — both are 1 epoch over a
+    K-augmented corpus, so we read tokens_trained from step0/config.json (not derivable from chin × K).
 """
 import argparse
 import json
@@ -28,6 +32,7 @@ from pathlib import Path
 REPO = Path("/n/home05/sqin/OLMo-core")
 RESULTS_ME = REPO / "results" / "dolma_val_loss"
 RESULTS_PA = REPO / "results" / "dolma_para_val_loss"
+RESULTS_SD = REPO / "results" / "dolma_sd_val_loss"
 CKPT_BASE = Path("/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints")
 OUT_DIR = REPO / "results"
 
@@ -36,6 +41,9 @@ ME_PATTERN = re.compile(
 )
 PA_PATTERN = re.compile(
     r"(?P<size>\d+M)_seed42_dolma_para_K(?P<K>\d+)_wd(?P<wd>[\d.]+)_lr(?P<lr>[\de.-]+)"
+)
+SD_PATTERN = re.compile(
+    r"(?P<size>\d+M)_seed42_dolma_selfdistill_K(?P<K>\d+)_wd(?P<wd>[\d.]+)_lr(?P<lr>[\de.-]+)"
 )
 SIZE_LABEL = re.compile(r"^(\d+)M$")
 
@@ -112,10 +120,20 @@ def collect_multi_epoch():
 
 def collect_paraphrase():
     """Walk RESULTS_PA, return best entry per (size, chin, K) including tokens_trained."""
+    return _collect_K_axis(RESULTS_PA, PA_PATTERN)
+
+
+def collect_selfdistill():
+    """Walk RESULTS_SD, return best entry per (size, chin, K) including tokens_trained."""
+    return _collect_K_axis(RESULTS_SD, SD_PATTERN)
+
+
+def _collect_K_axis(results_root: Path, pattern: re.Pattern):
+    """Shared logic for K-axis modes (paraphrase, self-distill)."""
     best = {}
-    if not RESULTS_PA.exists():
+    if not results_root.exists():
         return best
-    for chin_dir in sorted(RESULTS_PA.iterdir()):
+    for chin_dir in sorted(results_root.iterdir()):
         if not chin_dir.is_dir() or chin_dir.name not in CHIN_SCALE_MAP:
             continue
         for size_dir in sorted(chin_dir.iterdir()):
@@ -123,7 +141,7 @@ def collect_paraphrase():
             size = size_dir.name
             for result_file in sorted(size_dir.glob("*.json")):
                 run_name = result_file.stem
-                m = PA_PATTERN.match(run_name)
+                m = pattern.match(run_name)
                 if not m: continue
                 K = int(m.group("K")); wd = m.group("wd"); lr = m.group("lr")
                 val_loss = load_eval_loss(result_file, run_name)
@@ -133,14 +151,13 @@ def collect_paraphrase():
                     print(f"  WARN: missing tokens for {chin_dir.name}/{run_name}, skipping")
                     continue
                 key = (size, chin_dir.name, K)
-                # Tie-break on val_loss; if same K hparam wins, the tokens are identical anyway.
                 if key not in best or val_loss < best[key]["val_loss"]:
                     best[key] = {"val_loss": val_loss, "lr": lr, "wd": wd, "K": K,
                                  "tokens_trained": tokens}
     return best
 
 
-def render_size(size: str, me_best: dict, pa_best: dict) -> str:
+def render_size(size: str, me_best: dict, pa_best: dict, sd_best: dict) -> str:
     """Render the dolma_<size>.py module content."""
     N = n_params_from_size(size)
     chin_baseline = 20 * N
@@ -152,12 +169,16 @@ def render_size(size: str, me_best: dict, pa_best: dict) -> str:
     pa_by_chin = defaultdict(list)
     for (s, cd, K), v in pa_best.items():
         if s == size: pa_by_chin[cd].append(v)
+    sd_by_chin = defaultdict(list)
+    for (s, cd, K), v in sd_best.items():
+        if s == size: sd_by_chin[cd].append(v)
 
     for cd in me_by_chin: me_by_chin[cd].sort(key=lambda e: e["epoch"])
     for cd in pa_by_chin: pa_by_chin[cd].sort(key=lambda e: e["K"])
+    for cd in sd_by_chin: sd_by_chin[cd].sort(key=lambda e: e["K"])
 
     lines = ["import numpy as np\n"]
-    me_vars, pa_vars = [], []
+    me_vars, pa_vars, sd_vars = [], [], []
 
     for cd in CHIN_ORDER:
         if cd in me_by_chin:
@@ -174,12 +195,14 @@ def render_size(size: str, me_best: dict, pa_best: dict) -> str:
             lines.append(f"    'weight_decay': [{', '.join(e['wd'] for e in entries)}],")
             lines.append("}\n")
 
-    for cd in CHIN_ORDER:
-        if cd in pa_by_chin:
-            entries = pa_by_chin[cd]
+    def _render_K_block(by_chin, suffix, var_list):
+        for cd in CHIN_ORDER:
+            if cd not in by_chin:
+                continue
+            entries = by_chin[cd]
             scale = CHIN_SCALE_MAP[cd]
-            var = f"{VAR_NAMES[cd]}_para"
-            pa_vars.append(var)
+            var = f"{VAR_NAMES[cd]}_{suffix}"
+            var_list.append(var)
             tokens_list = [e["tokens_trained"] for e in entries]
             flops_list = [round(t / chin_baseline, 4) for t in tokens_list]
             lines.append(f"{var} = {{")
@@ -192,6 +215,9 @@ def render_size(size: str, me_best: dict, pa_best: dict) -> str:
             lines.append(f"    'weight_decay': [{', '.join(e['wd'] for e in entries)}],")
             lines.append("}\n")
 
+    _render_K_block(pa_by_chin, "para", pa_vars)
+    _render_K_block(sd_by_chin, "sd", sd_vars)
+
     lines.append("ALL_DATASETS = [")
     for v in me_vars: lines.append(f"    {v},")
     lines.append("]\n")
@@ -199,9 +225,16 @@ def render_size(size: str, me_best: dict, pa_best: dict) -> str:
     if pa_vars:
         lines.append("parap_datasets = [")
         for v in pa_vars: lines.append(f"    {v},")
+        lines.append("]\n")
+    else:
+        lines.append("parap_datasets = None\n")
+
+    if sd_vars:
+        lines.append("selfdistill_datasets = [")
+        for v in sd_vars: lines.append(f"    {v},")
         lines.append("]")
     else:
-        lines.append("parap_datasets = None")
+        lines.append("selfdistill_datasets = None")
     return "\n".join(lines) + "\n"
 
 
@@ -218,8 +251,13 @@ def main():
     print(f"Walking {RESULTS_PA} ...")
     pa_best = collect_paraphrase()
     print(f"  paraphrase best entries:  {len(pa_best)}")
+    print(f"Walking {RESULTS_SD} ...")
+    sd_best = collect_selfdistill()
+    print(f"  self-distill best entries: {len(sd_best)}")
 
-    sizes_seen = sorted({k[0] for k in me_best.keys()} | {k[0] for k in pa_best.keys()},
+    sizes_seen = sorted({k[0] for k in me_best.keys()}
+                        | {k[0] for k in pa_best.keys()}
+                        | {k[0] for k in sd_best.keys()},
                         key=lambda s: int(s.rstrip("M")))
     sizes = args.sizes if args.sizes else sizes_seen
     if args.sizes:
@@ -230,11 +268,12 @@ def main():
     for size in sizes:
         n_me = sum(1 for k in me_best if k[0] == size)
         n_pa = sum(1 for k in pa_best if k[0] == size)
-        if n_me == 0 and n_pa == 0:
+        n_sd = sum(1 for k in sd_best if k[0] == size)
+        if n_me == 0 and n_pa == 0 and n_sd == 0:
             continue
         out = OUT_DIR / f"dolma_{size.lower()}.py"
-        out.write_text(render_size(size, me_best, pa_best))
-        print(f"Wrote {out}: {n_me} multi-epoch + {n_pa} paraphrase entries")
+        out.write_text(render_size(size, me_best, pa_best, sd_best))
+        print(f"Wrote {out}: {n_me} multi-epoch + {n_pa} paraphrase + {n_sd} self-distill entries")
 
 
 if __name__ == "__main__":
