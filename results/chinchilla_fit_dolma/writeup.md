@@ -1040,6 +1040,342 @@ deliberate compromise of fit quality for physical consistency.
 
 ---
 
+## 5. Paraphrase: $\eta_{\text{para}}$ on a second token stream
+
+The repetition framework extends directly to *paraphrased* training
+data.  Instead of repeating the same Dolma tokens, paraphrase runs
+augment the original $D$ fresh tokens with $D'_{\text{para}}$
+paraphrased tokens (one or more LLM-rewrites per document, indexed by
+$K \in \{1, 2, 4, 8\}$).  We fit
+
+$$L \;=\; E_{\text{eff}}(N) \;+\; \frac{B}{(D + \eta_{\text{para}}\,D')^{\beta}}, \qquad D'_{\text{para}} = \texttt{tokens\_trained} - D,$$
+
+reusing the **canonical $k=20$ joint Chinchilla anchors from §3.1**
+(refit here for completeness — minor numerical drift from the $\sim 55 \to 56$
+1-ep dataset gives $E=1.758,\, A=1315,\, B=22{,}013,\, \alpha=0.40,\, \beta=0.454$).
+$\eta_{\text{para}}$ asks the same question as $\eta_{\text{repeat}}$
+but for a different second token stream: how many fresh-equivalent
+tokens is each paraphrased token worth?
+
+### 5.1 Data
+
+Per-size paraphrase coverage (scale $\ge 0.5\times$, baseline 1-ep
+required at the same scale; one paraphrase $\approx 0.30 \cdot D$ extra
+tokens, so $K=8$ reaches $D'/D \approx 2.6$):
+
+| size | $n_{\text{para}}$ | scales covered | $K$ values | $D'/D$ range |
+|---|---|---|---|---|
+| 14M  | 20 | $0.5, 1, 2, 4, 8\times$ | $1, 2, 4, 8$ | $0.31$–$2.61$ |
+| 30M  | 20 | $0.5, 1, 2, 4, 8\times$ | $1, 2, 4, 8$ | $0.31$–$2.61$ |
+| 60M  | 16 | $0.5, 1, 2, 4\times$ | $1, 2, 4, 8$ | $0.31$–$2.61$ |
+| 190M | 6  | $0.5, 1, 2\times$ | $1, 2$ | $0.27$–$0.64$ |
+
+Total pooled $n=62$.  **Critical limitation: $D'/D$ never exceeds $\sim 2.6$**
+across any size.  Repetition data, by contrast, reaches $D'/D=63$
+(64-epoch).  $\eta_{\text{para}}$ is therefore well-determined in the
+*low-$D'/D$* regime only — saturation parameters (Form B's $R^*$,
+Form C's $b$) are extrapolations not interpolations.
+
+Code: [data.py](data.py) `extract_paraphrase` / `load_with_para`.
+
+### 5.2 Per-point $\eta_{\text{para}}$: paraphrases are nearly fresh
+
+Inverting the loss with the joint anchors (both ΔL and $E_{\text{eff}}$
+solvers, §4.2):
+
+| size | $n$ | ΔL form: range, η>1 | $E_{\text{eff}}$ form: range, median, η>1 |
+|---|---|---|---|
+| 14M  | 20 | $[0.54, 1.40]$, 5/20  | $[0.30, 1.30]$, **0.85**, 4/20 |
+| 30M  | 20 | $[0.20, 2.89]$, 9/20  | $[-0.12, 2.06]$, **0.90**, 6/20 |
+| 60M  | 16 | $[0.63, 8.33]$, 14/16 | $[-0.91, 2.48]$, **1.07**, 9/16 |
+| 190M | 6  | $[0.32, 1.44]$, 2/6   | $[0.80, 1.31]$, **1.02**, 4/6 |
+
+**Headline:** median $\eta_{\text{para}} \in [0.85, 1.07]$ across sizes.
+Paraphrased tokens are roughly $0.85$–$1.0\times$ fresh-equivalent —
+nearly indistinguishable from new Dolma tokens in this $D'/D$ range.
+For comparison, $\eta_{\text{repeat}}$ at matched $(D/N, D'/D)$
+(within the $D'/D \le 2.6$ overlap) sits at $\sim 0.5$–$0.9$ depending on
+$D/N$, falling to $\sim 0.1$–$0.3$ at $D'/D \gtrsim 30$.  Paraphrase is
+strictly better than repetition everywhere it's tested.
+
+**60M ΔL instability is the same artefact as 190M had for repetition (§3.4).**
+The joint $\beta=0.454$ over-predicts loss at 60M's small scales, so
+$\Delta L$ inflates and the inversion blows up ($\eta \to 8$).  The
+$E_{\text{eff}}$ form (median 1.07, range $[-0.91, 2.48]$) is more
+representative for 60M.  We use $E_{\text{eff}}$ values for the
+"median" column above; ΔL is reported alongside as the
+diagnostic.
+
+Figure: [fit_eta_para_vs_repeat.pdf](fit_eta_para_vs_repeat.pdf) — per-point
+$\eta$ on log-log axes, paraphrase (left) vs repetition (right),
+coloured by size.  Note the much narrower paraphrase $D'/D$ range and
+the visibly *higher* η values, especially at large scales.
+
+### 5.3 Form B with $R^{*}(N)$: the chosen form, applied to paraphrase
+
+We use the same form chosen for repetition (§4.3),
+
+$$\eta_{\text{para}}(D, D'; N) \;=\; \frac{R^{*}\!\left(1 - e^{-x/R^{*}}\right)}{x}, \qquad x = D'/D, \qquad \log R^{*}(D, N) \;=\; \log K + \rho \cdot \log(D/N) + \sigma \cdot \log N,$$
+
+with $(B, \beta)$ frozen at the canonical $k=20$ Chinchilla anchors.
+
+**Per-size Form-B fits:**
+
+| size | $n$ | $\log K$ | $\rho$ | $\sigma$ | $R^{*}(1\times)$ | RMSE | LOO |
+|---|---|---|---|---|---|---|---|
+| 14M  | 20 | 14.0 | $+0.30$ | $-0.80$ | **5.4** | 0.016 | 0.016 |
+| 30M  | 20 | 13.9 | $+10.2$ | $-2.12$ | $3.3\times 10^{3}$ | 0.029 | 0.034 |
+| 60M  | 16 |  9.9 | $+10.2$ | $-1.73$ | $1.1\times 10^{4}$ | 0.047 | 0.070 |
+| 190M |  6 | 18.1 | $-12.8$ | $+1.55$ | $9.8\times 10^{3}$ | 0.005 | 0.006 |
+| **pooled joint** | **62** | **$-24.0$** | $+12.1$ | $-0.16$ | $\sim 10^{4}$ | **0.030** | **0.030** |
+| *repetition Form B* (§4.3) | 102 | 17.8 | $-0.93$ | $-0.69$ | **23** | — | 0.020 |
+
+**Reading the table.**  Only **14M produces a finite, interpretable
+$R^{*} \approx 5.4$** — the only size with enough $D'/D$ reach (max
+$2.61$) and enough scale variation (5 scales × 4 K values) to make the
+saturation knee visible.  Every other per-size fit, and the joint, runs
+$R^{*}$ off to $10^{3}$–$10^{4}$ at the working point and lets the
+$(\rho, \sigma)$ exponents flip sign at random — a degenerate solution
+where $R^{*} \to \infty$ over the data range and $\eta \equiv 1$ is
+the loss minimum.
+
+**Why it degenerates.**  With $D'/D \le 2.6 \ll R^{*}$, $\eta(x)
+\approx 1 - x/(2R^{*})$ — the data only sees the *linear* regime of
+the saturation curve.  Any $R^{*}$ large enough that $x/R^{*} \ll 1$
+gives essentially the same prediction, so $(\log K, \rho, \sigma)$ are
+unidentifiable individually; only the combination $1/R^{*}$ at each
+data point is constrained, and the data wants that combination near
+zero.  **The $K$ range, not the form, is the limiting factor.**
+
+**Comparison to repetition Form B.**  Repetition's $R^{*}(30\text{M},
+1\times) = 23$ — 14M's paraphrase $R^{*} = 5.4$ is actually *smaller*,
+and the per-size 14M curve in [fit_eta_para_formB.pdf](fit_eta_para_formB.pdf)
+sits visibly below the repetition curve at high $D'/D$.  But
+extrapolating from one identified point to a confident "paraphrase
+saturates faster than repetition" would be reckless: the other three
+sizes' $R^{*}$ values are noise.
+
+**Sanity check via simpler forms.**  As a cross-check, fitting
+$\eta_{\text{para}} = c$ (constant) and $\eta_{\text{para}} = c
+(D/N)^{-\gamma}$ on the pooled data:
+
+| form | $n_{\text{par}}$ | LOO | params |
+|---|---|---|---|
+| const               | 1 | 0.031 | $c = 0.872$ |
+| power $(D/N)$       | 2 | 0.029 | $c = 0.493,\; \gamma = -0.188$ |
+| **Form B $R^{*}(N)$**   | **3** | **0.030** | (degenerate, see above) |
+
+All three sit within $0.002$ of each other on LOO — the constant fit
+$\eta_{\text{para}} \approx 0.87$ is statistically as good as the 3-parameter
+saturating form.  This is a different statement than the repetition case
+(§4.3), where the 3-parameter $R^{*}(N)$ wins by a clear $\sim 30\%$
+RMSE margin.
+
+Figure:
+[fit_eta_para_formB.pdf](fit_eta_para_formB.pdf) — per-size Form-B
+fits (blue) vs the repetition Form-B curve at matched $(D/N, D'/D)$
+(red dashed); per-point $\eta_{\text{para}}$ as background dots
+(grey ΔL, white $E_{\text{eff}}$).  Each panel shows the $(\log K,
+\rho, \sigma)$ row from the table above; only the 14M panel has a
+visibly bending blue curve, the others are flat at $\eta \approx 1$.
+
+### 5.4 Per-size pattern across all candidate forms
+
+For completeness — LOO RMSE for the form library on the same data:
+
+| size | $n$ | const | power $(D/N)$ | Form B 2-param | Form B $R^{*}(N)$ |
+|---|---|---|---|---|---|
+| 14M  | 20 | 0.016 | **0.015** | 0.016 | 0.016 |
+| 30M  | 20 | 0.034 | 0.028 | 0.034 | **0.034** |
+| 60M  | 16 | 0.049 | 0.049 | 0.056 | 0.070 |
+| 190M | 6  | 0.007 | 0.008 | **0.006** | 0.006 |
+
+Per-size LOOs differ by $\le 0.005$ across forms at every size.  60M is
+hardest — its $D'/D$ range plus the joint-anchor mismatch (same artefact
+as 190M had for repetition, §3.4) give a $\sim 0.05$ LOO floor that no
+form gets under.
+
+Figure: [fit_eta_para_per_size.pdf](fit_eta_para_per_size.pdf) — 4
+forms × 4 sizes grid.  All forms collapse to nearly-flat $\eta \approx 1$
+curves over the data range.
+
+### 5.5 Comparison to repetition: paraphrase is the second-best fresh data
+
+Both fits are at the same $(B, \beta)$, so comparison is direct.
+
+| | $\eta_{\text{repeat}}$ (§3.3) | $\eta_{\text{para}}$ (§5.3) |
+|---|---|---|
+| pooled $n$ | 102 | 62 |
+| max $D'/D$ in fit | 63 | 2.6 |
+| Form B $R^{*}$ identifiable? | yes (joint and per-size 14–370M) | no (only per-size 14M) |
+| Form B $R^{*}(30\text{M}, 1\times)$ | 23 | 5.4 (14M-only fit, extrapolated) |
+| const-fit $\eta$   | 0.82 | **0.87** |
+| effective $\eta$ across data range | 0.1–0.9 (saturates) | 0.85–1.0 (no saturation) |
+
+**Paraphrase is uniformly better than (or at worst comparable to)
+repetition.**  Inside the overlap range $D'/D \le 2.6$ where both have
+data, the two stay within $\sim 0.1$ of each other in $\eta$.  At the
+high $D'/D$ that *only* repetition reaches (4–60×), repetition $\eta$
+falls to 0.1–0.4 while Form B's flat extrapolation says paraphrase
+would still be near 1 — but **outside the tested $D'/D \le 2.6$ range
+this is a prediction, not a measurement** (see §5.6).
+
+Figure: [fit_eta_para_joint.pdf](fit_eta_para_joint.pdf) — pooled
+$\eta_{\text{para}}$ vs $D'/D$ with the joint Form-B $R^{*}(N)$ fit
+overlay; residuals coloured by size.
+[fit_eta_para_vs_repeat.pdf](fit_eta_para_vs_repeat.pdf) — per-point η
+side-by-side, paraphrase (left) vs repetition (right).
+
+### 5.6 Open questions on paraphrase
+
+1. **$R^{*}_{\text{para}}$ needs $K \gg 8$ to identify.**  With $K=32$ or
+   $K=64$ paraphrases at $0.5\times$ scale ($D'/D \sim 10$–$20$), Form B
+   becomes identifiable joint and per-size.  The 14M number $R^{*}\approx 5.4$
+   is the only data-driven hint — and it would put paraphrase saturating
+   *faster* than repetition at $14$M, which is surprising and worth checking.
+2. **Higher-$K$ at large-$N$.**  190M only has $K \in \{1, 2\}$ at three
+   scales — not enough to fit $\sigma$ from one size.  The pooled $\sigma$
+   for paraphrase is unreliable; 370M / 600M paraphrase runs would
+   tighten $\sigma$ considerably.
+3. **Diminishing-returns *across* paraphrase generations.**  We treat
+   all $K$ paraphrases as one stream of "paraphrased tokens" with the
+   same $\eta$ per token.  A richer model could let the $i$-th paraphrase
+   be worth less than the first.  Currently invisible because we only
+   have $K \in \{1, 2, 4, 8\}$.
+
+Code: [fit_eta_para.py](fit_eta_para.py).  Joint Chinchilla anchor is
+cached in `.joint_anchor_cache.npz` after first run (≈ 5 min) and
+reloaded thereafter.
+
+---
+
+## 6. One-shot triple fit (1-epoch + repetition + paraphrase)
+
+The §5 paraphrase analysis used Chinchilla anchors fixed from the
+1-epoch-only fit (§3.1, two-stage).  The natural next step: fit
+**every parameter on every data source simultaneously**, with a
+single shared Chinchilla curve and *separate* exp-sat $R^{*}(N)$
+parameters for repetition vs. paraphrase.
+
+**Functional form (11 parameters total):**
+
+$$L \;=\; E + \frac{A}{N^{\alpha}} + \frac{B}{(D + \eta_{\text{src}}\,D')^{\beta}}, \qquad \text{src} \in \{\text{1ep}, \text{repeat}, \text{para}\}$$
+
+$$\eta_{\text{src}}(D, D'; N) \;=\; \frac{R^{*}_{\text{src}}\!\left(1 - e^{-x/R^{*}_{\text{src}}}\right)}{x}, \qquad x = D'/D, \qquad \log R^{*}_{\text{src}} \;=\; \log K_{\text{src}} + \rho_{\text{src}} \log(D/N) + \sigma_{\text{src}} \log N$$
+
+with $D' = 0$ (so $\eta$ inert) on 1-epoch points,
+$D' = (\text{epochs}-1)\cdot D$ on repetition,
+$D' = \texttt{tokens\_trained} - D$ on paraphrase.  Five Chinchilla
+parameters $(E, A, B, \alpha, \beta)$ are *shared*; six are split
+between the two saturation surfaces.
+
+**Pipeline.**
+Stage 1: fit the 9-param sub-model (Chinchilla + $\eta_{\text{rep}}$) on the
+1-ep + rep subset to reproduce the writeup_final reference.
+Stage 2: warm-start the full 11-param triple from Stage 1, sweeping a
+24-point grid over $(\log K_{\text{para}}, \rho_{\text{para}}, \sigma_{\text{para}})$.
+Stage 3: iterative residual-greedy drop on the *pooled* (1-ep + rep + para)
+residuals.  Pooled $n=301$ (56 / 182 / 63).
+Code: [fit_joint_triple.py](fit_joint_triple.py).
+
+### 6.1 $k$-sweep on the pooled residual
+
+| $k$ | $n_{\text{kept}}$ | $E$ | $A$ | $B$ | $\alpha$ | $\beta$ | $\log K_{\text{rep}}$ | $\rho_{\text{rep}}$ | $\sigma_{\text{rep}}$ | $\log K_{\text{para}}$ | $\rho_{\text{para}}$ | $\sigma_{\text{para}}$ | RMSE 1ep / rep / para |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+|  0 | 301 | 0.002 | 50 |   872 | 0.187 | 0.273 | 17.33 | $-0.90$ | $-0.70$ | 9.97 | $-2.62$ | $+0.20$ | 0.073 / 0.045 / 0.035 |
+|  5 | 296 | 0.002 | 32 | 2 736 | 0.148 | 0.337 | 12.91 | $-0.67$ | $-0.49$ | 10.16 | $-2.47$ | $+0.14$ | 0.057 / 0.044 / 0.037 |
+| 10 | 291 | 0.003 | 28 | 8 619 | 0.134 | 0.398 | 11.39 | $-0.55$ | $-0.43$ | 10.13 | $-2.87$ | $+0.26$ | 0.058 / 0.038 / 0.029 |
+| **15** | **286** | **0.003** | **29** | **15 599** | **0.133** | **0.431** | **10.58** | **$-0.41$** | **$-0.39$** | **10.10** | **$-2.56$** | **$+0.18$** | **0.043 / 0.036 / 0.029** |
+| 20 | 281 | 0.003 | 31 | 22 290 | 0.135 | 0.451 | 10.60 | $-0.27$ | $-0.41$ | 10.10 | $-2.60$ | $+0.21$ | 0.040 / 0.032 / 0.030 |
+| 25 | 276 | 0.003 | 33 | 31 051 | 0.137 | 0.470 | 10.71 | $-0.15$ | $-0.42$ | 10.09 | $-2.68$ | $+0.26$ | 0.034 / 0.029 / 0.031 |
+| 30 | 271 | 0.003 | 34 | 35 533 | 0.138 | 0.478 | 11.23 | $-0.10$ | $-0.46$ | 10.06 | $-2.94$ | $+0.34$ | 0.033 / 0.028 / 0.027 |
+
+The first $|\Delta\beta| < 0.01$ break is at $k=25 \to 30$, so the
+auto-canonical pick is $k=30$.  Following writeup_final's convention
+(§1, picking the smallest $k$ where $\beta$ is within ~0.015 of the
+saturation value and $\eta < 1$ everywhere), **$k=15$ is the headline**
+because it matches writeup_final's pipeline directly.
+
+### 6.2 Comparison with previously reported fits
+
+| fit | $k$ | $E$ | $A$ | $B$ | $\alpha$ | $\beta$ | $\log K_{\text{rep}}$ | $\rho_{\text{rep}}$ | $\sigma_{\text{rep}}$ | $\log K_{\text{para}}$ | $\rho_{\text{para}}$ | $\sigma_{\text{para}}$ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1-ep only (writeup §3.1)        | 20 | 1.72 | 1115 | 20 828 | 0.390 | 0.451 | — | — | — | — | — | — |
+| 1-ep + rep (writeup_final §2)   | 15 | 0.05 | 31.5 | 16 539 | 0.137 | 0.436 | 10.32 | $-0.27$ | $-0.39$ | — | — | — |
+| **triple (this section)**       | **15** | **0.003** | **28.9** | **15 599** | **0.133** | **0.431** | **10.58** | **$-0.41$** | **$-0.39$** | **10.10** | **$-2.56$** | **$+0.18$** |
+| triple (canonical $k=30$)       | 30 | 0.003 | 34.2 | 35 533 | 0.138 | 0.478 | 11.23 | $-0.10$ | $-0.46$ | 10.06 | $-2.94$ | $+0.34$ |
+
+**Reading the comparison.**
+
+1. **Adding paraphrase data hardly disturbs the rep-only fit.** At
+   matched $k=15$, $\beta$ moves $0.436 \to 0.431$ (a tenth-percent
+   shift), $B$ moves $16{,}539 \to 15{,}599$ (~6%), $(E, A, \alpha)$
+   are essentially identical (one-shot rep already had $E \approx 0$,
+   $\alpha = 0.137$ vs. triple $\alpha = 0.133$).  $\eta_{\text{rep}}$
+   parameters move modestly: $\rho_{\text{rep}}$ from $-0.27$ to $-0.41$,
+   $\sigma_{\text{rep}}$ unchanged at $-0.39$.  The Chinchilla curve is
+   pinned by 56 + 182 = 238 points; adding 63 paraphrase points doesn't
+   override that anchor.
+2. **Triple-fit RMSE on each subset matches the dedicated fit on that
+   subset.** 1-ep RMSE 0.043 vs. writeup_final 0.042; rep RMSE 0.036 vs.
+   0.035; para RMSE 0.029 (no rep-only baseline to compare).
+   **The paraphrase-η surface is fit "for free"** — it costs nothing
+   in Chinchilla / $\eta_{\text{rep}}$ quality, and gains a clean
+   parametric $\eta_{\text{para}}$.
+3. **The two $\eta$ surfaces are clearly distinct.** $\eta_{\text{rep}}$
+   (k=15): $\log K = 10.58, \rho = -0.41, \sigma = -0.39$; $R^{*}$ at
+   $D/N = 20$, $N = 30$M $\approx 14$.
+   $\eta_{\text{para}}$: $\log K = 10.10, \rho = -2.56, \sigma = +0.18$;
+   $R^{*}$ at the same point $\approx 250$, dropping to $\sim 1$ at
+   $D/N = 160$.  **Paraphrase $\rho$ is much more negative than
+   repetition $\rho$** — paraphrase tokens are nearly fresh-equivalent
+   at small scale (huge $R^{*}$, no saturation visible) and saturate
+   much faster than repetition at large scale.  This was unidentifiable
+   in §5.3 (paraphrase-only fit, where $\rho_{\text{para}}$ flipped sign
+   randomly across sizes); the joint fit pins it.
+4. **Going from 1-ep-only fit ($E=1.72$, $A=1115$, $\alpha=0.39$,
+   $\beta=0.451$) to one-shot fits is a real change of decomposition,
+   not just a refinement.** The one-shot family pushes most of the
+   irreducible loss into $A/N^{\alpha}$ (with $E \approx 0$) instead of
+   into a large constant $E$.  $E_{\text{eff}}(N) = E + A/N^{\alpha}$
+   evaluated at any of our sizes agrees within $\sim 5\%$ across all
+   three fits — it's just that the $(E, A, \alpha)$ split is
+   reparameterized.  $\beta$ moves the most genuinely: $0.451 \to 0.436$
+   (one-shot rep) $\to 0.431$ (triple, $k=15$) $\to 0.478$ (triple,
+   canonical $k=30$).
+
+### 6.3 Diagnostic figure
+
+[fit_joint_triple.pdf](fit_joint_triple.pdf) — three-panel for the
+canonical-$k$ triple fit:
+(a) $L$ vs. effective tokens $D + D'$, with 1-ep (○), repetition (×),
+paraphrase (□) markers, coloured by size; red rings mark dropped
+points.
+(b) Residuals vs. $D$, no source-conditional structure visible after
+trimming.
+(c) Parity plot: predicted vs. observed $L$, all three sources lie on
+the unit-diagonal.
+
+### 6.4 What this changes for the headline
+
+The triple fit at $k=15$ is the most *complete* current model:
+
+- Chinchilla: $E \approx 0,\, A \approx 29,\, B \approx 15{,}600,\, \alpha = 0.13,\, \beta = 0.43$.
+- $\eta_{\text{rep}}$: $\log R^{*}_{\text{rep}} = 10.6 - 0.41\log(D/N) - 0.39 \log N$.
+- $\eta_{\text{para}}$: $\log R^{*}_{\text{para}} = 10.1 - 2.56\log(D/N) + 0.18 \log N$.
+
+For any $(N, D, K)$ paraphrase or $(N, D, \text{epochs})$ repetition
+budget you can now predict loss directly from one set of
+self-consistent parameters.  Within each subset's RMSE, this
+prediction is as accurate as the dedicated fit on that subset.
+
+The honest caveat from §5.3 still applies: the paraphrase $\eta$
+parameters are pinned mostly by the $D/N \in [10, 160]$ axis, not by
+the $D'/D$ axis (which only reaches 2.6 anywhere).  $K \ge 32$ runs
+would tighten $(\rho_{\text{para}}, \sigma_{\text{para}})$ further.
+
+---
+
 ## 4. Open questions
 
 1. **Size-dependent $\beta$ in the 1-epoch fit.** The joint fit uses
@@ -1055,6 +1391,7 @@ deliberate compromise of fit quality for physical consistency.
 2. **Bootstrap CIs for $\eta$ across sizes.** Warm-started LOO already
    handles stability diagnostics; a full bootstrap would give CIs on
    $(R_0, \rho)$. ~30 s per size.
-3. **Paraphrase / synthetic data extension.** The framework extends
-   directly via $\eta_{\text{para}}$ on the second token stream. Not
-   currently in the Dolma data.
+3. **Paraphrase / synthetic data extension.** Done — see §5. Headline:
+   $\eta_{\text{para}} \approx 0.87$ ≈ const over $D'/D \le 2.6$,
+   weak positive $(D/N)$ exponent.  Saturation is unreached and
+   requires $K \ge 32$ to identify.

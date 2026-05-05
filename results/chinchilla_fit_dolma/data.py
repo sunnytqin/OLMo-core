@@ -119,3 +119,69 @@ def extract_multi_epoch(datasets, N: float, *,
 
 def all_sizes() -> Iterable[str]:
     return list(SIZES.keys())
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Paraphrase data (parallel to multi-epoch).
+#
+# A paraphrase run trains on D fresh Dolma tokens + D'_para paraphrased
+# tokens (≈ K · α · D, with α ≈ 0.3 because paraphrases are shorter than
+# originals; we read D'_para directly off `tokens_trained − D`).
+#
+# Same η fitting framework: L = E_eff(N) + B/(D + η_para · D')^β, with
+# the joint Chinchilla anchors fixed.  L_1ep is the *no-paraphrase*
+# 1-epoch loss at the same (size, scale), used by the ΔL solver.
+# ──────────────────────────────────────────────────────────────────────
+
+def extract_paraphrase(datasets, parap_datasets, N: float, *,
+                        scale_min: float = DEFAULT_SCALE_MIN):
+    """Return (scale, D, K, D'_para, L, L_1ep) arrays for paraphrase points.
+
+    Skips rows where no 1-epoch (no-paraphrase) baseline exists at the
+    same scale, so the ΔL solver and the loss-difference diagnostics
+    have a 1-epoch reference to compare against.
+    """
+    L_1ep_by_scale = {}
+    for ds in datasets:
+        if 1 not in ds["epochs"]:
+            continue
+        scale = ds["chinchilla_scale"][0]
+        L_1ep_by_scale[scale] = ds["validation_loss"][ds["epochs"].index(1)]
+
+    rows = []
+    for pds in parap_datasets:
+        scale = pds["chinchilla_scale"][0]
+        if scale < scale_min:
+            continue
+        if scale not in L_1ep_by_scale:
+            continue
+        L_1ep = L_1ep_by_scale[scale]
+        if np.isnan(L_1ep):
+            continue
+        D = scale * TTP_RATIO * N
+        for i, K in enumerate(pds["K"]):
+            tokens_trained = pds["tokens_trained"][i]
+            loss = pds["validation_loss"][i]
+            if np.isnan(loss):
+                continue
+            Dp = float(tokens_trained) - D
+            if Dp <= 0:
+                continue
+            rows.append((scale, D, int(K), Dp, loss, L_1ep))
+    if not rows:
+        empty = np.array([], dtype=np.float64)
+        return empty, empty, empty, empty, empty, empty
+    a = np.array(rows, dtype=np.float64)
+    return a[:, 0], a[:, 1], a[:, 2], a[:, 3], a[:, 4], a[:, 5]
+
+
+def load_with_para(size: str):
+    """Return (N, ALL_DATASETS, parap_datasets) for a size.
+
+    Sizes without a `parap_datasets` attribute return an empty list.
+    """
+    if size not in SIZES:
+        raise ValueError(f"Unknown size {size!r}; choose from {list(SIZES)}")
+    N, module_name = SIZES[size]
+    mod = importlib.import_module(module_name)
+    return N, mod.ALL_DATASETS, getattr(mod, "parap_datasets", [])
