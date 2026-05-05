@@ -2,10 +2,11 @@
 # Merge individual eval results and generate heatmaps for one or more settings.
 #
 # Usage:
-#   bash merge_and_plot.sh                  # both settings
-#   bash merge_and_plot.sh multi_epoch      # just multi-epoch
-#   bash merge_and_plot.sh para             # just paraphrase
-#   bash merge_and_plot.sh multi_epoch para # both, explicit
+#   bash merge_and_plot.sh                              # all settings
+#   bash merge_and_plot.sh multi_epoch                  # just multi-epoch
+#   bash merge_and_plot.sh para                         # just paraphrase
+#   bash merge_and_plot.sh selfdistill                  # just self-distillation
+#   bash merge_and_plot.sh multi_epoch para selfdistill # all, explicit
 
 set -e
 
@@ -16,6 +17,7 @@ CHIN_DIRS=(chinchilla_0.05 chinchilla_0.1 chinchilla_0.25 chinchilla_0.5 chinchi
 declare -A EVAL_SRC_DIR
 EVAL_SRC_DIR[multi_epoch]="../dolma_val_loss"
 EVAL_SRC_DIR[para]="../dolma_para_val_loss"
+EVAL_SRC_DIR[selfdistill]="../dolma_sd_val_loss"
 
 run_setting() {
     local setting="$1"
@@ -62,7 +64,7 @@ run_setting() {
 }
 
 if [ "$#" -eq 0 ]; then
-    SETTINGS_TO_RUN=(multi_epoch para)
+    SETTINGS_TO_RUN=(multi_epoch para selfdistill)
 else
     SETTINGS_TO_RUN=("$@")
 fi

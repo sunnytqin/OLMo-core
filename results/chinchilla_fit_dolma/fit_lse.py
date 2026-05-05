@@ -45,19 +45,32 @@ ForwardFn = Callable[[Dict[str, torch.Tensor]], torch.Tensor]
 
 def _lbfgs(params: Dict[str, torch.Tensor], forward_fn: ForwardFn,
            log_L_obs: torch.Tensor, *, delta: float, max_iter: int,
-           outer_iter: int, lr: float) -> float:
-    """Run L-BFGS + Huber in log space; returns final sum-Huber loss."""
+           outer_iter: int, lr: float,
+           weights: torch.Tensor = None) -> float:
+    """Run L-BFGS + Huber in log space; returns final (weighted) Huber loss.
+    If weights is given (1-D tensor, same length as log_L_obs), per-row Huber
+    is multiplied by weights and summed."""
     opt = torch.optim.LBFGS(
         list(params.values()), lr=lr, max_iter=max_iter,
         history_size=50, line_search_fn="strong_wolfe",
     )
-    huber = torch.nn.HuberLoss(delta=delta, reduction="sum")
+    if weights is None:
+        huber = torch.nn.HuberLoss(delta=delta, reduction="sum")
 
-    def closure():
-        opt.zero_grad()
-        loss = huber(forward_fn(params), log_L_obs)
-        loss.backward()
-        return loss
+        def closure():
+            opt.zero_grad()
+            loss = huber(forward_fn(params), log_L_obs)
+            loss.backward()
+            return loss
+    else:
+        huber_per = torch.nn.HuberLoss(delta=delta, reduction="none")
+
+        def closure():
+            opt.zero_grad()
+            per_elem = huber_per(forward_fn(params), log_L_obs)
+            loss = (per_elem * weights).sum()
+            loss.backward()
+            return loss
 
     final = float("inf")
     for _ in range(outer_iter):
@@ -75,6 +88,7 @@ def fit_lse(forward_fn: ForwardFn,
             grid_max_iter: int = 50,
             grid_outer_iter: int = 1,
             lr: float = 1.0,
+            weights: torch.Tensor = None,
             verbose: bool = False) -> Dict:
     """Grid search + L-BFGS refine; returns dict with fitted params.
 
@@ -94,10 +108,15 @@ def fit_lse(forward_fn: ForwardFn,
                   for k, v in init.items()}
         _lbfgs(params, forward_fn, log_L_obs,
                delta=delta, max_iter=grid_max_iter,
-               outer_iter=grid_outer_iter, lr=lr)
+               outer_iter=grid_outer_iter, lr=lr, weights=weights)
         with torch.no_grad():
-            loss = torch.nn.HuberLoss(delta=delta, reduction="sum")(
-                forward_fn(params), log_L_obs).item()
+            if weights is None:
+                loss = torch.nn.HuberLoss(delta=delta, reduction="sum")(
+                    forward_fn(params), log_L_obs).item()
+            else:
+                per_elem = torch.nn.HuberLoss(delta=delta, reduction="none")(
+                    forward_fn(params), log_L_obs)
+                loss = (per_elem * weights).sum().item()
         if loss < best_loss:
             best_loss = loss
             best_state = {k: v.detach().clone() for k, v in params.items()}
@@ -110,7 +129,7 @@ def fit_lse(forward_fn: ForwardFn,
     params = {k: v.detach().clone().requires_grad_(True) for k, v in best_state.items()}
     final_loss = _lbfgs(params, forward_fn, log_L_obs,
                         delta=delta, max_iter=max_iter,
-                        outer_iter=outer_iter, lr=lr)
+                        outer_iter=outer_iter, lr=lr, weights=weights)
 
     with torch.no_grad():
         pred = forward_fn(params)

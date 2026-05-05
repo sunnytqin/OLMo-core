@@ -349,7 +349,7 @@ def main() -> None:
     parser.add_argument(
         "--seeds",
         required=True,
-        help="Comma-separated seed numbers in 1..8.",
+        help="Comma-separated seed numbers in 1..16.",
     )
     parser.add_argument(
         "--overwrite",
@@ -361,8 +361,8 @@ def main() -> None:
     target_shards = [s.strip() for s in args.shards.split(",") if s.strip()]
     seeds = [int(s.strip()) for s in args.seeds.split(",") if s.strip()]
     for s in seeds:
-        if not 1 <= s <= 8:
-            raise ValueError(f"Seed must be in 1..8, got {s}")
+        if not 1 <= s <= 16:
+            raise ValueError(f"Seed must be in 1..16, got {s}")
 
     if not SHARD_MANIFEST.exists():
         raise FileNotFoundError(f"shard_manifest.json not found at {SHARD_MANIFEST}")

@@ -73,13 +73,33 @@ data_8x = {
 }
 
 data_0_05x_para = {
-    'chinchilla_scale': [0.05],
-    'K': [1],
-    'tokens_trained': [18050720],
-    'flops_multiplier': [0.0645],
-    'validation_loss': [10.9012],
-    'learning_rate': [1e-3],
-    'weight_decay': [0.1],
+    'chinchilla_scale': [0.05, 0.05, 0.05, 0.05],
+    'K': [1, 2, 4, 8],
+    'tokens_trained': [18050720, 22620970, 31724395, 49598082],
+    'flops_multiplier': [0.0645, 0.0808, 0.1133, 0.1771],
+    'validation_loss': [9.9377, 9.614, 8.9823, 8.38],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.1, 0.1, 0.1],
+}
+
+data_0_1x_para = {
+    'chinchilla_scale': [0.1, 0.1, 0.1, 0.1],
+    'K': [1, 2, 4, 8],
+    'tokens_trained': [36618964, 46123489, 64783269, 101707341],
+    'flops_multiplier': [0.1308, 0.1647, 0.2314, 0.3632],
+    'validation_loss': [8.7553, 8.4568, 8.1534, 8.0024],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.1, 0.1, 0.1],
+}
+
+data_0_25x_para = {
+    'chinchilla_scale': [0.25, 0.25, 0.25, 0.25],
+    'K': [1, 2, 4, 8],
+    'tokens_trained': [91538093, 115091050, 161331586, 253408693],
+    'flops_multiplier': [0.3269, 0.411, 0.5762, 0.905],
+    'validation_loss': [7.9887, 7.9028, 7.5366, 7.0287],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.2, 0.1, 0.1, 0.2],
 }
 
 data_0_5x_para = {
@@ -155,6 +175,8 @@ ALL_DATASETS = [
 
 parap_datasets = [
     data_0_05x_para,
+    data_0_1x_para,
+    data_0_25x_para,
     data_0_5x_para,
     data_1x_para,
     data_2x_para,

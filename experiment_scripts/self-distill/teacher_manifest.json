@@ -1,0 +1,155 @@
+{
+  "_README": [
+    "Teacher registry for self-distillation generation + training.",
+    "Keys are '<model_size>_chin<chinchilla_multiplier>' (e.g. '30M_chin0.05').",
+    "",
+    "Each entry declares which teacher checkpoint to use for generation and how many",
+    "synthetic files (each of size D = original dolma shard size) to produce. The",
+    "actual on-disk output dir is computed from the teacher info as:",
+    "  {data_root}/preprocessed/dolma2-0625/resharded/dolma2-tokenizer/self_distill/",
+    "  {basename(teacher_run_dir)}_{teacher_step}_temp{temperature}/",
+    "",
+    "'Generation done?' is determined by counting output_*.npy under that dir vs",
+    "N_target -- not stored here, so the manifest never goes stale.",
+    "",
+    "Teachers were chosen per (model_size, chinchilla) by best validation_loss across",
+    "all (wd, lr) configs at the requested epoch in",
+    "results/hparam/merged/multi_epoch/. Preferred epoch was 64 (else 32) for 14M/30M,",
+    "32 for 60M, 16 for 190M. Some cells were undersampled at sweep time -- see notes."
+  ],
+  "14M_chin0.25": {
+    "model_size": "14M",
+    "chinchilla_multiplier": 0.25,
+    "teacher_run_dir": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/14M_seed42_case4_dolma_epoch64_wd0.4_lr3e-3",
+    "teacher_step": "step2137",
+    "temperature": 1.0,
+    "N_target": 16,
+    "notes": "epoch=64 best (val_loss=4.8192). Only 3 configs swept (undersampled)."
+  },
+  "14M_chin0.5": {
+    "model_size": "14M",
+    "chinchilla_multiplier": 0.5,
+    "teacher_run_dir": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/14M_seed42_case4_dolma_epoch32_wd0.4_lr3e-3",
+    "teacher_step": "step2137",
+    "temperature": 1.0,
+    "N_target": 16,
+    "notes": "epoch=64 not available; using epoch=32 best (val_loss=4.5544). Only 4 configs swept."
+  },
+  "14M_chin1": {
+    "model_size": "14M",
+    "chinchilla_multiplier": 1,
+    "teacher_run_dir": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_1/14M_seed42_case4_dolma_epoch32_wd0.2_lr3e-3",
+    "teacher_step": "step4273",
+    "temperature": 1.0,
+    "N_target": 16,
+    "notes": "epoch=64 not available; using epoch=32 best (val_loss=4.3076). Only 4 configs swept."
+  },
+  "14M_chin2": {
+    "model_size": "14M",
+    "chinchilla_multiplier": 2,
+    "teacher_run_dir": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_2/14M_seed42_case4_dolma_epoch32_wd0.2_lr3e-3",
+    "teacher_step": "step8545",
+    "temperature": 1.0,
+    "N_target": 16,
+    "notes": "epoch=64 not available; using epoch=32 best (val_loss=4.1815). Only 4 configs swept."
+  },
+  "14M_chin4": {
+    "model_size": "14M",
+    "chinchilla_multiplier": 4,
+    "teacher_run_dir": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_4/14M_seed42_case4_dolma_epoch16_wd0.1_lr3e-3",
+    "teacher_step": "step8545",
+    "temperature": 1.0,
+    "N_target": 16,
+    "notes": "FALLBACK: no epoch=32/64 sweep exists for 14M chin=4 (only up to epoch=16). Using epoch=16 best (val_loss=4.1109, 1 config only). May want to train more epochs first."
+  },
+  "30M_chin0.25": {
+    "model_size": "30M",
+    "chinchilla_multiplier": 0.25,
+    "teacher_run_dir": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/30M_seed42_case4_dolma_epoch64_wd0.8_lr3e-3",
+    "teacher_step": "step4578",
+    "temperature": 1.0,
+    "N_target": 16,
+    "notes": "epoch=64 best (val_loss=4.1152, 19 configs)."
+  },
+  "30M_chin0.5": {
+    "model_size": "30M",
+    "chinchilla_multiplier": 0.5,
+    "teacher_run_dir": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/30M_seed42_case4_dolma_epoch64_wd0.4_lr3e-3",
+    "teacher_step": "step9156",
+    "temperature": 1.0,
+    "N_target": 16,
+    "notes": "epoch=64 best (val_loss=3.8820, 20 configs)."
+  },
+  "30M_chin1": {
+    "model_size": "30M",
+    "chinchilla_multiplier": 1,
+    "teacher_run_dir": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_1/30M_seed42_case4_dolma_epoch64_wd0.1_lr3e-3",
+    "teacher_step": "step18311",
+    "temperature": 1.0,
+    "N_target": 16,
+    "notes": "epoch=64 best (val_loss=3.7049, 19 configs)."
+  },
+  "30M_chin2": {
+    "model_size": "30M",
+    "chinchilla_multiplier": 2,
+    "teacher_run_dir": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_2/30M_seed42_case4_dolma_epoch64_wd0.1_lr3e-3",
+    "teacher_step": "step36622",
+    "temperature": 1.0,
+    "N_target": 16,
+    "notes": "epoch=64 best (val_loss=3.6069, 13 configs)."
+  },
+  "30M_chin4": {
+    "model_size": "30M",
+    "chinchilla_multiplier": 4,
+    "teacher_run_dir": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_4/30M_seed42_case4_dolma_epoch32_wd0.1_lr3e-3",
+    "teacher_step": "step36622",
+    "temperature": 1.0,
+    "N_target": 16,
+    "notes": "epoch=64 not available; using epoch=32 best (val_loss=3.5732, only 2 configs)."
+  },
+  "60M_chin0.5": {
+    "model_size": "60M",
+    "chinchilla_multiplier": 0.5,
+    "teacher_run_dir": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/60M_seed42_case4_dolma_epoch32_wd0.4_lr1e-3",
+    "teacher_step": "step9156",
+    "temperature": 1.0,
+    "N_target": 8,
+    "notes": "epoch=32 only choice (1 config: val_loss=3.4115)."
+  },
+  "60M_chin1": {
+    "model_size": "60M",
+    "chinchilla_multiplier": 1,
+    "teacher_run_dir": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_1/60M_seed42_case4_dolma_epoch32_wd0.4_lr1e-3",
+    "teacher_step": "step18311",
+    "temperature": 1.0,
+    "N_target": 8,
+    "notes": "epoch=32 only choice (1 config: val_loss=3.3004)."
+  },
+  "60M_chin2": {
+    "model_size": "60M",
+    "chinchilla_multiplier": 2,
+    "teacher_run_dir": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_2/60M_seed42_case4_dolma_epoch32_wd0.4_lr1e-3",
+    "teacher_step": "step36622",
+    "temperature": 1.0,
+    "N_target": 8,
+    "notes": "epoch=32 only choice (1 config: val_loss=3.2330)."
+  },
+  "190M_chin0.5": {
+    "model_size": "190M",
+    "chinchilla_multiplier": 0.5,
+    "teacher_run_dir": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/190M_seed42_case4_dolma_epoch16_wd0.2_lr3e-3",
+    "teacher_step": "step14496",
+    "temperature": 1.0,
+    "N_target": 8,
+    "notes": "epoch=16 best (val_loss=2.8671, 3 configs)."
+  },
+  "190M_chin1": {
+    "model_size": "190M",
+    "chinchilla_multiplier": 1,
+    "teacher_run_dir": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_1/190M_seed42_case4_dolma_epoch16_wd0.1_lr3e-3",
+    "teacher_step": "step28992",
+    "temperature": 1.0,
+    "N_target": 8,
+    "notes": "epoch=16 only choice (1 config: val_loss=2.7779)."
+  }
+}

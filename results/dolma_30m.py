@@ -81,6 +81,36 @@ data_16x = {
     'weight_decay': [0.1, 0.1, 0.1, 0.1, 0.1],
 }
 
+data_0_05x_para = {
+    'chinchilla_scale': [0.05, 0.05, 0.05, 0.05, 0.05],
+    'K': [1, 2, 4, 8, 16],
+    'tokens_trained': [39175842, 49337008, 69148369, 108521507, 188677952],
+    'flops_multiplier': [0.0653, 0.0822, 0.1152, 0.1809, 0.3145],
+    'validation_loss': [8.1116, 8.0923, 7.927, 7.6174, 7.1125],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.2, 0.1, 0.2, 0.1],
+}
+
+data_0_1x_para = {
+    'chinchilla_scale': [0.1, 0.1, 0.1, 0.1, 0.1],
+    'K': [1, 2, 4, 8, 16],
+    'tokens_trained': [78469544, 98757247, 138509525, 217276871, 378153239],
+    'flops_multiplier': [0.1308, 0.1646, 0.2308, 0.3621, 0.6303],
+    'validation_loss': [7.9215, 7.6659, 7.3115, 6.8166, 6.3976],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.1, 0.2, 0.1, 0.1],
+}
+
+data_0_25x_para = {
+    'chinchilla_scale': [0.25, 0.25, 0.25, 0.25, 0.25],
+    'K': [1, 2, 4, 8, 16],
+    'tokens_trained': [196180701, 246460684, 345235508, 541210823, 942174820],
+    'flops_multiplier': [0.327, 0.4108, 0.5754, 0.902, 1.5703],
+    'validation_loss': [6.9562, 6.6982, 6.2638, 5.7962, 5.3471],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.2, 0.1, 0.2, 0.1],
+}
+
 data_0_5x_para = {
     'chinchilla_scale': [0.5, 0.5, 0.5, 0.5],
     'K': [1, 2, 4, 8],
@@ -92,23 +122,23 @@ data_0_5x_para = {
 }
 
 data_1x_para = {
-    'chinchilla_scale': [1, 1, 1, 1],
-    'K': [1, 2, 4, 8],
-    'tokens_trained': [785109027, 985803162, 1381771817, 2166836268],
-    'flops_multiplier': [1.3085, 1.643, 2.303, 3.6114],
-    'validation_loss': [5.388, 5.1273, 4.6489, 4.275],
-    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3],
-    'weight_decay': [0.1, 0.2, 0.2, 0.1],
+    'chinchilla_scale': [1, 1, 1, 1, 1],
+    'K': [1, 2, 4, 8, 16],
+    'tokens_trained': [785109027, 985803162, 1381771817, 2166836268, 3774431780],
+    'flops_multiplier': [1.3085, 1.643, 2.303, 3.6114, 6.2907],
+    'validation_loss': [5.388, 5.1273, 4.6489, 4.275, 4.0397],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.2, 0.2, 0.1, 0.1],
 }
 
 data_2x_para = {
-    'chinchilla_scale': [2, 2, 2, 2],
-    'K': [1, 2, 4, 8],
-    'tokens_trained': [1570843038, 1971482440, 2765293587, 4336461741],
-    'flops_multiplier': [2.6181, 3.2858, 4.6088, 7.2274],
-    'validation_loss': [4.5164, 4.3329, 4.1125, 3.9939],
-    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3],
-    'weight_decay': [0.1, 0.1, 0.1, 0.2],
+    'chinchilla_scale': [2, 2, 2, 2, 2],
+    'K': [1, 2, 4, 8, 16],
+    'tokens_trained': [1570843038, 1971482440, 2765293587, 4336461741, 7554721060],
+    'flops_multiplier': [2.6181, 3.2858, 4.6088, 7.2274, 12.5912],
+    'validation_loss': [4.5164, 4.3329, 4.1125, 3.9939, 3.8717],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.1, 0.1, 0.2, 0.1],
 }
 
 data_4x_para = {
@@ -131,6 +161,26 @@ data_8x_para = {
     'weight_decay': [0.1, 0.2, 0.1, 0.1],
 }
 
+data_0_25x_sd = {
+    'chinchilla_scale': [0.25, 0.25, 0.25, 0.25, 0.25],
+    'K': [1, 2, 4, 8, 16],
+    'tokens_trained': [300958261, 601916522, 1203833044, 2407666088, 4799423101],
+    'flops_multiplier': [0.5016, 1.0032, 2.0064, 4.0128, 7.999],
+    'validation_loss': [6.5545, 5.7342, 5.088, 4.3069, 4.0281],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.1, 0.2, 0.2, 0.1],
+}
+
+data_0_5x_sd = {
+    'chinchilla_scale': [0.5, 0.5, 0.5, 0.5, 0.5],
+    'K': [1, 2, 4, 8, 16],
+    'tokens_trained': [599930425, 1199860850, 2399721700, 4799443400, 9598886800],
+    'flops_multiplier': [0.9999, 1.9998, 3.9995, 7.9991, 15.9981],
+    'validation_loss': [5.7219, 5.0083, 4.3131, 3.9961, 3.8589],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.4, 0.2, 0.2, 0.1, 0.1],
+}
+
 ALL_DATASETS = [
     data_0_05x,
     data_0_1x,
@@ -144,9 +194,17 @@ ALL_DATASETS = [
 ]
 
 parap_datasets = [
+    data_0_05x_para,
+    data_0_1x_para,
+    data_0_25x_para,
     data_0_5x_para,
     data_1x_para,
     data_2x_para,
     data_4x_para,
     data_8x_para,
+]
+
+selfdistill_datasets = [
+    data_0_25x_sd,
+    data_0_5x_sd,
 ]

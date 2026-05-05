@@ -1,0 +1,8 @@
+{
+  "30M_seed42_dolma_selfdistill_K8_wd0.2_lr3e-3": {
+    "validation_loss": 4.0003430253179175,
+    "perplexity": 54.61687088012695,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  }
+}

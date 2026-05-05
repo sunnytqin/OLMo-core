@@ -3,7 +3,7 @@ Training script for D + D' paraphrase scaling: train one epoch on the original
 dolma shard `D` concatenated with K paraphrase seeds (`D'`) of the same docs.
 
 Sweep axes (parallel of OLMo-scale-train-multiepoch-dolma.py):
-    model_size, chinchilla_multiplier, num_seeds (K, in 1..8)
+    model_size, chinchilla_multiplier, num_seeds (K, in 1..16)
 
 The paraphrased data is built by experiment_scripts/paraphrasing/build_sized_paraphrase.py,
 which produces paraphrased/sized_smollm2_mixed/{shard}_seed{N}.npy aligned doc-by-doc
@@ -76,7 +76,7 @@ _MODEL_REGISTRY = {
 #
 # Truncated where D would exceed 7.4B tokens — the paraphrase corpus only
 # covers the 4,866,732 docs of train_7.4B. Combos not listed here raise.
-# Supported K ∈ {1..8}.
+# Supported K ∈ {1..16}.
 # ---------------------------------------------------------------------------
 _DATASET_LOOKUP = {
     # 14M (chin unit = 280M tokens)
@@ -214,9 +214,9 @@ def build_config(opts: argparse.Namespace, overrides: List[str]) -> ExperimentCo
         )
     config_fn, model_params = _MODEL_REGISTRY[model_size]
 
-    if not 1 <= num_seeds <= 8:
+    if not 1 <= num_seeds <= 16:
         raise ValueError(
-            f"num_seeds must be in 1..8 (only 8 V2 paraphrase seeds exist), "
+            f"num_seeds must be in 1..16 (only 16 V2 paraphrase seeds exist), "
             f"got {num_seeds}. For K=0 baselines use OLMo-scale-train-multiepoch-dolma.py."
         )
 

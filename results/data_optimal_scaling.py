@@ -30,10 +30,32 @@ elif MODEL_SIZE == 'dolma_600m':
 else:
     raise ValueError(f'Unknown MODEL_SIZE: {MODEL_SIZE}')
 
-self_distill_data = getattr(model_data, 'self_distill_data', None)
+selfdistill_datasets = getattr(model_data, 'selfdistill_datasets', None)
 parap_datasets = getattr(model_data, 'parap_datasets', None)
 
 all_datasets = model_data.ALL_DATASETS
+
+
+def _best_per_chin(datasets):
+    """Return three lists (chin, val_loss, flops) — one entry per chin scale (lowest loss)."""
+    by_chin = {}
+    for data in datasets:
+        chin = data['chinchilla_scale'][0]
+        for f, l in zip(data['flops_multiplier'], data['validation_loss']):
+            if np.isnan(l):
+                continue
+            if chin not in by_chin or l < by_chin[chin][0]:
+                by_chin[chin] = (l, f)
+    items = sorted(by_chin.items())
+    chins = [c for c, _ in items]
+    losses = [v[0] for _, v in items]
+    flops = [v[1] for _, v in items]
+    return chins, losses, flops
+
+
+sd_best_chin, sd_best_loss, sd_best_flops = (
+    _best_per_chin(selfdistill_datasets) if selfdistill_datasets else ([], [], [])
+)
 
 # ---- Plot: Data Size vs Loss, scatter colored by FLOPs ----
 
@@ -64,10 +86,12 @@ if parap_datasets is not None:
             if not np.isnan(l):
                 flops_min = min(flops_min, f)
                 flops_max = max(flops_max, f)
-if self_distill_data is not None:
-    for f in self_distill_data['flops_multiplier']:
-        flops_min = min(flops_min, f)
-        flops_max = max(flops_max, f)
+if selfdistill_datasets is not None:
+    for data in selfdistill_datasets:
+        for f, l in zip(data['flops_multiplier'], data['validation_loss']):
+            if not np.isnan(l):
+                flops_min = min(flops_min, f)
+                flops_max = max(flops_max, f)
 
 norm = plt.Normalize(vmin=np.log2(flops_min), vmax=np.log2(flops_max))
 cmap = plt.cm.YlOrRd
@@ -106,13 +130,24 @@ if parap_datasets is not None:
                           marker='D', s=30, edgecolors='k', linewidths=0.4, zorder=12,
                           label='Paraphrasing')
 
-# Self-distillation points, shifted 8% right (rightmost position)
+# Self-distillation: scatter ALL (chin, K) points at 8%-right-shifted x position
 X_SHIFT_RIGHT = 1.08
-if self_distill_data is not None:
-    sd_flops = np.log2(np.array(self_distill_data['flops_multiplier'], dtype=float))
-    ax.scatter([c * 20 * X_SHIFT_RIGHT for c in self_distill_data['chinchilla_scale']],
-               self_distill_data['validation_loss'],
-               c=sd_flops, cmap=cmap, norm=norm,
+if selfdistill_datasets is not None:
+    sd_chin = []
+    sd_loss = []
+    sd_flops = []
+    for data in selfdistill_datasets:
+        chin = data['chinchilla_scale'][0]
+        for f, l in zip(data['flops_multiplier'], data['validation_loss']):
+            if not np.isnan(l):
+                sd_chin.append(chin)
+                sd_loss.append(l)
+                sd_flops.append(f)
+    sd_chin = np.array(sd_chin)
+    sd_loss = np.array(sd_loss)
+    sd_flops = np.array(sd_flops)
+    ax.scatter(sd_chin * 20 * X_SHIFT_RIGHT, sd_loss,
+               c=np.log2(sd_flops), cmap=cmap, norm=norm,
                marker='X', s=80, edgecolors='k', linewidths=0.5,
                label='Self-distillation', zorder=20)
 
@@ -144,13 +179,9 @@ if parap_datasets is not None:
             linestyle='--', color=COLOR_OPT_SYN, linewidth=2.5, alpha=0.9,
             label='Data Optimal (paraphrase)', zorder=5)
 
-# Data Optimal (self-distill): connect the self-distillation crosses directly
-if self_distill_data is not None:
-    sd_chin_sorted = sorted(zip(self_distill_data['chinchilla_scale'],
-                                self_distill_data['validation_loss']))
-    sd_ttp = [c * 20 for c, _ in sd_chin_sorted]
-    sd_loss = [l for _, l in sd_chin_sorted]
-    ax.plot(sd_ttp, sd_loss,
+# Data Optimal (self-distill): best-per-chin envelope across self-distill scatter
+if selfdistill_datasets is not None and sd_best_chin:
+    ax.plot([c * 20 for c in sd_best_chin], sd_best_loss,
             linestyle='--', color=COLOR_OPT_SELF, linewidth=2.5, alpha=0.9,
             label='Data Optimal (self-distill)', zorder=5)
 
@@ -195,9 +226,8 @@ if parap_datasets is not None:
     _pa_fn = _interp1d(np.log2([x for x, y in _pa_pairs]), [y for x, y in _pa_pairs],
                        kind='linear', fill_value='extrapolate')
     _blue_fns.append(_pa_fn)
-if self_distill_data is not None:
-    _sd_pairs = sorted(zip([c * 20 for c in self_distill_data['chinchilla_scale']],
-                           self_distill_data['validation_loss']))
+if selfdistill_datasets is not None and sd_best_chin:
+    _sd_pairs = sorted(zip([c * 20 for c in sd_best_chin], sd_best_loss))
     _sd_fn = _interp1d(np.log2([x for x, y in _sd_pairs]), [y for x, y in _sd_pairs],
                        kind='linear', fill_value='extrapolate')
     _blue_fns.append(_sd_fn)
@@ -220,7 +250,7 @@ ax.fill_between(_x_cb, _y_bot_cb, _co_y_cb,
                 color='#ffcc44', alpha=0.25, zorder=1, label='Compute-bound')
 
 # Data-bound: below darkest blue, above _MODEL_BOUND_Y, from y-spine to end of blue
-_do_xs = np.array([x for x, y in _sd_pairs]) if self_distill_data is not None else \
+_do_xs = np.array([x for x, y in _sd_pairs]) if (selfdistill_datasets is not None and sd_best_chin) else \
          np.array([x for x, y in _pa_pairs]) if parap_datasets is not None else \
          np.array([x for x, y in _me_pairs])
 _x_db = np.geomspace(_XLEFT, _do_xs.max(), 300)
