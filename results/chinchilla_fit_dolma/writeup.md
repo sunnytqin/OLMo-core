@@ -1376,6 +1376,166 @@ would tighten $(\rho_{\text{para}}, \sigma_{\text{para}})$ further.
 
 ---
 
+## 7. Quad-joint fit: 1-epoch + repetition + paraphrase + **self-distill**
+
+Same idea as §6, with a fourth token stream — *self-distilled* training
+data on top of the original Dolma — added to the pool.  Self-distill
+runs are 30M-only (5 scales × 5 $K$ levels but only 0.25× and 0.5× have
+the full $K \in \{1, 2, 4, 8, 16\}$ sweep), so the new dataset adds 10
+points reaching $D'/D = 31$ — comparable in $D'/D$ reach to repetition.
+
+### 7.1 Functional form (14 parameters)
+
+Three saturation surfaces share one Chinchilla curve:
+
+$$L \;=\; E + \frac{A}{N^{\alpha}} + \frac{B}{(D + \eta_{\text{src}}\,D')^{\beta}}, \qquad \text{src} \in \{\text{1ep}, \text{repeat}, \text{para}, \text{sd}\}$$
+
+with $\eta_{\text{src}} = R^{*}_{\text{src}}(1 - e^{-x/R^{*}_{\text{src}}})/x$ and
+$\log R^{*}_{\text{src}} = \log K_{\text{src}} + \rho_{\text{src}} \log(D/N) + \sigma_{\text{src}} \log N$
+(separate triple of $(\log K, \rho, \sigma)$ for each of rep/para/sd).
+$\sigma_{\text{sd}}$ is unidentifiable since SD is 30M-only — the fit
+reports a value but it's interchangeable with $\log K_{\text{sd}}$.
+
+Code: [fit_joint_quad.py](fit_joint_quad.py).  Pooled $n=359$ (1ep=56,
+rep=182, para=111, sd=10).
+
+### 7.2 Pipeline-revealing tension: small-scale paraphrase pushes against $\beta$
+
+The quad fit converges to a *qualitatively different* optimum than
+§6's triple.  Re-running the residual-drop sweep with extended
+$k \in [0, 60]$:
+
+| $k$ | $n_{\text{kept}}$ | $E$ | $A$ | $B$ | $\alpha$ | $\beta$ | RMSE 1ep / rep / para / sd |
+|---|---|---|---|---|---|---|---|
+|  0  | 359 | $\sim 0$ | 123 |   432 | 0.25 | **0.232** | 0.072 / 0.046 / 0.048 / 0.030 |
+| 15  | 344 | $\sim 0$ | 218 |   417 | 0.29 | **0.229** | 0.054 / 0.041 / 0.045 / 0.029 |
+| 30  | 329 | $\sim 0$ |  52 | 1 721 | 0.18 | **0.310** | 0.048 / 0.035 / 0.038 / 0.024 |
+| 60  | 299 | $\sim 0$ |  42 | 8 771 | 0.16 | **0.401** | 0.032 / 0.027 / 0.029 / 0.027 |
+
+$\beta$ does not plateau at small $k$ — it's stuck near $\sim 0.23$
+while the iterative drop chips away at outliers, then jumps to $\sim 0.40$
+once enough small-scale points are gone.  *Both* the $\beta = 0.23$ basin
+and the $\beta = 0.40$ basin are real local minima of L-BFGS; warm-starts
+from §6's triple-anchor $(\beta = 0.43)$ also collapse to $\beta = 0.23$
+on this pool, so the basin-finding isn't a numerical accident.
+
+**What's different from §6.**  Closer inspection: paraphrase data now
+has $111$ points (vs. 63 in §6 — 48 newly-included rows at scales
+$0.05, 0.1, 0.25\times$ with $K \in \{1, 2, 4, 8, 16\}$).
+The residual on small-scale paraphrase is what changes:
+
+| evaluation (no-fit, just score) on full pooled $n = 359$ | full RMSE | 1ep | rep | para | sd |
+|---|---|---|---|---|---|
+| §6 TRIPLE k=15 anchors + neutral SD seed | 0.081 | 0.116 | 0.053 | **0.099** | 0.031 |
+| QUAD low-β optimum (k=10 fit, $\beta = 0.22$) | **0.052** | 0.076 | 0.047 | **0.047** | 0.029 |
+| QUAD high-β extended (k=60 fit, $\beta = 0.40$, 60 pts dropped) | 0.075 | 0.109 | 0.052 | 0.087 | 0.027 |
+
+The triple anchor's para RMSE on the full pool is $0.099$ — small-scale
+para points are the systematic mis-fit.  The low-β quad fit cuts that
+to $0.047$, but at the cost of a worse 1-ep RMSE ($0.076$ vs $\sim 0.04$
+of the triple) — a real tradeoff, not a numerical glitch.  This is the
+same effect §3.1 saw at the other end of the data: small-scale points
+sit *below* the steep-$\beta$ Chinchilla extrapolation, and the 1-ep-only
+fit dropped them as outliers ($k=20$ on 55 points).  The quad fit, with
+many more small-scale paraphrase points it can't drop, has to accommodate
+them by softening $\beta$.
+
+### 7.3 Headline parameters
+
+With the §6 / writeup_final convention (smallest $k$ where $\beta$
+plateaus around the rep+1ep value), there is **no clean canonical $k$
+for the quad pool** — $\beta$ moves monotonically from $0.23$ to $0.40$
+across $k$.  We therefore report two anchors:
+
+| fit | $k$ | $E$ | $A$ | $B$ | $\alpha$ | $\beta$ | $\eta_{\text{rep}}$ ($\log K, \rho, \sigma$) | $\eta_{\text{para}}$ ($\log K, \rho, \sigma$) | $\eta_{\text{sd}}$ ($\log K, \rho, \sigma$) |
+|---|---|---|---|---|---|---|---|---|---|
+| QUAD low-β | 10 | $0.001$ | 287 |   378 | 0.31 | **0.223** | $(21.2, -1.06, -0.90)$ | $(25.2, +1.20, -1.37)$ | $(8.0, -4.68, +0.39)$ |
+| QUAD high-β (extended drop) | 60 | $0.001$ |  42 | 8 771 | 0.16 | **0.401** | $(18.9, -0.68, -0.82)$ | $(30.5, +0.75, -1.64)$ | $(8.0, -4.82, +0.42)$ |
+
+In *both* basins:
+- $\eta_{\text{rep}}$ has $\log K \in [19, 22]$ — much higher than §6's
+  triple ($\log K = 10.6$). $R^{*}$ is in the $10^{8}$–$10^{10}$ range
+  at typical $(D/N, N)$, so $\eta_{\text{rep}} \to 1$ over the
+  multi-epoch range. Saturation as a phenomenon has effectively been
+  re-absorbed into the (very shallow at low-β, less so at high-β)
+  Chinchilla curve.
+- $\eta_{\text{para}}$ similarly degenerates: $\log K \ge 25$.  $R^{*}$
+  is again astronomically large.
+- $\eta_{\text{sd}}$ is the only η surface with a *real* finite scale:
+  $\log K = 8.0$, $\rho_{\text{sd}} = -4.7$.  At $D/N = 10$, $N = 30$M:
+  $R^{*}_{\text{sd}} \approx 50$ — saturation visible within the
+  $K = 16$ data.
+
+### 7.4 Comparison with previous fits
+
+| fit | $k$ | $E$ | $A$ | $B$ | $\alpha$ | $\beta$ |
+|---|---|---|---|---|---|---|
+| 1-ep only (§3.1)        | 20 | 1.72 | 1115 | 20 828 | 0.390 | 0.451 |
+| 1-ep + rep (writeup_final §2)   | 15 | 0.05 | 31.5 | 16 539 | 0.137 | 0.436 |
+| TRIPLE rep+para+1ep (§6)        | 15 | 0.003 | 28.9 | 15 599 | 0.133 | 0.431 |
+| **QUAD all 4 sources (low-β)**   | 10 | $\sim 0$ | 287  |    378 | 0.310 | **0.223** |
+| **QUAD all 4 sources (high-β)**  | 60 | $\sim 0$ |  42  |  8 771 | 0.156 | **0.401** |
+
+**The quad fit doesn't smoothly extend §6's headline.**  Adding 48
+small-scale paraphrase points + 10 SD points changes which optimum is
+preferred by the joint Huber loss.  Two readings:
+
+1. **The data is genuinely heterogeneous and a single Chinchilla curve
+   can't fit all sources at high accuracy.**  The triple-anchor's para
+   RMSE on small scales (0.099) is the smoking gun — it's not just one
+   bad point, it's the entire low-$D$ wing of paraphrase.  The fit
+   trades 1-ep accuracy ($0.04 \to 0.08$) for paraphrase accuracy
+   ($0.10 \to 0.05$), and the optimizer lands on the trade
+   automatically.
+2. **The SD points add a strong saturation signal at $D'/D = 31$ that
+   re-weights everything.**  $\eta_{\text{sd}}$ with $R^{*}_{\text{sd}}
+   \approx 50$ is the only η surface where the data clearly demands a
+   finite ceiling.  This ceiling is consistent with repetition (e.g.
+   §4.1's $R^{*}_{\text{rep}}(30\text{M}, 1\times) \approx 17$) — but
+   the joint fit, having to fit a single $\beta$ for everything, can't
+   keep both the rep and the SD η surfaces *and* the para small-scale
+   data fitted at the same time.
+
+### 7.5 Diagnostic figure
+
+[fit_joint_quad.pdf](fit_joint_quad.pdf) — three-panel for the
+extended-drop $k=60$ fit:
+(a) $L$ vs. effective tokens $D + D'$, with 1-ep (○), rep (×),
+paraphrase (□), SD (◇) markers; red rings mark dropped points.
+(b) Residuals vs. $D$ — small-scale points (left) show the
+under-prediction of loss that drives the basin choice.
+(c) Parity plot: predicted vs. observed $L$.
+
+### 7.6 Recommendation and open question
+
+For *prediction* of new runs, the **low-β optimum ($k=10$, $\beta = 0.223$)
+gives the best calibrated forecast on the full pooled data** — total
+RMSE $0.052$ on $n=359$, vs. $0.075$ for the high-β fit and $0.081$ for
+the §6 triple-anchor extended to the pool.
+
+For *interpretation* (what is the "right" $\beta$? What is the
+saturation budget for each source?), the picture is now genuinely
+ambiguous:
+
+- The 1-ep fit alone wants $\beta \approx 0.45$.
+- Adding rep alone (writeup_final): $\beta \approx 0.44$.
+- Adding rep + para (§6): $\beta \approx 0.43$.
+- Adding rep + para + SD with the full small-scale paraphrase coverage:
+  $\beta \in \{0.23, 0.40\}$ depending on how aggressively you trim
+  outliers, with $\beta = 0.23$ giving the lowest in-sample loss but
+  unphysical-looking $\eta$ (saturation parameter at $\sim 10^{10}$).
+
+**Open question.**  A $\beta(N)$ extension (open question 1 of §4)
+might resolve this — at small $N$ / small scale the implied $\beta$ is
+shallower, at large $N$ / large scale steeper.  A model with
+$\beta = \beta_{0} + \beta_{1}\log(N/N_{\text{ref}})$ could absorb the
+small-scale tension without pushing the large-$D$ $\beta$ down to $0.22$.
+Adding it would re-fit a quad model with this freedom and check whether
+$\eta_{\text{rep}}$, $\eta_{\text{para}}$ recover their §4 / §6
+saturating shapes.
+
+---
+
 ## 4. Open questions
 
 1. **Size-dependent $\beta$ in the 1-epoch fit.** The joint fit uses

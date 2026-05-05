@@ -185,3 +185,57 @@ def load_with_para(size: str):
     N, module_name = SIZES[size]
     mod = importlib.import_module(module_name)
     return N, mod.ALL_DATASETS, getattr(mod, "parap_datasets", [])
+
+
+def load_with_extras(size: str):
+    """Return (N, ALL_DATASETS, parap_datasets, selfdistill_datasets)."""
+    if size not in SIZES:
+        raise ValueError(f"Unknown size {size!r}; choose from {list(SIZES)}")
+    N, module_name = SIZES[size]
+    mod = importlib.import_module(module_name)
+    return (N, mod.ALL_DATASETS,
+            getattr(mod, "parap_datasets", []),
+            getattr(mod, "selfdistill_datasets", []))
+
+
+def extract_selfdistill(datasets, sd_datasets, N: float, *,
+                         scale_min: float = DEFAULT_SCALE_MIN):
+    """Return (scale, D, K, D'_sd, L, L_1ep) for self-distill rows.
+
+    Same convention as `extract_paraphrase`: D = chinchilla_scale · 20 · N
+    fresh tokens; D'_sd = tokens_trained − D self-distilled tokens added on
+    top.  For 30M self-distill, tokens_trained = 2K · D so D'/D = 2K − 1
+    (range 1 → 31 for K ∈ {1, 2, 4, 8, 16}).
+    """
+    L_1ep_by_scale = {}
+    for ds in datasets:
+        if 1 not in ds["epochs"]:
+            continue
+        scale = ds["chinchilla_scale"][0]
+        L_1ep_by_scale[scale] = ds["validation_loss"][ds["epochs"].index(1)]
+
+    rows = []
+    for sds in sd_datasets:
+        scale = sds["chinchilla_scale"][0]
+        if scale < scale_min:
+            continue
+        if scale not in L_1ep_by_scale:
+            continue
+        L_1ep = L_1ep_by_scale[scale]
+        if np.isnan(L_1ep):
+            continue
+        D = scale * TTP_RATIO * N
+        for i, K in enumerate(sds["K"]):
+            tokens_trained = sds["tokens_trained"][i]
+            loss = sds["validation_loss"][i]
+            if np.isnan(loss):
+                continue
+            Dp = float(tokens_trained) - D
+            if Dp <= 0:
+                continue
+            rows.append((scale, D, int(K), Dp, loss, L_1ep))
+    if not rows:
+        empty = np.array([], dtype=np.float64)
+        return empty, empty, empty, empty, empty, empty
+    a = np.array(rows, dtype=np.float64)
+    return a[:, 0], a[:, 1], a[:, 2], a[:, 3], a[:, 4], a[:, 5]
