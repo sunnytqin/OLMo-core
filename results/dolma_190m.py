@@ -82,33 +82,33 @@ data_16x = {
 }
 
 data_0_5x_para = {
-    'chinchilla_scale': [0.5, 0.5, 0.5, 0.5],
-    'K': [1, 2, 4, 8],
-    'tokens_trained': [2486222768, 3120317325, 4376935984, 6866320009],
-    'flops_multiplier': [0.6543, 0.8211, 1.1518, 1.8069],
-    'validation_loss': [3.5815, 3.4831, 3.3724, 3.1983],
-    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3],
-    'weight_decay': [0.1, 0.2, 0.2, 0.2],
+    'chinchilla_scale': [0.5, 0.5, 0.5, 0.5, 0.5],
+    'K': [1, 2, 4, 8, 16],
+    'tokens_trained': [2486222768, 3120317325, 4376935984, 6866320009, 11964512570],
+    'flops_multiplier': [0.6543, 0.8211, 1.1518, 1.8069, 3.1486],
+    'validation_loss': [3.5815, 3.4831, 3.3724, 3.1983, 3.0734],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.2, 0.2, 0.2, 0.1],
 }
 
 data_1x_para = {
-    'chinchilla_scale': [1, 1, 1, 1],
-    'K': [1, 2, 4, 8],
-    'tokens_trained': [4970147247, 6237612767, 8750277711, 13729915768],
-    'flops_multiplier': [1.3079, 1.6415, 2.3027, 3.6131],
-    'validation_loss': [3.232, 3.1645, 3.0883, 3.0305],
-    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3],
-    'weight_decay': [0.1, 0.2, 0.2, 0.2],
+    'chinchilla_scale': [1, 1, 1, 1, 1],
+    'K': [1, 2, 4, 8, 16],
+    'tokens_trained': [4970147247, 6237612767, 8750277711, 13729915768, 23926366715],
+    'flops_multiplier': [1.3079, 1.6415, 2.3027, 3.6131, 6.2964],
+    'validation_loss': [3.232, 3.1645, 3.0883, 3.0305, 2.9575],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.2, 0.2, 0.2, 0.1],
 }
 
 data_2x_para = {
-    'chinchilla_scale': [2, 2],
-    'K': [1, 2],
-    'tokens_trained': [9670419295, 12131079742],
-    'flops_multiplier': [2.5448, 3.1924],
-    'validation_loss': [3.014, 2.9808],
-    'learning_rate': [3e-3, 3e-3],
-    'weight_decay': [0.2, 0.2],
+    'chinchilla_scale': [2, 2, 2, 2, 2],
+    'K': [1, 2, 4, 8, 16],
+    'tokens_trained': [9670419295, 12131079742, 17009424061, 26679032762, 46482745254],
+    'flops_multiplier': [2.5448, 3.1924, 4.4762, 7.0208, 12.2323],
+    'validation_loss': [3.014, 2.9808, 2.9518, 2.9227, 2.879],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.2, 0.2, 0.2, 0.2, 0.1],
 }
 
 ALL_DATASETS = [
@@ -128,3 +128,5 @@ parap_datasets = [
     data_1x_para,
     data_2x_para,
 ]
+
+selfdistill_datasets = None
