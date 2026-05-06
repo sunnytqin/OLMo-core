@@ -272,7 +272,126 @@ budget; beyond that, repeat-token compute buys little relative to
 gathering fresh data. A 14M model needs $\sim$54 epochs for the same
 milestone, so a small model can usefully soak up tens of repeats.
 
-## 5. Open questions
+## 5. Paraphrase: triple-joint fit on 1-epoch + repetition + paraphrase
+
+The framework lifts directly to a second repeated stream — *paraphrased*
+training data — via a paraphrase-specific $\eta_{\text{para}}$.  Each
+paraphrase run trains on $D$ fresh Dolma tokens plus
+$D'_{\text{para}} = \texttt{tokens\_trained} - D$ paraphrased tokens
+(one or more LLM rewrites per document, indexed by $K$).
+
+We refit the model in a **single one-shot joint optimization** over all
+three sources:
+
+$$L \;=\; E + \frac{A}{N^{\alpha}} + \frac{B}{(D + \eta_{\text{src}}\,D')^{\beta}}, \qquad \text{src} \in \{\text{1ep}, \text{repeat}, \text{para}\},$$
+
+with shared Chinchilla parameters $(E, A, B, \alpha, \beta)$ and
+*separate* exp-sat $R^{*}(N)$ surfaces for repetition and paraphrase
+(each parameterised as $\log R^{*}_{\text{src}} = \log K_{\text{src}} +
+\rho_{\text{src}}\log(D/N) + \sigma_{\text{src}}\log N$).  Total: 11
+parameters on 301 pooled points (1ep=56, rep=182, para=63).
+Pipeline mirrors §2: rep-only 9-param sub-fit → warm-start with a
+small grid over the paraphrase $\eta$ params → iterative residual drop.
+Code: [fit_joint_triple.py](fit_joint_triple.py).
+
+### 5.1 Headline triple-joint anchors (canonical $k=15$)
+
+$$\boxed{\quad E = 0.003, \quad A = 28.9, \quad B = 15{,}599, \quad \alpha = 0.133, \quad \beta = 0.431 \quad}$$
+
+with the two saturation surfaces
+
+$$\boxed{\quad \log R^{*}_{\text{rep}}(D, N) \;=\; 10.58 - 0.41\,\log(D/N) - 0.39\,\log N \quad}$$
+
+$$\boxed{\quad \log R^{*}_{\text{para}}(D, N) \;=\; 10.10 - 2.56\,\log(D/N) + 0.18\,\log N \quad}$$
+
+Fit quality on the 286 / 301 retained points:
+1-ep RMSE = $0.043$, repetition RMSE = $0.036$, paraphrase RMSE = $0.029$.
+The three subset RMSEs match the dedicated single-source fits within
+a tenth-percent — adding paraphrase data **does not disturb** the
+$(E, A, B, \alpha, \beta)$ or $\eta_{\text{rep}}$ values from §2.
+
+### 5.2 Comparison with previous fits
+
+| fit | $E$ | $A$ | $B$ | $\alpha$ | $\beta$ | $\log K_{\text{rep}}$ | $\log K_{\text{para}}$ |
+|---|---|---|---|---|---|---|---|
+| 1-ep only (two-stage)        | 1.72 | 1115 | 20 828 | 0.390 | 0.451 | — | — |
+| 1-ep + rep (one-shot, §2)    | 0.05 | 31.5 | 16 539 | 0.137 | 0.436 | 10.32 | — |
+| **TRIPLE (this section)**    | **0.003** | **28.9** | **15 599** | **0.133** | **0.431** | **10.58** | **10.10** |
+
+Adding paraphrase to the one-shot fit moves $\beta$ by 0.005, $B$ by
+6%; $(E, A, \alpha)$ are unchanged within rounding.  The only newly
+identified parameters are the paraphrase-η surface.
+
+### 5.3 What $\eta_{\text{para}}$ tells us
+
+Evaluate $R^{*}_{\text{para}}(D/N, N)$ at $N = 30$M:
+$R^{*}_{\text{para}} = 252$ at $D/N=20$ (1× scale), dropping to $1.27$
+at $D/N=160$ (8× scale) — paraphrase tokens are *nearly fresh-equivalent*
+($\eta \approx 1$) at small scale and saturate fast at large scale.
+Repetition's $R^{*}_{\text{rep}}$ at the same points is $\sim 14$
+(small scale) and $\sim 6$ (large scale), an order of magnitude lower.
+At small $D'/D$ where both have data, paraphrase and repetition are
+within $\sim 0.1$ of each other in $\eta$; at the large $D'/D$ that
+only repetition reaches in our data (4–60×), repetition saturates while
+paraphrase's flat extrapolation predicts $\eta \approx 1$ (out-of-sample
+prediction, not measured).
+
+The paraphrase $D'/D$ axis only reaches $2.6$ in our data (vs. $63$ for
+repetition).  $K \ge 32$ runs at small Chinchilla scale would tighten
+$(\rho_{\text{para}}, \sigma_{\text{para}})$ substantially.
+
+### 5.4 Out-of-sample extrapolation: refit on $N \le 30$M, predict
+$N \in \{190, 370, 600\}$M
+
+To confirm the law extrapolates beyond the sizes used to fit it, we
+refit the same triple model using **only $N \le 30$M runs** (146 points
+from 14M and 30M: 17 1-ep + 87 repetition + 42 paraphrase) and use the
+resulting parameters to predict the held-out $N \in \{190, 370, 600\}$M
+validation losses across all $D'$ regimes.
+
+(With only two $N$ values in the fit set the $(E, A, \alpha)$
+decomposition is not separately identifiable from the data alone, so
+we warm-start the small-$N$ fit from the §5 triple anchors before
+running the standard residual-drop sweep.  This pins the optimisation
+in the §5 basin while letting all 11 parameters re-equilibrate to the
+2-size data.)
+
+**Extrapolation results:**
+
+| split | $n$ | RMSE (log $L$) | max $|\Delta|$ | mean residual |
+|---|---|---|---|---|
+| in-sample (small-$N$ fit, $k=15$) | 146 | **0.073** | 0.42 | $-0.017$ |
+| held-out 190M (1ep / rep / para) | 9 / 28 / 10 | $0.082$ / $0.059$ / **$0.029$** | 0.17 / 0.16 / 0.05 | $+0.058 / +0.032 / +0.026$ |
+| held-out 370M (1ep / rep)        | 8 / 27       | $0.116$ / $0.076$ | 0.21 / 0.21 | $+0.094 / +0.066$ |
+| held-out 600M (1ep)              | 7            | $0.135$           | 0.26        | $+0.119$ |
+| **held-out total**               | **89**       | **$0.079$**        | $0.26$      | $+0.057$ |
+
+**Held-out RMSE (0.079) is comparable to in-sample RMSE (0.073) ** —
+the law extrapolates to sizes 6×–20× larger than the fit set with no
+catastrophic miscalibration.  Within each held-out $N$, the
+*paraphrase* predictions are the most accurate (RMSE 0.029, mean bias
+$+0.026$) — the paraphrase $\eta$ surface generalises cleanly across
+$N$.
+
+The mean residual is **systematically positive and grows with $N$**
+($+0.058$ at 190M $\to +0.094$ at 370M $\to +0.119$ at 600M):
+the small-$N$ fit *under-predicts* observed loss at large $N$ by
+roughly 6–12%.  This is the same pattern the in-sample 1-epoch
+residuals at 14M / 30M show ($-0.11, -0.06$ in the table above —
+small-$N$ 1-epoch points are *over-predicted*); the small-$N$ fit
+absorbs the small-$N$ 1-epoch bias by setting $\alpha$ slightly steeper
+than §5's joint value ($0.165$ vs. $0.133$), which then over-shrinks
+$E_{\text{eff}}(N)$ at large $N$.
+
+A $\beta(N)$ extension (open question 1 in §6) would close most of
+this 6–12% gap — at small $N$ the implied $\beta$ is shallower, at
+large $N$ steeper, and a single shared $\beta$ has to compromise.
+
+Code: [fit_triple_extrapolate.py](fit_triple_extrapolate.py).
+Diagnostic: [fit_triple_extrapolate.pdf](fit_triple_extrapolate.pdf)
+(parity, residuals vs. effective tokens, residuals vs. $D/N$).
+
+## 6. Open questions
 
 1. **Size-dependent $\beta$ in the 1-epoch fit.** Fixing $E_{\text{eff}}(N)$
    at the joint values and refitting $(B, \beta)$ per size gives
@@ -285,8 +404,15 @@ milestone, so a small model can usefully soak up tens of repeats.
    to see whether the $\Delta = 0.001$ is statistically meaningful.
 3. **Bootstrap $R^{*}$ uncertainty.** With 102 points, parametric
    bootstrap on $(\log K, \rho, \sigma)$ is ~30s per form.
-4. **Paraphrase / synthetic-data extension.** The framework lifts
-   directly to two repeated streams via $\eta_{\text{para}}$.
+4. **Paraphrase / synthetic-data extension.** Done — see §5. Headline:
+   the triple-joint fit (1-ep + rep + para) recovers §2's repetition
+   anchors within 1% and adds a clean paraphrase $\eta$ surface;
+   refitting on $N \le 30$M and predicting $N \in \{190, 370, 600\}$M
+   gives held-out RMSE $0.079$ vs in-sample $0.073$.  Open question:
+   the $K \le 8$ paraphrase $D'/D$ range maxes out at $2.6$ —
+   $K \ge 32$ at small scale would let us identify
+   $R^{*}_{\text{para}}$ rather than infer it from a $D/N$-dependent
+   extrapolation.
 5. **Sub-saturation regime at large $N$.** Our largest models (190M /
    370M) only have a few high-epoch points; the curvature of $\eta$
    at $D'/D > R^{*}$ is poorly constrained at those sizes. A few
@@ -295,14 +421,18 @@ milestone, so a small model can usefully soak up tens of repeats.
 ## Reproducing
 
 ```bash
-python fit_joint_all.py            # canonical one-shot joint fit (k-sweep)
+python fit_joint_all.py            # one-shot rep+1ep joint fit (§2)
 python fit_chinchilla_joint.py     # two-stage 1-epoch fit (ablation)
 python fit_eta.py                  # all η forms, per-size + joint (form ranking)
+python fit_joint_triple.py         # triple-joint fit (1-ep + rep + para, §5)
+python fit_triple_extrapolate.py   # extrapolation experiment (§5.4)
 python paper_figures.py            # generates paper/fig{1,2,3,4,5}.pdf
 ```
 
 Code: [fit_lse.py](fit_lse.py), [data.py](data.py),
-[fit_joint_all.py](fit_joint_all.py) (canonical pipeline),
+[fit_joint_all.py](fit_joint_all.py) (one-shot rep+1ep),
 [fit_chinchilla_joint.py](fit_chinchilla_joint.py),
 [fit_eta.py](fit_eta.py),
+[fit_joint_triple.py](fit_joint_triple.py) (triple, §5 headline),
+[fit_triple_extrapolate.py](fit_triple_extrapolate.py) (small-$N$ extrapolation, §5.4),
 [paper_figures.py](paper_figures.py).

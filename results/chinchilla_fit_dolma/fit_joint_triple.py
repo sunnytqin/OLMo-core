@@ -167,8 +167,13 @@ def make_forward_rep_only(N_arr, D_arr, Dp_arr, is_multi_arr):
 # Data
 # ──────────────────────────────────────────────────────────────────────
 
-def collect_pooled_triple():
+def collect_pooled_triple(scale_min_para: float = 0.5):
     """1-ep + multi-ep (repetition) + paraphrase pooled across sizes.
+
+    `scale_min_para` filters the paraphrase corpus by chinchilla scale
+    (D = chinchilla_scale * 20 * N). Default 0.5 reproduces the writeup
+    §5/§6 corpus (63 paraphrase points). Set to 0.0 to include the
+    small-scale paraphrase rows added after §6 (used in §7's quad fit).
 
     Returns dict with arrays N, D, Dp, L, source (0/1/2), tag.
     """
@@ -190,7 +195,7 @@ def collect_pooled_triple():
         # paraphrase
         if parap:
             sp, Dp_, Kp_, Dpp, Lp, _ = extract_paraphrase(
-                datasets, parap, N, scale_min=0.0)
+                datasets, parap, N, scale_min=scale_min_para)
             for d, dp, l in zip(Dp_, Dpp, Lp):
                 tags.append(size); Ns.append(N); Ds.append(d); Dps.append(dp)
                 Ls.append(l); src.append(SOURCE_PARA)
