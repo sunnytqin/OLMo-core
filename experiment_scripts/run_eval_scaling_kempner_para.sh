@@ -15,13 +15,14 @@
 #SBATCH --array=0-3
 
 module purge
-module load Mambaforge
 module load cuda cudnn
-mamba activate openrlhf
+
+ENV_PYTHON="/n/holylabs/dam_lab/Lab/sqin/envs/openrlhf/bin/python"
+export PATH="/n/holylabs/dam_lab/Lab/sqin/envs/openrlhf/bin:$PATH"
 
 cd /n/home05/sqin/OLMo-core/experiment_scripts/
 
-python run_eval_batch.py \
+$ENV_PYTHON run_eval_batch.py \
     --manifest /n/home05/sqin/OLMo-core/results/chinchilla_fit_dolma_para/manifest_needs_eval.json \
     --results-dir /n/home05/sqin/OLMo-core/results/dolma_para_val_loss \
     --worker-id $SLURM_ARRAY_TASK_ID \

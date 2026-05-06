@@ -1,0 +1,14 @@
+{
+  "_description": "Actual parameter counts for OLMo3 model configs used in dolma scaling experiments. vocab_size=100278 (dolma2 tokenizer), padded_vocab_size=100352. Embedding = d_model * padded_vocab_size. Source: olmo_core.nn.transformer.config.TransformerConfig.olmo3_*.",
+  "padded_vocab_size": 100352,
+  "tokenizer": "dolma2",
+  "sizes": {
+    "14M":  {"nominal": 14000000,  "total_params": 26740864,  "embedding_params": 12845056,  "non_embedding_params": 13895808},
+    "30M":  {"nominal": 30000000,  "total_params": 54792448,  "embedding_params": 25690112,  "non_embedding_params": 29102336},
+    "60M":  {"nominal": 60000000,  "total_params": 95957376,  "embedding_params": 38535168,  "non_embedding_params": 57422208},
+    "100M": {"nominal": 100000000, "total_params": 153117184, "embedding_params": 51380224, "non_embedding_params": 101736960},
+    "190M": {"nominal": 190000000, "total_params": 267424512, "embedding_params": 77070336, "non_embedding_params": 190354176},
+    "370M": {"nominal": 370000000, "total_params": 474022912, "embedding_params": 102760448, "non_embedding_params": 371262464},
+    "600M": {"nominal": 600000000, "total_params": 676414720, "embedding_params": 128450560, "non_embedding_params": 547964160}
+  }
+}

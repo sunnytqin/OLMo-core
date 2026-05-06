@@ -167,8 +167,13 @@ def make_forward_rep_only(N_arr, D_arr, Dp_arr, is_multi_arr):
 # Data
 # ──────────────────────────────────────────────────────────────────────
 
-def collect_pooled_triple(scale_min_para: float = 0.5):
+def collect_pooled_triple(scale_min_para: float = 0.5exclude_sizes_1ep=("14m",),
+                           exclude_sizes_rep=("14m",),
+                           exclude_sizes_para=()):
     """1-ep + multi-ep (repetition) + paraphrase pooled across sizes.
+
+    Per-source size exclusion. Defaults exclude 14m from 1ep + rep but
+    keep it for paraphrase.
 
     `scale_min_para` filters the paraphrase corpus by chinchilla scale
     (D = chinchilla_scale * 20 * N). Default 0.5 reproduces the writeup
@@ -181,19 +186,21 @@ def collect_pooled_triple(scale_min_para: float = 0.5):
     for size in SIZES:
         N, datasets, parap = load_with_para(size)
         # 1-epoch
-        s1, D1, L1 = extract_1epoch(datasets, N, scale_min=0.0)
-        for d, l in zip(D1, L1):
-            tags.append(size); Ns.append(N); Ds.append(d); Dps.append(0.0)
-            Ls.append(l); src.append(SOURCE_NONE)
+        if size not in exclude_sizes_1ep:
+            s1, D1, L1 = extract_1epoch(datasets, N, scale_min=0.0)
+            for d, l in zip(D1, L1):
+                tags.append(size); Ns.append(N); Ds.append(d); Dps.append(0.0)
+                Ls.append(l); src.append(SOURCE_NONE)
         # repetition
-        sm, Dm, em, Dpm, Lm, _L1m = extract_multi_epoch(
-            datasets, N, scale_min=0.0,
-            exclude_overfit=OVERFIT_EXCLUDE.get(size, set()))
-        for d, dp, l in zip(Dm, Dpm, Lm):
-            tags.append(size); Ns.append(N); Ds.append(d); Dps.append(dp)
-            Ls.append(l); src.append(SOURCE_REPEAT)
+        if size not in exclude_sizes_rep:
+            sm, Dm, em, Dpm, Lm, _L1m = extract_multi_epoch(
+                datasets, N, scale_min=0.0,
+                exclude_overfit=OVERFIT_EXCLUDE.get(size, set()))
+            for d, dp, l in zip(Dm, Dpm, Lm):
+                tags.append(size); Ns.append(N); Ds.append(d); Dps.append(dp)
+                Ls.append(l); src.append(SOURCE_REPEAT)
         # paraphrase
-        if parap:
+        if parap and size not in exclude_sizes_para:
             sp, Dp_, Kp_, Dpp, Lp, _ = extract_paraphrase(
                 datasets, parap, N, scale_min=scale_min_para)
             for d, dp, l in zip(Dp_, Dpp, Lp):
