@@ -12,8 +12,8 @@ instead of repetition:
   * region labels (Compute-bound / Data-bound / Model-bound)
   * action arrows ("add paraphrases", "add fresh data")
 
-Scaling-law anchors are the §6.2 triple joint fit (k=15) from
-results/chinchilla_fit_dolma/writeup.md.
+Scaling-law anchors are the frozen-backbone η_para fit (k=15, 14M excluded)
+from results/chinchilla_fit_dolma/fit_joint_freeze.py.
 
 Saves one PDF + PNG per size to results/.
 """
@@ -29,21 +29,19 @@ from matplotlib.lines import Line2D
 sys.path.insert(0, os.path.dirname(__file__))
 
 
-# === Scaling-law parameters ===
-# fit_joint_triple_v2_nopen_14mpara.json — triple joint fit on 1-ep +
-# repetition + paraphrase. N = non-embedding params; 14M dropped from
-# 1-ep + rep but its paraphrase points kept; **no penalty, no
-# weighting**. The extra 14M paraphrase points pin σ_para naturally
-# negative. Canonical residual-drop k=20 (n_kept=290 / 310).
-SL_E     = 1.1739
-SL_A     = 212.04
-SL_B     = 5542.28
-SL_ALPHA = 0.2913
-SL_BETA  = 0.3727
+# === Scaling-law parameters (fit_joint_freeze.py, frozen backbone, k=15) ===
+# Chinchilla backbone pinned to the writeup_final rep+1ep headline values.
+# η_para fitted on the paraphrase-only pool with 14M excluded (n_total=142,
+# sizes 30M/60M/190M/370M). Canonical residual-drop k=15.
+SL_E     = 0.050
+SL_A     = 31.0
+SL_B     = 16539.0
+SL_ALPHA = 0.137
+SL_BETA  = 0.436
 # η_para surface
-SL_LOG_K_PARA = 36.8210
-SL_RHO_PARA   = -2.1965
-SL_SIGMA_PARA = -1.5060
+SL_LOG_K_PARA = 11.348948
+SL_RHO_PARA   = -0.290130
+SL_SIGMA_PARA = -0.477855
 
 
 def E_eff(N):

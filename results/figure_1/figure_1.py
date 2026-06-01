@@ -35,13 +35,13 @@ plt.rcParams.update({
     'font.family':       'serif',
     'font.serif':        ['P052', 'Palatino', 'TeX Gyre Pagella', 'serif'],
     'mathtext.fontset':  'cm',
-    'font.size':         12,
-    'axes.titlesize':    13,
-    'axes.labelsize':    13,
-    'xtick.labelsize':   11,
-    'ytick.labelsize':   11,
-    'legend.fontsize':   10,
-    'figure.titlesize':  14,
+    'font.size':         18,
+    'axes.titlesize':    20,
+    'axes.labelsize':    20,
+    'xtick.labelsize':   16,
+    'ytick.labelsize':   16,
+    'legend.fontsize':   15,
+    'figure.titlesize':  22,
     'lines.linewidth':   1.8,
     'axes.grid':         True,
     'grid.alpha':        0.25,
@@ -145,12 +145,12 @@ def load_points(tag, modname, N):
 
 
 # === Visual constants ===
-FONT_LABEL  = 14
-FONT_TITLE  = 15
-FONT_TICK   = 12
-FONT_LEGEND = 11
-FONT_REGION = 13
-FONT_CBAR   = 12
+FONT_LABEL  = 20
+FONT_TITLE  = 22
+FONT_TICK   = 17
+FONT_LEGEND = 16
+FONT_REGION = 18
+FONT_CBAR   = 17
 
 CMAP = plt.cm.plasma  # for model-size coloring in panel (c)
 
@@ -218,7 +218,7 @@ def main():
 
     fig, axes = plt.subplots(1, 3, figsize=(19, 4.6))
     ax_a, ax_b, ax_c = axes
-    fig.subplots_adjust(wspace=0.22)
+    fig.subplots_adjust(wspace=0.18)
 
     # ---------- Panel (a): single-size three regimes ----------
     tag_a, N_a, _ = PANEL_A_SIZE
@@ -234,9 +234,9 @@ def main():
     lme_xa  = L_inf_epochs(xa, N_a)
     e_eff_a = E_eff(N_a)
 
-    # Y-range: capped at 8.5 to reduce white space.
+    # Y-range: capped at 8.0 to reduce white space.
     L_min_a = min(L_a.min(), e_eff_a) - 0.4
-    L_max_a = 8.5
+    L_max_a = 8.0
     FLOOR = e_eff_a - 0.5
 
     # Region fills (no legend entries — annotated in-plot)
@@ -273,8 +273,8 @@ def main():
 
     # "compute-optimal scaling": text in upper-left between 100M and 1B,
     # dashed arrow pointing mostly leftward onto the black curve.
-    x_co_text, y_co_text = 2.2e8, L_max_a - 0.4
-    x_co_tip = 1.2e8
+    x_co_text, y_co_text = 2.2e8, L_max_a - 1.0
+    x_co_tip = 4.2e8
     y_co_tip = float(L_chin(N_a, x_co_tip))
     ax_a.annotate('compute-optimal scaling',
                   xy=(x_co_tip, y_co_tip),
@@ -329,9 +329,9 @@ def main():
                                   color=COLOR_COMPUTE_DARK, lw=1.5,
                                   shrinkA=4, shrinkB=4),
                   zorder=15)
-    x_db = 1.2e10
+    x_db = 1.7e10
     ax_a.text(x_db, (float(L_inf_epochs(x_db, N_a)) + e_eff_a) / 2,
-              'Data-bound', fontsize=FONT_REGION, ha='center', va='center',
+              'Data-bound', fontsize=FONT_REGION, ha='right', va='center',
               color=COLOR_DATA_DARK, fontstyle='italic', fontweight='bold',
               zorder=15)
     ax_a.text(np.sqrt(X_MIN * X_MAX_A), e_eff_a - 0.18,
@@ -469,21 +469,25 @@ def main():
     ax_c.yaxis.set_minor_formatter(plt.NullFormatter())
     ax_c.set_xlabel(r"Total tokens trained  $D + D'$",
                     fontsize=FONT_LABEL, fontweight='bold')
-    ax_c.set_ylabel(r"Effective fresh tokens  $D + \eta\,D'$",
+    ax_c.set_ylabel(r"$D_{\rm eff}$",
                     fontsize=FONT_LABEL, fontweight='bold')
     ax_c.set_title('(c)', fontsize=FONT_TITLE, fontweight='bold')
     ax_c.tick_params(labelsize=FONT_TICK)
+    ax_c.tick_params(axis='y', pad=2)
+    ax_c.yaxis.set_label_coords(-0.08, 0.5)
     ax_c.grid(True, which='both', alpha=0.25)
-    leg_n = ax_c.legend(loc='lower right', fontsize=FONT_LEGEND, ncol=2,
-                        columnspacing=1.0, handletextpad=0.4, title=r'$N$',
-                        title_fontsize=FONT_LEGEND)
+    LEG_FS = FONT_LEGEND - 3  # smaller legend text to avoid overlap
+    leg_n = ax_c.legend(loc='lower right', fontsize=LEG_FS, ncol=2,
+                        columnspacing=0.8, handletextpad=0.3, title=r'$N$',
+                        title_fontsize=LEG_FS, borderpad=0.4,
+                        labelspacing=0.3)
     ax_c.add_artist(leg_n)
 
     # Size legend: marker size encodes TTP (D/N).
     from matplotlib.lines import Line2D
     size_handles = []
     for ttp_val in (2, 20, 320):
-        sz = np.sqrt(size_for_DN(ttp_val))  # markersize is sqrt of s
+        sz = 0.75 * np.sqrt(size_for_DN(ttp_val))  # shrink for legend
         size_handles.append(
             Line2D([0], [0], marker='o', linestyle='',
                    markerfacecolor='0.55', markeredgecolor='black',
@@ -491,9 +495,9 @@ def main():
                    label=rf'${ttp_val}$')
         )
     ax_c.legend(handles=size_handles, loc='upper left',
-                fontsize=FONT_LEGEND, title='TTP (D/N)',
-                title_fontsize=FONT_LEGEND, frameon=True,
-                labelspacing=1.2, borderpad=0.8, handletextpad=0.6)
+                fontsize=LEG_FS, title='TTP (D/N)',
+                title_fontsize=LEG_FS, frameon=True,
+                labelspacing=0.7, borderpad=0.4, handletextpad=0.4)
 
     out_pdf = os.path.join(os.path.dirname(__file__), 'figure_1.pdf')
     out_png = out_pdf.replace('.pdf', '.png')

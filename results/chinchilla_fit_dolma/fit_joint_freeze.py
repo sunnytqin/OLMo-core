@@ -1,38 +1,33 @@
 """
-Two-stage joint fit on 1-epoch + repetition + paraphrase data with Stage 1
-parameters frozen ("all1" freeze).
+Frozen-Chinchilla fit: η_para only.
 
-Functional form (shared Chinchilla, separate η for repetition vs paraphrase):
+Stage 1 is *not* re-fitted. The shared Chinchilla parameters are pinned to
+the writeup_final / one-shot rep+1ep headline values:
 
-    L(N, D, D'; src) = E + A/N^α + B / (D + η_src(D, D'; N) · D')^β
+    E = 0.050,  A = 31,  B = 16,539,  α = 0.137,  β = 0.436
 
-with src ∈ {none (1-epoch), repeat, para}. η_src has Form-B exp-sat shape:
+(Plus η_rep set to its writeup_final values — only used for completeness;
+this script fits on paraphrase data only, so η_rep never enters the loss.)
 
-    η_src(D, D'; N) = R*_src · (1 − e^{−x/R*_src}) / x,    x = D'/D,
-    log R*_src = log K_src + ρ_src · log(D/N) + σ_src · log N.
+Functional form (paraphrase points only):
+
+    L(N, D, D'; para) = E + A/N^α + B / (D + η_para(D, D'; N) · D')^β
+    η_para(D, D'; N) = R*_para · (1 − e^{−x/R*_para}) / x,    x = D'/D
+    log R*_para     = log K_para + ρ_para · log(D/N) + σ_para · log N
 
 Procedure:
-    Stage 1.  Fit 9 params (Chinchilla E, A, B, α, β + η_rep) on
-              1-epoch + repetition data only (14M excluded).
-              This reproduces fit_joint_all.py.
-
-    Stage 2.  Freeze all 8 Stage 1 parameters and fit the 3 remaining
-              η_para parameters (log K_para, ρ_para, σ_para) on the full
-              pooled 1-ep + rep + para dataset.
-
-    Stage 3.  Iterative residual-greedy drop sweep with η_para refit at
-              every k.  Pick canonical k as first plateau in para-RMSE.
-
-Data choices:
-  • 14M excluded from 1-epoch and repetition (Stage 1 input).
-  • 14M kept for paraphrase (Stage 2/3 input).
-  • OVERFIT_EXCLUDE applied to repetition per data.py.
+    Stage 2.  Fit (log K_para, ρ_para, σ_para) on paraphrase data with all
+              other parameters held at their frozen values.
+    Stage 3.  Iterative residual-greedy drop sweep on paraphrase points,
+              warm-starting η_para at every k.
 
 Output:
-    fit_joint_freeze.pdf — diagnostic plot (data/residual/parity).
+    fit_joint_freeze.json — canonical-k summary.
+    fit_joint_freeze.pdf  — diagnostic plot.
 """
 
 import glob
+import json
 import os
 import sys
 from typing import Dict
@@ -61,47 +56,66 @@ plt.rcParams.update({
     "figure.titlesize": 14,
 })
 
-from data import (OVERFIT_EXCLUDE, SIZES,  # noqa: E402
-                  extract_1epoch, extract_multi_epoch,
-                  extract_paraphrase, load_with_para)
+from data import SIZES, extract_paraphrase, load_with_para  # noqa: E402
 from fit_joint_triple import (SOURCE_NONE, SOURCE_PARA, SOURCE_REPEAT,  # noqa: E402
-                                GRID_REP_ONLY, PARA_GRID,
-                                fmt_tokens, make_forward_rep_only,
+                                PARA_GRID, fmt_tokens,
                                 make_triple_forward)
 from fit_lse import fit_lse  # noqa: E402
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DELTA = 0.1
-EXCLUDE_SIZES_1EP_REP = ("14m",)
+
+# Sizes excluded from the paraphrase pool (14M is excluded by default — it
+# extrapolates poorly in the joint repetition fits as well).
+EXCLUDE_SIZES = {"14m"}
+
+# ──────────────────────────────────────────────────────────────────────
+# Frozen Stage-1 parameters (writeup_final / one-shot rep+1ep, k=15)
+# ──────────────────────────────────────────────────────────────────────
+
+FROZEN_E     = 0.050
+FROZEN_A     = 31.0
+FROZEN_B     = 16539.0
+FROZEN_ALPHA = 0.137
+FROZEN_BETA  = 0.436
+
+# η_rep is unused (we fit on paraphrase only), but the triple-forward needs
+# values to evaluate. Pin to writeup_final reference for transparency.
+FROZEN_LOG_K_REP = 10.32
+FROZEN_RHO_REP   = -0.270
+FROZEN_SIGMA_REP = -0.388
+
+FROZEN_FULL: Dict[str, float] = {
+    "e":         float(np.log(FROZEN_E)),
+    "a":         float(np.log(FROZEN_A)),
+    "b":         float(np.log(FROZEN_B)),
+    "alpha":     FROZEN_ALPHA,
+    "beta":      FROZEN_BETA,
+    "log_K_rep": FROZEN_LOG_K_REP,
+    "rho_rep":   FROZEN_RHO_REP,
+    "sigma_rep": FROZEN_SIGMA_REP,
+}
 
 
 # ──────────────────────────────────────────────────────────────────────
 # Data
 # ──────────────────────────────────────────────────────────────────────
 
-def collect_pooled():
-    """Pool 1-ep + rep + para across model sizes; 14M excluded from 1ep+rep."""
+def collect_para_only():
+    """Pool paraphrase points across all sizes that have parap_datasets,
+    skipping any size in EXCLUDE_SIZES."""
     tags, Ns, Ds, Dps, Ls, src = [], [], [], [], [], []
     for size in SIZES:
+        if size in EXCLUDE_SIZES:
+            continue
         N, datasets, parap = load_with_para(size)
-        skip_1ep_rep = size in EXCLUDE_SIZES_1EP_REP
-        if not skip_1ep_rep:
-            _, D1, L1 = extract_1epoch(datasets, N, scale_min=0.0)
-            for d, l in zip(D1, L1):
-                tags.append(size); Ns.append(N); Ds.append(d); Dps.append(0.0)
-                Ls.append(l); src.append(SOURCE_NONE)
-            _, Dm, _, Dpm, Lm, _ = extract_multi_epoch(
-                datasets, N, scale_min=0.0,
-                exclude_overfit=OVERFIT_EXCLUDE.get(size, set()))
-            for d, dp, l in zip(Dm, Dpm, Lm):
-                tags.append(size); Ns.append(N); Ds.append(d); Dps.append(dp)
-                Ls.append(l); src.append(SOURCE_REPEAT)
-        if parap:
-            _, Dp_, _, Dpp, Lp, _ = extract_paraphrase(
-                datasets, parap, N, scale_min=0.0)
-            for d, dp, l in zip(Dp_, Dpp, Lp):
-                tags.append(size); Ns.append(N); Ds.append(d); Dps.append(dp)
-                Ls.append(l); src.append(SOURCE_PARA)
+        if not parap:
+            continue
+        _, D_, _, Dp_, L_, _ = extract_paraphrase(
+            datasets, parap, N, scale_min=0.0)
+        for d, dp, l in zip(D_, Dp_, L_):
+            tags.append(size); Ns.append(N); Ds.append(d); Dps.append(dp)
+            Ls.append(l); src.append(SOURCE_PARA)
     return dict(
         tags=np.array(tags),
         N=np.array(Ns, dtype=np.float64),
@@ -126,18 +140,8 @@ def _wrap_fixed(forward_fn, fixed_params):
     return fwd
 
 
-def stage1_rep_only(data, delta=DELTA):
-    """Fit 9-param (Chinchilla + η_rep) on 1ep + rep only."""
-    keep = data["source"] != SOURCE_PARA
-    fwd = make_forward_rep_only(
-        data["N"][keep], data["D"][keep], data["Dp"][keep],
-        is_multi_arr=(data["source"][keep] == SOURCE_REPEAT))
-    log_L = torch.tensor(np.log(data["L"][keep]), dtype=torch.float64)
-    return fit_lse(fwd, log_L, GRID_REP_ONLY, delta=delta, verbose=False)
-
-
 def stage2_para_only(data, fixed_params, delta=DELTA):
-    """Fit only η_para (3 params); all 8 Stage 1 params held fixed."""
+    """Fit only η_para (3 params); all 8 frozen params held fixed."""
     base = make_triple_forward(
         data["N"], data["D"], data["Dp"], data["source"])
     fwd = _wrap_fixed(base, fixed_params)
@@ -201,14 +205,12 @@ def _summary(data, params, pred_full, keep):
     resid = log_L - pred_full
     out = dict(rmse_full=float(np.sqrt(np.mean(resid ** 2))),
                rmse_kept=float(np.sqrt(np.mean(resid[keep] ** 2))))
-    for tag, src_id in [("1ep", SOURCE_NONE), ("rep", SOURCE_REPEAT),
-                         ("para", SOURCE_PARA)]:
-        m = (data["source"] == src_id)
-        mk = m & keep
-        out[f"n_{tag}"] = int(m.sum())
-        out[f"n_{tag}_kept"] = int(mk.sum())
-        out[f"rmse_{tag}"] = (float(np.sqrt(np.mean(resid[mk] ** 2)))
-                              if mk.any() else float("nan"))
+    m = (data["source"] == SOURCE_PARA)
+    mk = m & keep
+    out["n_para"] = int(m.sum())
+    out["n_para_kept"] = int(mk.sum())
+    out["rmse_para"] = (float(np.sqrt(np.mean(resid[mk] ** 2)))
+                          if mk.any() else float("nan"))
     return out
 
 
@@ -243,26 +245,11 @@ def plot_diagnostic(data, pred_full, keep, dropped, params, summary, path):
     for tag in sizes:
         m = data["tags"] == tag
         c = color_of[tag]
-        m1 = m & (data["source"] == SOURCE_NONE)
-        ax_data.scatter(data["D"][m1], data["L"][m1], s=70, color=c,
-                        edgecolors="k", linewidths=0.4, marker="o",
-                        zorder=4, label=tag)
-        mr = m & (data["source"] == SOURCE_REPEAT)
-        ax_data.scatter(data["D"][mr] + data["Dp"][mr], data["L"][mr],
-                        s=42, color=c, marker="x", alpha=0.7, zorder=3)
-        mp = m & (data["source"] == SOURCE_PARA)
-        ax_data.scatter(data["D"][mp] + data["Dp"][mp], data["L"][mp],
-                        s=42, color=c, edgecolors="k", linewidths=0.5,
-                        marker="s", alpha=0.85, zorder=3)
-        for src_id, mk_marker in [(SOURCE_NONE, "o"),
-                                    (SOURCE_REPEAT, "x"),
-                                    (SOURCE_PARA, "s")]:
-            mm = m & (data["source"] == src_id)
-            if mm.any():
-                ax_res.scatter(data["D"][mm], resid[mm], s=40, color=c,
-                                edgecolors=("k" if mk_marker != "x"
-                                              else "none"),
-                                linewidths=0.3, marker=mk_marker)
+        ax_data.scatter(data["D"][m] + data["Dp"][m], data["L"][m],
+                        s=50, color=c, edgecolors="k", linewidths=0.5,
+                        marker="s", alpha=0.85, zorder=3, label=tag)
+        ax_res.scatter(data["D"][m], resid[m], s=40, color=c,
+                       edgecolors="k", linewidths=0.3, marker="s")
         ax_par.scatter(np.exp(pred_full[m]), data["L"][m], s=42, color=c,
                        edgecolors="k", linewidths=0.3)
 
@@ -281,13 +268,13 @@ def plot_diagnostic(data, pred_full, keep, dropped, params, summary, path):
     ax_data.grid(alpha=0.3)
     p = params
     ax_data.set_title(
-        rf"Stage-1-frozen fit: $E={np.exp(p['e']):.2f}$, $A={np.exp(p['a']):.0f}$, "
-        rf"$B={np.exp(p['b']):.0f}$, $\alpha={p['alpha']:.2f}$, "
+        rf"Frozen Chinchilla: $E={np.exp(p['e']):.3f}$, "
+        rf"$A={np.exp(p['a']):.0f}$, "
+        rf"$B={np.exp(p['b']):.0f}$, $\alpha={p['alpha']:.3f}$, "
         rf"$\beta={p['beta']:.3f}$" + "\n"
-        rf"η_rep (frozen): $\log K={p['log_K_rep']:.1f}$, $\rho={p['rho_rep']:+.2f}$, "
-        rf"$\sigma={p['sigma_rep']:+.2f}$  |  "
-        rf"η_para (fit): $\log K={p['log_K_para']:.1f}$, $\rho={p['rho_para']:+.2f}$, "
-        rf"$\sigma={p['sigma_para']:+.2f}$",
+        rf"η_para (fit): $\log K={p['log_K_para']:.2f}$, "
+        rf"$\rho={p['rho_para']:+.3f}$, "
+        rf"$\sigma={p['sigma_para']:+.3f}$",
         fontsize=11)
 
     ax_res.axhline(0, color="gray", linestyle="--", linewidth=1, alpha=0.5)
@@ -295,9 +282,8 @@ def plot_diagnostic(data, pred_full, keep, dropped, params, summary, path):
     ax_res.xaxis.set_major_formatter(FuncFormatter(fmt_tokens))
     ax_res.set_xlabel(r"$D$")
     ax_res.set_ylabel(r"residual ($\log L$)")
-    ax_res.set_title(rf"Residuals (kept RMSE: 1ep={summary['rmse_1ep']:.3f}, "
-                     rf"rep={summary['rmse_rep']:.3f}, "
-                     rf"para={summary['rmse_para']:.3f})")
+    ax_res.set_title(rf"Paraphrase residuals "
+                     rf"(kept RMSE: {summary['rmse_para']:.3f})")
     ax_res.grid(alpha=0.3)
 
     lo = min(np.exp(pred_full).min(), data["L"].min()) * 0.95
@@ -309,8 +295,8 @@ def plot_diagnostic(data, pred_full, keep, dropped, params, summary, path):
     ax_par.grid(alpha=0.3)
 
     fig.suptitle(
-        "Stage-1-frozen joint fit: η_para fitted on top of frozen "
-        "Chinchilla + η_rep   (○ 1ep, × repeat, □ para)",
+        "Frozen-Chinchilla fit: η_para fitted on paraphrase data only "
+        "(□ para)",
         fontsize=14, y=1.02)
     fig.tight_layout()
     fig.savefig(path, bbox_inches="tight")
@@ -328,7 +314,7 @@ def _print_params(label, p):
           f"B={np.exp(p['b']):.2f}  α={p['alpha']:.4f}  β={p['beta']:.4f}")
     if "log_K_rep" in p:
         print(f"    η_rep:      log K={p['log_K_rep']:.2f}  "
-              f"ρ={p['rho_rep']:+.3f}  σ={p['sigma_rep']:+.3f}")
+              f"ρ={p['rho_rep']:+.3f}  σ={p['sigma_rep']:+.3f}  (frozen)")
     if "log_K_para" in p:
         print(f"    η_para:     log K={p['log_K_para']:.2f}  "
               f"ρ={p['rho_para']:+.3f}  σ={p['sigma_para']:+.3f}")
@@ -336,43 +322,41 @@ def _print_params(label, p):
 
 def main():
     print("=" * 96)
-    print("Stage-1-frozen joint fit "
-          "(η_para fitted on top of frozen Chinchilla + η_rep)")
+    print("Frozen-Chinchilla fit: paraphrase-only η_para over pinned "
+          "Stage-1 params")
     print("=" * 96)
 
-    data = collect_pooled()
-    n_per = {SOURCE_NONE:   int((data["source"] == SOURCE_NONE).sum()),
-             SOURCE_REPEAT: int((data["source"] == SOURCE_REPEAT).sum()),
-             SOURCE_PARA:   int((data["source"] == SOURCE_PARA).sum())}
-    print(f"\nPooled: n_total={len(data['L'])}  "
-          f"(1ep={n_per[SOURCE_NONE]}, rep={n_per[SOURCE_REPEAT]}, "
-          f"para={n_per[SOURCE_PARA]})  "
-          f"[14M excluded from 1ep+rep, kept for para]")
+    data = collect_para_only()
+    excl = sorted(EXCLUDE_SIZES) if EXCLUDE_SIZES else "(none)"
+    print(f"\nPooled (paraphrase only): n_total={len(data['L'])}  "
+          f"[excluded sizes: {excl}]")
+    sizes_seen = sorted(set(data["tags"].tolist()),
+                        key=lambda t: SIZES[t][0])
+    counts = {t: int((data["tags"] == t).sum()) for t in sizes_seen}
+    print(f"  per-size counts: {counts}")
 
-    print("\n[Stage 1] Fitting rep-only sub-model (9 params, no paraphrase)...")
-    res1 = stage1_rep_only(data)
-    p1 = res1["params"]
-    print(f"  rep-only RMSE: {res1.get('rmse_logL', float('nan')):.4f}")
-    _print_params("(stage 1 — rep-only baseline)", p1)
+    print("\n[Stage 1] FROZEN — using writeup_final headline values:")
+    print(f"  E={FROZEN_E}, A={FROZEN_A}, B={FROZEN_B}, "
+          f"α={FROZEN_ALPHA}, β={FROZEN_BETA}")
+    print(f"  η_rep (frozen, unused): logK={FROZEN_LOG_K_REP}, "
+          f"ρ={FROZEN_RHO_REP}, σ={FROZEN_SIGMA_REP}")
 
-    fixed_keys = ["e", "a", "b", "alpha", "beta",
-                  "log_K_rep", "rho_rep", "sigma_rep"]
-    fixed_params: Dict[str, float] = {k: p1[k] for k in fixed_keys}
+    fixed_params = dict(FROZEN_FULL)
 
-    print(f"\n[Stage 2] Fitting η_para only ({len(fixed_keys)} Stage-1 params "
-          f"frozen)...")
+    print(f"\n[Stage 2] Fitting η_para only "
+          f"(8 frozen params held fixed, 3 trainable)...")
     res2 = stage2_para_only(data, fixed_params)
     para_init = res2["params"]
     p2 = {**para_init, **fixed_params}
     _print_params("(stage 2 — η_para over frozen Stage 1)", p2)
 
-    K_VALUES = [0, 5, 10, 15, 20, 25, 30]
+    K_VALUES = [0, 2, 5, 8, 10, 12, 15]
     print(f"\n[Stage 3] Iterative residual drop, k ∈ {K_VALUES}...")
     sweep = topk_drop_sweep(data, para_init, fixed_params, K_VALUES)
 
     print(f"\n  {'k':>3s}  {'n_kept':>6s}  | "
           f"{'lK_par':>7s} {'ρ_par':>7s} {'σ_par':>7s} | "
-          f"{'1ep':>5s}  {'rep':>5s}  {'par':>5s}")
+          f"{'para':>5s}")
     for k in K_VALUES:
         r = sweep[k]
         s = _summary(data, r["params"], r["pred_full"], r["keep"])
@@ -380,7 +364,6 @@ def main():
         print(f"  {k:>3d}  {int(r['keep'].sum()):>6d}  | "
               f"{p['log_K_para']:>7.2f} {p['rho_para']:>+7.3f} "
               f"{p['sigma_para']:>+7.3f} | "
-              f"{s['rmse_1ep']:>5.3f}  {s['rmse_rep']:>5.3f}  "
               f"{s['rmse_para']:>5.3f}")
 
     canonical = pick_canonical_k(sweep, data, K_VALUES, tol=0.001)
@@ -388,9 +371,40 @@ def main():
     rc = sweep[canonical]
     sc = _summary(data, rc["params"], rc["pred_full"], rc["keep"])
     _print_params(f"(canonical k={canonical})", rc["params"])
-    print(f"    fit RMSE — 1ep: {sc['rmse_1ep']:.4f}  "
-          f"rep: {sc['rmse_rep']:.4f}  para: {sc['rmse_para']:.4f}  "
-          f"|  kept-total: {sc['rmse_kept']:.4f}")
+    print(f"    para RMSE (kept): {sc['rmse_para']:.4f}  |  "
+          f"all-points RMSE: {sc['rmse_full']:.4f}")
+
+    out_json = {
+        "method": "frozen-chinchilla, paraphrase-only η_para fit",
+        "excluded_sizes": sorted(EXCLUDE_SIZES),
+        "frozen": dict(FROZEN_FULL),
+        "frozen_human": {
+            "E": FROZEN_E, "A": FROZEN_A, "B": FROZEN_B,
+            "alpha": FROZEN_ALPHA, "beta": FROZEN_BETA,
+            "log_K_rep": FROZEN_LOG_K_REP,
+            "rho_rep": FROZEN_RHO_REP,
+            "sigma_rep": FROZEN_SIGMA_REP,
+        },
+        "k_values": K_VALUES,
+        "canonical_k": canonical,
+        "canonical_params": rc["params"],
+        "canonical_summary": sc,
+        "per_k": {
+            str(k): {
+                "params": sweep[k]["params"],
+                "summary": _summary(data, sweep[k]["params"],
+                                     sweep[k]["pred_full"],
+                                     sweep[k]["keep"]),
+                "n_dropped": len(sweep[k]["dropped"]),
+            } for k in K_VALUES
+        },
+        "n_total": int(len(data["L"])),
+        "per_size_counts": counts,
+    }
+    json_path = os.path.join(SCRIPT_DIR, "fit_joint_freeze.json")
+    with open(json_path, "w") as f:
+        json.dump(out_json, f, indent=2)
+    print(f"Saved {json_path}")
 
     plot_diagnostic(
         data, rc["pred_full"], rc["keep"], rc["dropped"],
