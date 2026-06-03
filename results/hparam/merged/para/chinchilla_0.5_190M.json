@@ -58,5 +58,17 @@
     "perplexity": 24.489648818969727,
     "tokens_evaluated": 3478624,
     "num_batches": 794
+  },
+  "190M_seed42_dolma_para_K16_wd0.1_lr3e-3": {
+    "validation_loss": 3.073366781000312,
+    "perplexity": 21.614553451538086,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
+  },
+  "190M_seed42_dolma_para_K32_wd0.1_lr3e-3": {
+    "validation_loss": 2.9969606536480913,
+    "perplexity": 20.024581909179688,
+    "tokens_evaluated": 3478624,
+    "num_batches": 794
   }
 }

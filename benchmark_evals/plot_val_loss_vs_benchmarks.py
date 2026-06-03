@@ -1,281 +1,211 @@
 """
 Validation BPB vs downstream benchmark performance.
-Combines 30M and 370M models on the same plots.
 
-Outputs:
-  figures/bpb_vs_benchmarks_paper.pdf  — paper-ready 3-panel horizontal figure
-  figures/bpb_vs_<bench>.pdf           — exploratory single-benchmark figures
+Reads the manifest files (manifest_10pct.json, manifest_10pct_para.json) for the
+list of evaluated checkpoints + their dolma validation loss, then finds the
+corresponding lm_eval results under results/<manifest_id>/.
+
+Produces:
+  figures/val_loss_vs_benchmarks.pdf  — one panel per benchmark (4x5 grid)
 """
 import json
-import re
-import sys
+import math
+from collections import defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from compute_bpb import ce_to_bpb, select_best_runs
+# nats/token -> bits/byte. Measured on C4 val with allenai/dolma2-tokenizer.
+BYTES_PER_TOKEN = 4.6954
 
-# ── paths ────────────────────────────────────────────────────────────────────
-EVALS_DIR = Path(__file__).parent / "results"
 
-# ── benchmark metric to extract from results JSON ────────────────────────────
+def ce_to_bpb(loss_nats: float) -> float:
+    return loss_nats / math.log(2) / BYTES_PER_TOKEN
+
+ROOT = Path(__file__).parent
+RESULTS_DIR = ROOT / "results"
+OUT_DIR = ROOT / "figures"
+OUT_DIR.mkdir(exist_ok=True)
+
+MANIFESTS = [
+    ROOT / "manifest_10pct.json",
+    ROOT / "manifest_10pct_para.json",
+]
+
+# benchmark_name -> (json_metric_key, ylabel, higher_is_better)
 BENCHMARK_METRICS = {
-    "hellaswag":        ("acc_norm,none",            "acc_norm",    True),
-    "lambada_openai":   ("acc,none",                 "acc",         True),
-    "openbookqa":       ("acc_norm,none",            "acc_norm",    True),
-    "race":             ("acc,none",                 "acc",         True),
-    "gsm8k":            ("exact_match,strict-match", "exact_match", True),
-    "gsm8k_bpb_task":   ("bits_per_byte,none",       "bits_per_byte", False),
-    "webqs":            ("exact_match,none",         "exact_match", True),
-    "squad_completion": ("contains,none",            "contains",    True),
-    "c4":               ("bits_per_byte,none",       "bits_per_byte", False),
-    "wikitext":         ("bits_per_byte,none",       "bits_per_byte", False),
+    "c4":                  ("bits_per_byte,none",      "BPB",        False),
+    "wikitext":            ("bits_per_byte,none",      "BPB",        False),
+    "lambada_openai":      ("acc,none",                "Accuracy",   True),
+    "hellaswag":           ("acc_norm,none",           "Acc (norm)", True),
+    "openbookqa":          ("acc_norm,none",           "Acc (norm)", True),
+    "race":                ("acc,none",                "Accuracy",   True),
+    "squad_completion-1":  ("contains,none",           "Contains",   True),
+    "webqs":               ("exact_match,none",        "EM",         True),
+    "gsm8k":               ("exact_match,strict-match", "EM",        True),
+    "asdiv_lm":            ("bits_per_byte,none",      "BPB",        False),
+    "gsm8k_lm":            ("bits_per_byte,none",      "BPB",        False),
+    "humaneval_lm":        ("bits_per_byte,none",      "BPB",        False),
+    "mbpp_lm":             ("bits_per_byte,none",      "BPB",        False),
+    "nq_open_lm":          ("bits_per_byte,none",      "BPB",        False),
+    "triviaqa_lm":         ("bits_per_byte,none",      "BPB",        False),
+    "webqs_lm":            ("bits_per_byte,none",      "BPB",        False),
+    "squad_completion_lm": ("bits_per_byte,none",      "BPB",        False),
+    "ifeval_lm":           ("bits_per_byte,none",      "BPB",        False),
 }
 
-PAPER_BENCHMARKS = ["hellaswag", "lambada_openai", "squad_completion"]
-PAPER_BENCH_TITLES = {
-    "hellaswag":        "HellaSwag",
-    "lambada_openai":   "LAMBADA",
-    "squad_completion": "SQuAD (completion)",
-}
+# Order by category for the grid layout
+PANEL_ORDER = [
+    # row 1 — perplexity / BPB on natural text
+    "c4", "wikitext",
+    # row 1 cont — accuracy tasks
+    "lambada_openai", "hellaswag", "openbookqa",
+    # row 2 — accuracy/exact-match
+    "race", "squad_completion-1", "webqs", "gsm8k",
+    # row 2 cont — code BPB
+    "humaneval_lm",
+    # row 3 — math BPB
+    "asdiv_lm", "gsm8k_lm", "mbpp_lm",
+    # row 3 cont — QA BPB
+    "nq_open_lm", "triviaqa_lm",
+    # row 4 — QA BPB cont + instruct BPB
+    "webqs_lm", "squad_completion_lm", "ifeval_lm",
+]
 
-# ── style ────────────────────────────────────────────────────────────────────
-FONT_LABEL  = 18
-FONT_TICK   = 16
-FONT_LEGEND = 11
-
-cmap_flops = plt.cm.YlOrRd
-
-# Marker: chinchilla scale determines shape
-chin_marker = {0.05: "o", 0.1: "s", 0.25: "D"}
-chin_label  = {
-    0.05: r"0.05× Chin.",
-    0.1:  r"0.1× Chin.",
-    0.25: r"0.25× Chin.",
-}
-
-# Model size: determines fill style (filled=370M, open=30M)
-SIZE_STYLE = {
-    "370M": {"facecolor": None, "linewidths": 0.5},   # filled (color from flops)
-    "30M":  {"facecolor": "none", "linewidths": 1.5},  # open/hollow
-}
-SIZE_LABEL = {
-    "370M": "370M (filled)",
-    "30M":  "30M (open)",
-}
-
-MODEL_SIZES = ["370M", "30M"]
-
-# ── helpers ───────────────────────────────────────────────────────────────────
-
-def epoch_from_folder(name: str) -> int | None:
-    m = re.search(r"epoch(\d+)", name)
-    return int(m.group(1)) if m else None
+# Model size -> colormap index (smaller = lighter, larger = darker).
+# Each source gets its own colormap so we can compare loss-to-downstream
+# between regimes while keeping model size visible.
+SIZE_ORDER = ["14M", "30M", "60M", "100M", "190M", "370M", "600M"]
+# Use the 0.25–0.95 range so the lightest end is still readable
+_LO, _HI = 0.25, 0.95
+SOURCE_CMAP = {"multiepoch": plt.cm.Blues, "para": plt.cm.Reds}
+SOURCE_LABEL = {"multiepoch": "multi-epoch (D × n)", "para": "paraphrase (D + D'×K)"}
 
 
-def load_results(json_path: Path) -> dict:
-    with open(json_path) as f:
-        return json.load(f)["results"]
+def size_color(size: str, source: str):
+    i = SIZE_ORDER.index(size)
+    frac = _LO + (_HI - _LO) * (i / (len(SIZE_ORDER) - 1))
+    return SOURCE_CMAP[source](frac)
 
 
-def collect_data(chin_dir: Path, best_runs: list[dict]) -> list[dict]:
-    """Collect eval results matched against best runs for a chinchilla scale."""
-    best_by_epoch = {r["epoch"]: r for r in best_runs}
+def find_results_json(manifest_id: str) -> Path | None:
+    """Find the latest results_*.json under results/<manifest_id>/."""
+    run_dir = RESULTS_DIR / manifest_id
+    if not run_dir.is_dir():
+        return None
+    candidates = list(run_dir.rglob("results_*.json"))
+    if not candidates:
+        return None
+    return sorted(candidates)[-1]
+
+
+def collect_rows():
+    """Load each manifest entry's eval results into a flat list of row dicts."""
     rows = []
-    for exp_dir in sorted(chin_dir.iterdir()):
-        epoch = epoch_from_folder(exp_dir.name)
-        if epoch is None:
+    for manifest_path in MANIFESTS:
+        if not manifest_path.exists():
             continue
-        best = best_by_epoch.get(epoch)
-        if best is None:
-            continue
-        json_files = list(exp_dir.rglob("results_*.json"))
-        if not json_files:
-            continue
-        results = load_results(sorted(json_files)[-1])
-        row = {
-            "epoch": epoch,
-            "val_loss": best["validation_loss"],
-            "val_bpb": best["bpb"],
-            "flops_multiplier": best["flops_multiplier"],
-            "size": best["size"],
-        }
-        for bench, (key, _, _) in BENCHMARK_METRICS.items():
-            row[bench] = results.get(bench, {}).get(key)
-        rows.append(row)
+        for entry in json.load(open(manifest_path)):
+            rj_path = find_results_json(entry["manifest_id"])
+            if rj_path is None:
+                continue
+            results = json.load(open(rj_path))["results"]
+            row = {
+                "manifest_id": entry["manifest_id"],
+                "size": entry["size"],
+                "chinchilla_scale": entry["chinchilla_scale"],
+                "val_loss": entry["validation_loss"],
+                "val_bpb": ce_to_bpb(entry["validation_loss"]),
+                "source": entry.get("source", "multiepoch"),
+            }
+            # secondary key (epoch or K) for hover/debug
+            if "epoch" in entry:
+                row["secondary"] = ("epoch", entry["epoch"])
+            elif "K" in entry:
+                row["secondary"] = ("K", entry["K"])
+            for bench, (key, _, _) in BENCHMARK_METRICS.items():
+                v = results.get(bench, {}).get(key)
+                row[bench] = v if isinstance(v, (int, float)) else None
+            rows.append(row)
     return rows
 
 
-# ── collect rows for all model sizes and chinchilla scales ───────────────────
-# Key: (model_size, chinchilla_scale) -> list of row dicts
-all_rows: dict[tuple[str, float], list[dict]] = {}
+def plot_grid(rows, out_path: Path):
+    n_panels = len(PANEL_ORDER)
+    ncols = 5
+    nrows = int(np.ceil(n_panels / ncols))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(4.2 * ncols, 3.2 * nrows))
+    axes = np.asarray(axes).reshape(-1)
 
-for model_size in MODEL_SIZES:
-    all_best = select_best_runs(size_filter=model_size)
-    for chin_scale in sorted(set(r["chinchilla_scale"] for r in all_best)):
-        if chin_scale not in chin_marker:
-            continue
-        chin_dir = EVALS_DIR / f"{model_size}_chinchilla{chin_scale:g}"
-        if not chin_dir.exists():
-            continue
-        runs_for_chin = [r for r in all_best if r["chinchilla_scale"] == chin_scale]
-        rows = collect_data(chin_dir, runs_for_chin)
-        if rows:
-            all_rows[(model_size, chin_scale)] = rows
+    for ax, bench in zip(axes, PANEL_ORDER):
+        _, ylabel, higher_is_better = BENCHMARK_METRICS[bench]
+        scale = 100 if ylabel.startswith("Acc") or ylabel in ("EM", "Contains") else 1
+        for r in rows:
+            if r[bench] is None:
+                continue
+            ax.scatter(
+                r["val_bpb"], r[bench] * scale,
+                marker="o",
+                color=size_color(r["size"], r["source"]),
+                s=42,
+                edgecolors="k", linewidths=0.4, alpha=0.9, zorder=3,
+            )
+        ax.set_title(bench, fontsize=11)
+        ax.set_xlabel("Val BPB", fontsize=9)
+        ax.set_ylabel(f"{ylabel}{' (%)' if scale == 100 else ''}", fontsize=9)
+        ax.tick_params(axis="both", labelsize=8)
+        ax.grid(True, alpha=0.3)
+        ax.invert_xaxis()  # left -> right means better (lower BPB)
 
-if not all_rows:
-    print("No data found. Run evals first.")
-    sys.exit(1)
+    # Hide unused axes
+    for ax in axes[n_panels:]:
+        ax.set_visible(False)
 
-# ── shared flops colormap ────────────────────────────────────────────────────
-all_flops = [r["flops_multiplier"] for rows in all_rows.values()
-             for r in rows if r["flops_multiplier"] is not None]
-flops_min, flops_max = min(all_flops), max(all_flops)
-norm_flops = plt.Normalize(vmin=np.log2(flops_min), vmax=np.log2(flops_max))
+    # Shared legend: two rows of size swatches, one per source colormap.
+    handles = []
+    for source in ("multiepoch", "para"):
+        handles.append(
+            plt.Line2D([], [], linestyle="", marker="", label=SOURCE_LABEL[source])
+        )
+        for sz in SIZE_ORDER:
+            handles.append(
+                plt.Line2D([], [], marker="o", color=size_color(sz, source),
+                           linestyle="", markersize=8,
+                           markeredgecolor="k", markeredgewidth=0.4,
+                           label=f"N={sz}")
+            )
+    fig.legend(
+        handles=handles,
+        loc="lower center", ncol=len(SIZE_ORDER) + 1, fontsize=9,
+        bbox_to_anchor=(0.5, -0.03), frameon=False,
+    )
 
-FLOPS_TICKS = [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8, 16, 32, 64]
-
-
-def flops_color(f):
-    return cmap_flops(norm_flops(np.log2(f)))
-
-
-def add_colorbar(fig, ax):
-    sm = plt.cm.ScalarMappable(cmap=cmap_flops, norm=norm_flops)
-    sm.set_array([])
-    cbar = fig.colorbar(sm, ax=ax, pad=0.02)
-    cbar.ax.invert_yaxis()
-    cbar.set_label("FLOPs (Chinchilla Optimal = 1×)", fontsize=FONT_LEGEND)
-    cbar.ax.tick_params(labelsize=FONT_TICK)
-    valid_ticks = [v for v in FLOPS_TICKS if flops_min <= v <= flops_max]
-    cbar.set_ticks([np.log2(v) for v in valid_ticks])
-    cbar.set_ticklabels([f"{v:g}" for v in valid_ticks])
-    return cbar
-
-
-def scatter_point(ax, x, y, chin_scale, model_size, flops_mult, s=80):
-    """Plot a single point with marker=chin_scale, fill=model_size, color=flops."""
-    c = flops_color(flops_mult)
-    style = SIZE_STYLE[model_size]
-    if style["facecolor"] == "none":
-        ax.scatter(x, y, marker=chin_marker[chin_scale], facecolors="none",
-                   edgecolors=c, s=s, zorder=3, linewidths=style["linewidths"])
-    else:
-        ax.scatter(x, y, marker=chin_marker[chin_scale], color=c,
-                   s=s, zorder=3, edgecolors="k", linewidths=style["linewidths"])
-
-
-# ── output dir ───────────────────────────────────────────────────────────────
-OUT_DIR = Path(__file__).parent / "figures"
-OUT_DIR.mkdir(exist_ok=True)
-
-# ── paper figure: 1 row × 3 panels ──────────────────────────────────────────
-fig, axes = plt.subplots(1, 3, figsize=(14, 4), sharey=False)
-
-all_bpb = [r["val_bpb"] for rows in all_rows.values() for r in rows]
-x_min, x_max = min(all_bpb), max(all_bpb)
-x_margin = (x_max - x_min) * 0.05
-X_LIM = (x_max + x_margin, x_min - x_margin)
-
-for ax, bench in zip(axes, PAPER_BENCHMARKS):
-    _, ylabel, is_pct = BENCHMARK_METRICS[bench]
-    scale_factor = 100 if is_pct else 1
-
-    for (model_size, chin_scale), rows in all_rows.items():
-        valid = [r for r in rows if r.get(bench) is not None
-                 and r["flops_multiplier"] is not None]
-        for r in valid:
-            scatter_point(ax, r["val_bpb"], r[bench] * scale_factor,
-                          chin_scale, model_size, r["flops_multiplier"])
-
-    ax.set_xlim(X_LIM)
-    ax.yaxis.set_major_locator(plt.MaxNLocator(nbins=5, integer=True))
-    ax.set_title(PAPER_BENCH_TITLES[bench], fontsize=FONT_LABEL)
-    ax.tick_params(axis="both", labelsize=FONT_TICK)
-    ax.grid(True, alpha=0.3)
-
-axes[0].set_ylabel("Accuracy (%)", fontsize=FONT_LABEL)
-fig.supxlabel("Validation BPB", fontsize=FONT_LABEL, y=0.04)
-
-add_colorbar(fig, axes[-1])
-
-# Legend: marker shape = chinchilla scale, fill = model size
-shape_handles = [
-    plt.scatter([], [], marker=chin_marker[s], color="grey",
-                s=60, edgecolors="k", linewidths=0.5, label=chin_label[s])
-    for s in sorted(s for s in chin_marker
-                    if any(s == cs for (_, cs) in all_rows.keys()))
-]
-size_handles = []
-for sz in MODEL_SIZES:
-    if any(sz == ms for (ms, _) in all_rows.keys()):
-        if SIZE_STYLE[sz]["facecolor"] == "none":
-            size_handles.append(
-                plt.scatter([], [], marker="o", facecolors="none",
-                            edgecolors="grey", s=60, linewidths=1.5,
-                            label=SIZE_LABEL[sz]))
-        else:
-            size_handles.append(
-                plt.scatter([], [], marker="o", color="grey",
-                            edgecolors="k", s=60, linewidths=0.5,
-                            label=SIZE_LABEL[sz]))
-
-axes[0].legend(handles=shape_handles + size_handles, fontsize=FONT_LEGEND,
-               title="Data scale / Model size", title_fontsize=FONT_LEGEND,
-               loc="best")
-
-fig.tight_layout()
-paper_path = OUT_DIR / "bpb_vs_benchmarks_paper.pdf"
-fig.savefig(paper_path, bbox_inches="tight")
-plt.close(fig)
-print(f"Saved {paper_path}")
-
-# ── exploratory: one figure per benchmark ────────────────────────────────────
-for bench, (_, ylabel, is_pct) in BENCHMARK_METRICS.items():
-    scale_factor = 100 if is_pct else 1
-    fig, ax = plt.subplots(figsize=(5.5, 4))
-
-    for (model_size, chin_scale), rows in all_rows.items():
-        valid = [r for r in rows if r.get(bench) is not None
-                 and r["flops_multiplier"] is not None]
-        for r in valid:
-            scatter_point(ax, r["val_bpb"], r[bench] * scale_factor,
-                          chin_scale, model_size, r["flops_multiplier"], s=70)
-
-    ax.invert_xaxis()
-    ax.set_xlabel("Validation BPB", fontsize=FONT_LABEL)
-    ax.set_ylabel(f"{'Accuracy (%)' if is_pct else ylabel}", fontsize=FONT_LABEL)
-    ax.set_title(bench, fontsize=FONT_LABEL)
-    ax.tick_params(axis="both", labelsize=FONT_TICK)
-    ax.grid(True, alpha=0.3)
-
-    shape_handles = [
-        plt.scatter([], [], marker=chin_marker[s], color="grey",
-                    s=60, edgecolors="k", linewidths=0.5, label=chin_label[s])
-        for s in sorted(s for s in chin_marker
-                        if any(s == cs for (_, cs) in all_rows.keys()))
-    ]
-    size_handles = []
-    for sz in MODEL_SIZES:
-        if any(sz == ms for (ms, _) in all_rows.keys()):
-            if SIZE_STYLE[sz]["facecolor"] == "none":
-                size_handles.append(
-                    plt.scatter([], [], marker="o", facecolors="none",
-                                edgecolors="grey", s=60, linewidths=1.5,
-                                label=SIZE_LABEL[sz]))
-            else:
-                size_handles.append(
-                    plt.scatter([], [], marker="o", color="grey",
-                                edgecolors="k", s=60, linewidths=0.5,
-                                label=SIZE_LABEL[sz]))
-
-    ax.legend(handles=shape_handles + size_handles, fontsize=FONT_LEGEND,
-              title="Data scale / Model size", title_fontsize=FONT_LEGEND)
-    add_colorbar(fig, ax)
-
-    fig.tight_layout()
-    out_path = OUT_DIR / f"bpb_vs_{bench}.pdf"
-    fig.savefig(out_path, bbox_inches="tight")
+    fig.suptitle("Validation BPB vs downstream benchmark performance "
+                 "(left → right = better model)", fontsize=14, y=1.0)
+    fig.tight_layout(rect=(0, 0.03, 1, 0.98))
+    fig.savefig(out_path, bbox_inches="tight", dpi=150)
     plt.close(fig)
     print(f"Saved {out_path}")
+
+
+def main():
+    rows = collect_rows()
+    if not rows:
+        print("No data found — make sure results/ has entries matching the manifests.")
+        return
+    by_source = defaultdict(int)
+    by_size = defaultdict(int)
+    for r in rows:
+        by_source[r["source"]] += 1
+        by_size[r["size"]] += 1
+    print(f"Loaded {len(rows)} rows")
+    print(f"  by source: {dict(by_source)}")
+    print(f"  by size:   {dict(by_size)}")
+
+    plot_grid(rows, OUT_DIR / "val_loss_vs_benchmarks.pdf")
+    plot_grid(rows, OUT_DIR / "val_loss_vs_benchmarks.png")
+
+
+if __name__ == "__main__":
+    main()

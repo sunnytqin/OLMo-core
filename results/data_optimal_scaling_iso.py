@@ -23,16 +23,29 @@ Region semantics (corrected):
 Scaling-law anchors are the canonical one-shot joint fit from
 results/chinchilla_fit_dolma/writeup_final.md (k=15, all 7 sizes).
 """
+import glob
 import os
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 from matplotlib.ticker import FuncFormatter
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
 
 sys.path.insert(0, os.path.dirname(__file__))
+
+
+# Palatino Linotype (bundled in results/fonts/) — matches isoloss_contour styling.
+_FONT_DIR = os.path.join(os.path.dirname(__file__), 'fonts')
+for _f in glob.glob(os.path.join(_FONT_DIR, 'palatinolinotype_*.ttf')):
+    font_manager.fontManager.addfont(_f)
+plt.rcParams.update({
+    'font.family':      'serif',
+    'font.serif':       ['Palatino Linotype', 'P052', 'Palatino', 'serif'],
+    'mathtext.fontset': 'cm',
+})
 
 
 # === Scaling-law parameters (writeup_final.md, one-shot joint fit, k=15) ===
@@ -80,14 +93,14 @@ def L_iso_x(D, x, N):
 # === Visual constants ===
 # Match the typography of results/isoloss_contour.py so both figures look
 # consistent in the same paper.
-FONT_LABEL  = 26
-FONT_LEGEND = 20
-FONT_TICK   = 22
-FONT_ANNOT  = 22
-FONT_REGION = 22
-FONT_TITLE  = 28
-FONT_CBAR_LABEL = 24
-FONT_CBAR_TICK  = 20
+FONT_LABEL  = 30
+FONT_LEGEND = 24
+FONT_TICK   = 26
+FONT_ANNOT  = 28
+FONT_REGION = 28
+FONT_TITLE  = 30
+FONT_CBAR_LABEL = 26
+FONT_CBAR_TICK  = 22
 
 CMAP = LinearSegmentedColormap.from_list(
     'compute',
@@ -135,12 +148,18 @@ def _fmt_d(v):
     return f'{v:g}'
 
 
+def actual_flops(flops_multiplier, N):
+    """FLOPs = 6·N·D_total = 120·N²·flops_multiplier (since C* = 120 N²)."""
+    return np.asarray(flops_multiplier) * 120.0 * N ** 2
+
+
 def joint_flops_norm(sizes):
+    """Norm over log2(actual FLOPs) across all panels' data."""
     all_f = []
-    for model_size, _ in sizes:
+    for model_size, N in sizes:
         md = __import__(model_size)
         _, _, f = _collect(md.ALL_DATASETS)
-        all_f.append(f)
+        all_f.append(actual_flops(f, N))
     af = np.concatenate(all_f)
     return plt.Normalize(vmin=np.log2(af.min()), vmax=np.log2(af.max()))
 
@@ -151,117 +170,134 @@ def _render_panel_a(ax, model_size, N, norm):
     md = __import__(model_size)
     chin, loss, flops = _collect(md.ALL_DATASETS)
 
-    sc = ax.scatter(chin * 20 * N, loss,
-                    c=np.log2(flops), cmap=CMAP, norm=norm,
+    sc = ax.scatter(chin * 20.0, loss,
+                    c=np.log2(actual_flops(flops, N)), cmap=CMAP, norm=norm,
                     s=85, edgecolors='black', linewidths=1.0, zorder=10,
                     label='Models trained')
 
-    XLEFT  = min(chin) * 20 * N * 0.5
-    XRIGHT = 1.4e10                         # cap at 14B tokens
+    # X axis is TTP (= D/N) so it lines up with the small-multiples panels.
+    XLEFT_TTP  = min(chin) * 20.0 * 0.5
+    XRIGHT_TTP = 500.0
     e_eff  = E_eff(N)
     FLOOR  = e_eff - 0.45
     Y_TOP  = max(loss.max() + 0.6, 9.0)
 
-    xi      = np.geomspace(XLEFT, XRIGHT, 500)
-    l1ep_xi = L_1ep(xi, N)
-    lme_xi  = L_inf_epochs(xi, N)
+    ttp_grid = np.geomspace(XLEFT_TTP, XRIGHT_TTP, 500)
+    D_grid   = ttp_grid * N
+    l1ep_xi  = L_1ep(D_grid, N)
+    lme_xi   = L_inf_epochs(D_grid, N)
 
     # Region fills.
-    ax.fill_between(xi, lme_xi, l1ep_xi, where=l1ep_xi > lme_xi,
+    ax.fill_between(ttp_grid, lme_xi, l1ep_xi, where=l1ep_xi > lme_xi,
                     color=COLOR_COMPUTE_REGION, alpha=ALPHA_COMPUTE, zorder=2,
                     label='Compute-bound')
-    ax.fill_between(xi, e_eff, lme_xi, where=lme_xi > e_eff,
+    ax.fill_between(ttp_grid, e_eff, lme_xi, where=lme_xi > e_eff,
                     color=COLOR_DATA_REGION, alpha=ALPHA_DATA, zorder=3,
                     label='Data-bound')
-    ax.fill_between([XLEFT, XRIGHT], FLOOR, e_eff,
+    ax.fill_between([XLEFT_TTP, XRIGHT_TTP], FLOOR, e_eff,
                     color=COLOR_MODEL_REGION, alpha=ALPHA_MODEL, zorder=1,
                     label='Model-bound')
 
     # 1-epoch fit + iso-D'/D dashed curves coloured by FLOPs + multi-epoch fit.
-    ax.plot(xi, l1ep_xi, linestyle='-', color=COLOR_FIT_1EP,
+    ax.plot(ttp_grid, l1ep_xi, linestyle='-', color=COLOR_FIT_1EP,
             linewidth=3.0, alpha=0.95, zorder=12,
             label=r"CD-law: $D'/D = 0$")
     for x in ISO_X_VALUES:
-        L_xi = L_iso_x(xi, x, N)
-        flops_xi = (xi / (20 * N)) * (1.0 + x)
-        log2_flops = np.log2(flops_xi)
-        pts = np.array([xi, L_xi]).T.reshape(-1, 1, 2)
+        L_xi = L_iso_x(D_grid, x, N)
+        flops_mult_xi = (ttp_grid / 20.0) * (1.0 + x)
+        log2_flops = np.log2(actual_flops(flops_mult_xi, N))
+        pts = np.array([ttp_grid, L_xi]).T.reshape(-1, 1, 2)
         segs = np.concatenate([pts[:-1], pts[1:]], axis=1)
         lc = LineCollection(segs, cmap=CMAP, norm=norm,
                             linestyles='dashed', linewidths=1.6,
                             alpha=0.95, zorder=11)
         lc.set_array(0.5 * (log2_flops[:-1] + log2_flops[1:]))
         ax.add_collection(lc)
-    ax.plot(xi, lme_xi, linestyle='-', color=COLOR_FIT_MEINF,
+    ax.plot(ttp_grid, lme_xi, linestyle='-', color=COLOR_FIT_MEINF,
             linewidth=3.0, alpha=0.95, zorder=12,
             label=r"CD-law: $D'/D \to \infty$")
     ax.axhline(e_eff, linestyle='-', color=COLOR_IRREDUCIBLE,
                linewidth=3.0, alpha=0.95, zorder=12,
-               label=r"CD-law: $D' \to \infty,\ D \to \infty$")
+               label=r"CD-law: $D \to \infty$")
 
-    ax.set_xlabel('Fresh Data Size,  D (tokens)',
+    ax.set_xlabel('TTP (D/N)',
                   fontsize=FONT_LABEL, fontweight='bold')
     ax.set_ylabel('Validation Loss',
                   fontsize=FONT_LABEL, fontweight='bold')
     ax.set_xscale('log', base=10)
-    ax.set_xlim(XLEFT, XRIGHT)
+    ax.set_xlim(XLEFT_TTP, XRIGHT_TTP)
     ax.set_ylim(FLOOR, Y_TOP)
     ax.tick_params(axis='both', labelsize=FONT_TICK)
-    ax.set_xticks([1e8, 3e8, 1e9, 3e9, 1e10])
-    ax.xaxis.set_major_formatter(FuncFormatter(lambda v, p: _fmt_d(v)))
+    ax.set_xticks([1, 10, 100])
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda v, p: f'{v:g}'))
     ax.xaxis.set_minor_formatter(plt.NullFormatter())
     ax.grid(True, alpha=0.2, linewidth=0.5)
 
     # === In-region text labels ===
-    # Compute-bound: text in the white region just above the 1-epoch fit.
-    x_cb_text = 3.0e9
-    y_cb_text = float(L_1ep(x_cb_text, N)) + 0.55
-    ax.text(x_cb_text, y_cb_text, 'Compute-bound',
-            fontsize=FONT_REGION, ha='center', va='bottom',
-            color=COLOR_COMPUTE_DARK, fontstyle='italic', fontweight='bold',
-            zorder=15)
+    # Compute-bound: blue guideline arrow from the text down into the
+    # compute-bound (blue) band, mirroring the "add fresh data" treatment.
+    ttp_cb_text = 80.0
+    y_cb_text   = float(L_1ep(ttp_cb_text * N, N)) + 1.10
+    ttp_cb_tip  = 20.0
+    y_cb_tip    = 0.5 * (float(L_1ep(ttp_cb_tip * N, N))
+                         + float(L_inf_epochs(ttp_cb_tip * N, N)))
+    ax.annotate('Compute-bound',
+                xy=(ttp_cb_tip, y_cb_tip),
+                xytext=(ttp_cb_text, y_cb_text),
+                fontsize=FONT_REGION, ha='center', va='bottom',
+                color=COLOR_COMPUTE_DARK, fontstyle='italic', fontweight='bold',
+                arrowprops=dict(arrowstyle='-|>', color=COLOR_COMPUTE_DARK,
+                                lw=2.5, mutation_scale=24,
+                                shrinkA=4, shrinkB=2,
+                                connectionstyle='arc3,rad=0.25'),
+                zorder=15)
 
     # Data-bound: in the sage band, where it's still wide (low/mid D).
-    x_db = 1.0e9
-    y_db = (float(L_inf_epochs(x_db, N)) + e_eff) / 2
-    ax.text(x_db, y_db, 'Data-bound',
+    ttp_db = 33.0
+    y_db = (float(L_inf_epochs(ttp_db * N, N)) + e_eff) / 2
+    ax.text(ttp_db, y_db, 'Data-bound',
             fontsize=FONT_REGION, ha='center', va='center',
             color=COLOR_DATA_DARK, fontstyle='italic', fontweight='bold',
             zorder=15)
 
     # Model-bound: below the irreducible-loss line.
-    ax.text(np.sqrt(XLEFT * XRIGHT), e_eff - 0.18,
-            'Model-bound  (need larger N)',
+    ax.text(np.sqrt(XLEFT_TTP * XRIGHT_TTP), e_eff - 0.18,
+            'Model-bound',
             fontsize=FONT_REGION, ha='center', va='top',
             color=COLOR_MODEL_DARK, fontstyle='italic', fontweight='bold',
             zorder=15)
 
     # === Action arrows ===
-    # "add compute": vertical arrow inside the compute-bound region.
-    arrow_x = 0.25 * 20 * N
-    y_top = float(L_1ep(arrow_x, N)) - 0.15
-    y_bot = float(L_inf_epochs(arrow_x, N)) + 0.20
-    ax.annotate('', xy=(arrow_x, y_bot), xytext=(arrow_x, y_top),
+    # "add compute": vertical arrow inside the compute-bound region. Shifted
+    # to the left so the arrowhead/text don't overlap the data scatter cluster.
+    arrow_ttp = 2.5
+    y_top = float(L_1ep(arrow_ttp * N, N)) - 0.15
+    y_bot = float(L_inf_epochs(arrow_ttp * N, N)) + 0.20
+    ax.annotate('', xy=(arrow_ttp, y_bot), xytext=(arrow_ttp, y_top),
                 arrowprops=dict(arrowstyle='-|>', color=COLOR_ARROW, lw=3.0,
                                 mutation_scale=28),
                 zorder=15)
-    ax.text(arrow_x * 1.20, (y_top + y_bot) / 2,
-            'add compute\n(more epochs)',
+    ax.text(arrow_ttp * 1.20, (y_top + y_bot) / 2,
+            'add compute',
             fontsize=FONT_ANNOT, ha='left', va='center',
             color=COLOR_TEXT, fontweight='bold', zorder=15)
 
-    # "add fresh data": arrow along the multi-epoch limit on the far left,
-    # text well below the curve, dark crimson.
-    x_a, x_b = 0.08 * 20 * N, 0.5 * 20 * N
-    y_a, y_b = float(L_inf_epochs(x_a, N)), float(L_inf_epochs(x_b, N))
-    ax.annotate('', xy=(x_b, y_b), xytext=(x_a, y_a),
+    # "add fresh data": red guideline arrow from the text up to a point on
+    # the multi-epoch (red) curve, so it's visually anchored to that line.
+    ttp_text = 1.0
+    y_text   = float(L_inf_epochs(ttp_text * N, N)) - 1.10
+    ttp_tip  = 5.0
+    y_tip    = float(L_inf_epochs(ttp_tip * N, N))
+    ax.annotate('add fresh data',
+                xy=(ttp_tip, y_tip),
+                xytext=(ttp_text, y_text),
+                fontsize=FONT_ANNOT, ha='left', va='top',
+                color=COLOR_DATA_HIGHLIGHT, fontweight='bold',
                 arrowprops=dict(arrowstyle='-|>', color=COLOR_DATA_HIGHLIGHT,
-                                lw=3.0, mutation_scale=28),
+                                lw=2.5, mutation_scale=24,
+                                shrinkA=4, shrinkB=2,
+                                connectionstyle='arc3,rad=-0.25'),
                 zorder=15)
-    ax.text(x_a * 1.05, y_a - 1.00,
-            'add fresh data',
-            fontsize=FONT_ANNOT, ha='left', va='top',
-            color=COLOR_DATA_HIGHLIGHT, fontweight='bold', zorder=15)
 
     return sc
 
@@ -277,7 +313,7 @@ def _render_panel_b(ax, model_size, N, norm, ttp_range, y_range):
     e_eff = E_eff(N)
 
     sc = ax.scatter(chin * 20.0, loss,
-                    c=np.log2(flops), cmap=CMAP, norm=norm,
+                    c=np.log2(actual_flops(flops, N)), cmap=CMAP, norm=norm,
                     s=45, edgecolors='black', linewidths=0.6, zorder=10,
                     label='Models trained')
 
@@ -304,7 +340,7 @@ def _render_panel_b(ax, model_size, N, norm, ttp_range, y_range):
             label=r"CD-law: $D'/D \to \infty$")
     ax.axhline(e_eff, linestyle='-', color=COLOR_IRREDUCIBLE,
                linewidth=2.3, alpha=0.95, zorder=12,
-               label=r"CD-law: $D' \to \infty,\ D \to \infty$")
+               label=r"CD-law: $D \to \infty$")
 
     ax.set_xscale('log', base=10)
     ax.set_xlim(XLEFT_TTP, XRIGHT_TTP)
@@ -373,14 +409,17 @@ def plot_combined():
     axes['B190'].set_xlabel('TTP', fontsize=FONT_LABEL, fontweight='bold')
     axes['B370'].set_xlabel('TTP', fontsize=FONT_LABEL, fontweight='bold')
 
-    # Single shared FLOPs colorbar on the right.
+    # Single shared FLOPs colorbar on the right (actual FLOPs = 6·N·D_total).
+    # Pick decade ticks that fall inside the joint norm range so the bar fills.
     cbar = fig.colorbar(sc, cax=axes['cb'])
-    cbar.set_label('FLOPs (Chinchilla Optimal = 1X)',
+    cbar.set_label('FLOPs',
                    fontsize=FONT_CBAR_LABEL, fontweight='bold')
     cbar.ax.tick_params(labelsize=FONT_CBAR_TICK)
-    flops_ticks = [0.05, 0.5, 1, 8, 64, 1024]
-    cbar.set_ticks([np.log2(v) for v in flops_ticks])
-    cbar.set_ticklabels([f'{v:g}' for v in flops_ticks])
+    decade_min = int(np.ceil(norm.vmin / np.log2(10)))
+    decade_max = int(np.floor(norm.vmax / np.log2(10)))
+    decades = list(range(decade_min, decade_max + 1))
+    cbar.set_ticks([d * np.log2(10) for d in decades])
+    cbar.set_ticklabels([rf'$10^{{{d}}}$' for d in decades])
 
     # === Single combined legend at the bottom of the figure ===
     handles, labels = axes['A'].get_legend_handles_labels()
@@ -394,11 +433,11 @@ def plot_combined():
     all_keys = ['CD-Scaling Law Prediction',
                 r"CD-law: $D'/D = 0$",
                 r"CD-law: $D'/D \to \infty$",
-                r"CD-law: $D' \to \infty,\ D \to \infty$",
+                r"CD-law: $D \to \infty$",
                 'Models trained',
                 'Compute-bound', 'Data-bound', 'Model-bound']
     leg = fig.legend([handles_map[k] for k in all_keys], all_keys,
-                     loc='lower center', bbox_to_anchor=(0.5, -0.04),
+                     loc='lower center', bbox_to_anchor=(0.5, 0.02),
                      ncol=4, frameon=False,
                      fontsize=FONT_LEGEND)
     # Style the "CD-Scaling Law Prediction" entry as a blue, bold header.

@@ -1,0 +1,98 @@
+[
+  {
+    "size": "100M",
+    "chinchilla_scale": 0.25,
+    "epoch": 1,
+    "lr": 0.001,
+    "wd": 0.1,
+    "validation_loss": 5.850162242460691,
+    "run_name": "100M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3",
+    "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/100M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3/step239",
+    "step": 239,
+    "manifest_id": "100M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3_step239"
+  },
+  {
+    "size": "100M",
+    "chinchilla_scale": 1.0,
+    "epoch": 1,
+    "lr": 0.003,
+    "wd": 0.1,
+    "validation_loss": 3.972287410915858,
+    "run_name": "100M_seed42_case4_dolma_epoch1_wd0.1_lr3e-3",
+    "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_1/100M_seed42_case4_dolma_epoch1_wd0.1_lr3e-3/step954",
+    "step": 954,
+    "manifest_id": "100M_seed42_case4_dolma_epoch1_wd0.1_lr3e-3_step954"
+  },
+  {
+    "size": "14M",
+    "chinchilla_scale": 0.5,
+    "epoch": 16,
+    "lr": 0.003,
+    "wd": 0.1,
+    "validation_loss": 4.796749454290444,
+    "run_name": "14M_seed42_case4_dolma_epoch16_wd0.1_lr3e-3",
+    "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/14M_seed42_case4_dolma_epoch16_wd0.1_lr3e-3/step1069",
+    "step": 1069,
+    "manifest_id": "14M_seed42_case4_dolma_epoch16_wd0.1_lr3e-3_step1069"
+  },
+  {
+    "size": "14M",
+    "chinchilla_scale": 2.0,
+    "epoch": 1,
+    "lr": 0.003,
+    "wd": 0.1,
+    "validation_loss": 6.00818412051068,
+    "run_name": "14M_seed42_case4_dolma_epoch1_wd0.1_lr3e-3",
+    "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_2/14M_seed42_case4_dolma_epoch1_wd0.1_lr3e-3/step268",
+    "step": 268,
+    "manifest_id": "14M_seed42_case4_dolma_epoch1_wd0.1_lr3e-3_step268"
+  },
+  {
+    "size": "600M",
+    "chinchilla_scale": 0.1,
+    "epoch": 1,
+    "lr": 0.001,
+    "wd": 0.1,
+    "validation_loss": 4.160401299776911,
+    "run_name": "600M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3",
+    "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.1/600M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3/step573",
+    "step": 573,
+    "manifest_id": "600M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3_step573"
+  },
+  {
+    "size": "600M",
+    "chinchilla_scale": 0.5,
+    "epoch": 1,
+    "lr": 0.003,
+    "wd": 0.1,
+    "validation_loss": 2.9226725056487965,
+    "run_name": "600M_seed42_case4_dolma_epoch1_wd0.1_lr3e-3",
+    "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/600M_seed42_case4_dolma_epoch1_wd0.1_lr3e-3/step2862",
+    "step": 2862,
+    "manifest_id": "600M_seed42_case4_dolma_epoch1_wd0.1_lr3e-3_step2862"
+  },
+  {
+    "size": "60M",
+    "chinchilla_scale": 0.25,
+    "epoch": 16,
+    "lr": 0.001,
+    "wd": 0.2,
+    "validation_loss": 3.7426802755653394,
+    "run_name": "60M_seed42_case4_dolma_epoch16_wd0.2_lr1e-3",
+    "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/60M_seed42_case4_dolma_epoch16_wd0.2_lr1e-3/step2289",
+    "step": 2289,
+    "manifest_id": "60M_seed42_case4_dolma_epoch16_wd0.2_lr1e-3_step2289"
+  },
+  {
+    "size": "60M",
+    "chinchilla_scale": 1.0,
+    "epoch": 1,
+    "lr": 0.001,
+    "wd": 0.1,
+    "validation_loss": 4.905882357116658,
+    "run_name": "60M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3",
+    "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_1/60M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3/step573",
+    "step": 573,
+    "manifest_id": "60M_seed42_case4_dolma_epoch1_wd0.1_lr1e-3_step573"
+  }
+]

@@ -27,9 +27,13 @@ TASK_YAML_DIR = Path(__file__).parent
 EVAL_TASKS = "syn_pt_eval"
 
 MODEL_CONFIG_MAP = {
+    "14M": "olmo3_14M",
     "30M": "olmo3_30M",
     "60M": "olmo3_60M",
+    "100M": "olmo3_100M",
+    "190M": "olmo3_190M",
     "370M": "olmo3_370M",
+    "600M": "olmo3_600M",
 }
 
 
@@ -59,17 +63,17 @@ def get_all_checkpoints():
     return checkpoints
 
 
-def convert_checkpoint(checkpoint_path: Path, output_dir: Path) -> Path:
+def convert_checkpoint(checkpoint_path: Path, output_dir: Path, hf_name: str = None) -> Path:
     """Convert a single OLMo-core checkpoint to HuggingFace format."""
-    model_name = checkpoint_path.parent.name
-    step_name = checkpoint_path.name
-    hf_path = output_dir / f"{model_name}_{step_name}_hf"
+    if hf_name is None:
+        hf_name = f"{checkpoint_path.parent.name}_{checkpoint_path.name}_hf"
+    hf_path = output_dir / hf_name
 
     if (hf_path / "config.json").exists():
         print(f"  [skip] HF checkpoint already exists: {hf_path}")
         return hf_path
 
-    print(f"  Converting {model_name}/{step_name} -> {hf_path}")
+    print(f"  Converting {checkpoint_path} -> {hf_path}")
 
     tokenizer_config = TokenizerConfig.dolma2()
     model_size = detect_model_size(checkpoint_path)
@@ -162,10 +166,21 @@ def run_eval(hf_path: Path, run_name: str, limit: int = None, output_dir: Path =
     return True
 
 
+def load_manifest(manifest_path: Path, worker_id: int = 0, num_workers: int = 1):
+    """Load manifest entries, optionally sliced for a slurm array worker."""
+    with open(manifest_path) as f:
+        entries = json.load(f)
+    sliced = [e for i, e in enumerate(entries) if i % num_workers == worker_id]
+    return sliced
+
+
 def main():
     parser = argparse.ArgumentParser(description="Convert OLMo checkpoints and run lm_eval")
     parser.add_argument("--checkpoint", type=str, help="Path to a single checkpoint (e.g. shared/model/stepN)")
     parser.add_argument("--all", action="store_true", help="Run on all checkpoints in SHARED")
+    parser.add_argument("--manifest", type=str, help="Path to JSON manifest produced by build_manifest.py")
+    parser.add_argument("--worker-id", type=int, default=0, help="Slurm array worker index (manifest mode)")
+    parser.add_argument("--num-workers", type=int, default=1, help="Total slurm array workers (manifest mode)")
     parser.add_argument("--output-dir", type=str, default="/tmp/hf_models", help="Where to save HF checkpoints")
     parser.add_argument("--results-dir", type=str, default=None, help="Where to save eval results")
     parser.add_argument("--limit", type=int, default=None, help="Limit samples per task (for testing)")
@@ -176,23 +191,27 @@ def main():
     output_dir = Path(args.output_dir)
     results_dir = Path(args.results_dir) if args.results_dir else TASK_YAML_DIR / "results"
 
-    if args.all:
-        checkpoints = get_all_checkpoints()
+    # entries is list of (checkpoint_path, run_name) pairs
+    if args.manifest:
+        manifest_entries = load_manifest(Path(args.manifest), args.worker_id, args.num_workers)
+        entries = [(Path(e["checkpoint_path"]), e["manifest_id"]) for e in manifest_entries]
+        print(f"Manifest mode: worker {args.worker_id}/{args.num_workers} -> {len(entries)} checkpoint(s)")
+    elif args.all:
+        ckpts = get_all_checkpoints()
+        entries = [(c, f"{c.parent.name}_{c.name}") for c in ckpts]
     elif args.checkpoint:
-        checkpoints = [Path(args.checkpoint)]
+        c = Path(args.checkpoint)
+        entries = [(c, f"{c.parent.name}_{c.name}")]
     else:
-        parser.error("Specify --checkpoint or --all")
+        parser.error("Specify --checkpoint, --all, or --manifest")
 
-    print(f"Found {len(checkpoints)} checkpoint(s)")
+    print(f"Found {len(entries)} checkpoint(s)")
 
-    for ckpt in checkpoints:
-        model_name = ckpt.parent.name
-        step_name = ckpt.name
-        run_name = f"{model_name}_{step_name}"
+    for ckpt, run_name in entries:
         hf_path = output_dir / f"{run_name}_hf"
 
         if not args.eval_only:
-            hf_path = convert_checkpoint(ckpt, output_dir)
+            hf_path = convert_checkpoint(ckpt, output_dir, hf_name=f"{run_name}_hf")
 
         if not args.convert_only:
             run_eval(hf_path, run_name, limit=args.limit, output_dir=results_dir)

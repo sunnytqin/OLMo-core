@@ -72,6 +72,46 @@ data_8x = {
     'weight_decay': [0.2],
 }
 
+data_0_05x_para = {
+    'chinchilla_scale': [0.05, 0.05, 0.05, 0.05, 0.05, 0.05],
+    'K': [1, 2, 4, 8, 16, 32],
+    'tokens_trained': [483944386, 607413209, 851040456, 1334907447, 2322537946, 4166006910],
+    'flops_multiplier': [0.0654, 0.0821, 0.115, 0.1804, 0.3139, 0.563],
+    'validation_loss': [6.056, 5.768, 5.2947, 4.2886, 3.7609, 3.3389],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.2, 0.1, 0.1, 0.1, 0.1, 0.1],
+}
+
+data_0_1x_para = {
+    'chinchilla_scale': [0.1, 0.1, 0.1, 0.1, 0.1],
+    'K': [1, 2, 4, 8, 16],
+    'tokens_trained': [968029964, 1215160023, 1703151354, 2670192619, 4650806361],
+    'flops_multiplier': [0.1308, 0.1642, 0.2302, 0.3608, 0.6285],
+    'validation_loss': [4.9194, 4.4847, 3.9688, 3.5881, 3.2884],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.2, 0.1, 0.1, 0.1, 0.1],
+}
+
+data_0_5x_para = {
+    'chinchilla_scale': [0.5, 0.5, 0.5, 0.5, 0.5],
+    'K': [1, 2, 4, 8, 16],
+    'tokens_trained': [4840489570, 6076056272, 8525356437, 13378912780, 23317234568],
+    'flops_multiplier': [0.6541, 0.8211, 1.1521, 1.808, 3.151],
+    'validation_loss': [3.1342, 3.0855, 3.0187, 2.9176, 2.8309],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.1, 0.1, 0.1, 0.1, 0.1],
+}
+
+data_1x_para = {
+    'chinchilla_scale': [1, 1, 1, 1],
+    'K': [1, 2, 4, 8],
+    'tokens_trained': [9670419295, 12131079742, 17009424061, 26679032762],
+    'flops_multiplier': [1.3068, 1.6393, 2.2986, 3.6053],
+    'validation_loss': [2.903, 2.8626, 2.838, 2.7853],
+    'learning_rate': [3e-3, 3e-3, 3e-3, 3e-3],
+    'weight_decay': [0.2, 0.1, 0.1, 0.1],
+}
+
 ALL_DATASETS = [
     data_0_05x,
     data_0_1x,
@@ -83,4 +123,11 @@ ALL_DATASETS = [
     data_8x,
 ]
 
-parap_datasets = None
+parap_datasets = [
+    data_0_05x_para,
+    data_0_1x_para,
+    data_0_5x_para,
+    data_1x_para,
+]
+
+selfdistill_datasets = None

@@ -43,6 +43,7 @@ B_JOINT, BETA_JOINT = 16_539.0, 0.436
 
 # Discrete grids present in the data
 DoN_VALUES = (0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 40.0, 80.0, 160.0, 320.0)
+DoN_LEGEND_VALUES = (1.0, 5.0, 20.0, 80.0, 320.0)   # subset shown in panel (b) legend
 DpD_VALUES = (1.0, 3.0, 7.0, 15.0, 31.0, 63.0)
 SCALE_PANEL3 = 2.0
 SCALE_TOL = 0.05
@@ -62,13 +63,14 @@ plt.rcParams.update({
     'font.family':       'serif',
     'font.serif':        ['P052', 'Palatino', 'TeX Gyre Pagella', 'serif'],
     'mathtext.fontset':  'cm',
-    'font.size':         12,
-    'axes.titlesize':    13,
-    'axes.labelsize':    13,
-    'xtick.labelsize':   11,
-    'ytick.labelsize':   11,
-    'legend.fontsize':   9,
-    'lines.linewidth':   1.8,
+    'font.size':         26,
+    'axes.titlesize':    30,
+    'axes.labelsize':    30,
+    'xtick.labelsize':   24,
+    'ytick.labelsize':   24,
+    'legend.fontsize':   22,
+    'legend.title_fontsize': 24,
+    'lines.linewidth':   3.5,
     'axes.grid':         True,
     'grid.alpha':        0.25,
     'grid.linestyle':    '-',
@@ -133,22 +135,22 @@ def panel_30m_vs_DoverN(ax, N, DoN, DpD, eta, fit):
     for v in DpD_VALUES:
         y = R * (1.0 - np.exp(-v / R)) / v
         ax.plot(DoN_grid, y, '-', color=DpD_CMAP(DpD_NORM(v)),
-                linewidth=2.0, alpha=0.95, zorder=2)
+                linewidth=4.0, alpha=0.95, zorder=2)
 
     valid = ~np.isnan(eta) & (eta >= 0) & (DoN > 1.0)
     for v in DpD_VALUES:
         m = valid & (np.abs(DpD - v) <= 0.01)
         if not m.any():
             continue
-        ax.scatter(DoN[m], eta[m], s=44, color=DpD_CMAP(DpD_NORM(v)),
-                   edgecolors='k', linewidths=0.4, alpha=0.95, zorder=3,
-                   label=rf"$D'/D = {v:g}$")
-    ax.axhline(1.0, color='gray', linestyle=':', linewidth=1, zorder=1)
+        ax.scatter(DoN[m], eta[m], s=140, color=DpD_CMAP(DpD_NORM(v)),
+                   edgecolors='k', linewidths=0.8, alpha=0.95, zorder=3,
+                   label=rf"$r = {v:g}$")
+    ax.axhline(1.0, color='gray', linestyle=':', linewidth=1.8, zorder=1)
     ax.set_xscale('log'); ax.set_yscale('log')
-    ax.set_xlabel(r"data scale $D/N$")
-    ax.set_ylabel(r"$\eta$")
-    ax.set_title(rf"(a) 30M: $\eta$ vs $D/N$")
-    ax.legend(title=r"$D'/D$", loc="lower left", ncol=2,
+    ax.set_xlabel(r"$\mathrm{TTP} = D/N$")
+    ax.set_ylabel(r"$\eta$", fontsize=48)
+    ax.set_title(rf"(a) 30M: $\eta$ vs $\mathrm{{TTP}}$")
+    ax.legend(title=r"$r = D'/D$", loc="lower left", ncol=2,
               columnspacing=0.8, handletextpad=0.3)
 
 
@@ -158,23 +160,24 @@ def panel_30m_vs_DpoverD(ax, N, DoN, DpD, eta, fit):
     for v in DoN_VALUES:
         R = Rstar_30M(v * N, N, log_K_eff, rho)
         y = R * (1.0 - np.exp(-DpD_grid / R)) / DpD_grid
+        lbl = (rf"$\mathrm{{TTP}} = {v:g}$"
+               if v in DoN_LEGEND_VALUES else None)
         ax.plot(DpD_grid, y, '-', color=DoN_CMAP(DoN_NORM(v)),
-                linewidth=2.0, alpha=0.95, zorder=2,
-                label=rf"$D/N = {v:g}$")
+                linewidth=4.0, alpha=0.95, zorder=2, label=lbl)
 
     valid = ~np.isnan(eta) & (eta >= 0) & (DoN > 1.0)
     for v in DoN_VALUES:
         m = valid & (np.abs(DoN - v) <= 0.01 * v)
         if not m.any():
             continue
-        ax.scatter(DpD[m], eta[m], s=44, color=DoN_CMAP(DoN_NORM(v)),
-                   edgecolors='k', linewidths=0.4, alpha=0.95, zorder=3)
-    ax.axhline(1.0, color='gray', linestyle=':', linewidth=1, zorder=1)
+        ax.scatter(DpD[m], eta[m], s=140, color=DoN_CMAP(DoN_NORM(v)),
+                   edgecolors='k', linewidths=0.8, alpha=0.95, zorder=3)
+    ax.axhline(1.0, color='gray', linestyle=':', linewidth=1.8, zorder=1)
     ax.set_xscale('log'); ax.set_yscale('log')
-    ax.set_xlabel(r"$D'/D$")
-    ax.set_ylabel(r"$\eta$")
-    ax.set_title(rf"(b) 30M: $\eta$ vs $D'/D$")
-    ax.legend(title=r"$D/N$", loc="lower left", ncol=2,
+    ax.set_xlabel(r"$r = D'/D$")
+    ax.set_ylabel(r"$\eta$", fontsize=48)
+    ax.set_title(rf"(b) 30M: $\eta$ vs $r$")
+    ax.legend(title=r"$\mathrm{TTP} = D/N$", loc="lower left", ncol=2,
               columnspacing=0.8, handletextpad=0.3)
 
 
@@ -197,25 +200,24 @@ def panel_multiN_at_2x(ax, scale=SCALE_PANEL3):
         D = scale * TTP_RATIO * N
         R = Rstar_KN(D, N)
         y = R * (1.0 - np.exp(-DpD_grid / R))   # = η · D'/D
-        ax.plot(DpD_grid, y, '-', color=colors[tag], linewidth=2.0,
+        ax.plot(DpD_grid, y, '-', color=colors[tag], linewidth=4.0,
                 label=f"{tag}  $R^*$={R:.1f}")
-        ax.axhline(R, color=colors[tag], linestyle=':', linewidth=1.0,
-                   alpha=0.5)
+        ax.axhline(R, color=colors[tag], linestyle=':', linewidth=2.0,
+                   alpha=0.6)
 
     for tag in sizes_plot:
         m = (tags == tag) & valid
         if not m.any():
             continue
         DpD_emp = Dps[m] / Ds[m]
-        ax.scatter(DpD_emp, eta_pp[m] * DpD_emp, s=40, color=colors[tag],
-                   edgecolors='k', linewidths=0.4, alpha=0.9, zorder=3)
+        ax.scatter(DpD_emp, eta_pp[m] * DpD_emp, s=130, color=colors[tag],
+                   edgecolors='k', linewidths=0.8, alpha=0.9, zorder=3)
 
     ax.set_xscale('log'); ax.set_yscale('log')
-    ax.set_xlabel(r"$D'/D$")
-    ax.set_ylabel(r"$\eta \cdot D'/D$")
-    ax.set_title(rf"(c) multi-$N$ at ${scale}\times$:  "
-                 rf"dotted = $R^*$ asymptote")
-    ax.legend(loc='lower right')
+    ax.set_xlabel(r"$r = D'/D$")
+    ax.set_ylabel(r"$\eta \cdot D'/D$", fontsize=38)
+    ax.set_title(rf"(c) $\mathrm{{TTP}}={scale:g}$, across $N$ scales")
+    ax.legend(loc='lower right', title=r"$N$ (params)")
 
 
 if __name__ == "__main__":
@@ -223,7 +225,7 @@ if __name__ == "__main__":
     print(f"30M refit: log K_eff={fit['params']['log_K_eff']:.3f}, "
           f"ρ={fit['params']['rho']:.3f}")
 
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5.0))
+    fig, axes = plt.subplots(1, 3, figsize=(28, 8.5))
     panel_30m_vs_DoverN(axes[0], N, DoN, DpD, eta, fit)
     panel_30m_vs_DpoverD(axes[1], N, DoN, DpD, eta, fit)
     panel_multiN_at_2x(axes[2])

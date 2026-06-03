@@ -1,12 +1,26 @@
+import glob
 import importlib
+import os
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 from scipy.interpolate import griddata, RegularGridInterpolator, RBFInterpolator
 from scipy.integrate import solve_ivp
 from scipy.ndimage import gaussian_filter
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from matplotlib.patches import Polygon
+
+
+# Palatino Linotype (bundled in results/fonts/) — matches figure_1 styling.
+_FONT_DIR = os.path.join(os.path.dirname(__file__), 'fonts')
+for _f in glob.glob(os.path.join(_FONT_DIR, 'palatinolinotype_*.ttf')):
+    font_manager.fontManager.addfont(_f)
+plt.rcParams.update({
+    'font.family':      'serif',
+    'font.serif':       ['Palatino Linotype', 'P052', 'Palatino', 'serif'],
+    'mathtext.fontset': 'cm',
+})
 
 
 # Reversed gist_heat: bright (cream/yellow) at low loss, dark (red/black) at
@@ -236,14 +250,12 @@ def create_contour_plot(ax, x_data, y_data, z_data, x_label, x_ticks, x_ticklabe
 
     # Set axis labels and title
     ax.set_xlabel(x_label, fontsize=font_label, fontweight='bold')
-    ax.set_ylabel('Fresh Data D (TTP, Chinchilla x)', fontsize=font_label, fontweight='bold')
+    ax.set_ylabel('Fresh Data D (TTP, D/N)', fontsize=font_label, fontweight='bold')
 
-    # Customize tick labels for y-axis (TTP = chinchilla_scale * 20)
+    # y axis is internally chinchilla_scale; TTP = 20 · chinchilla_scale.
     y_ticks = [0.05, 0.1, 0.25, 0.5, 1, 2, 4, 8, 16]
     ax.set_yticks(y_ticks)
-    ax.set_yticklabels(['D=1N\n(0.05x)', 'D=2N\n(0.1x)', 'D=5N\n(0.25x)', 'D=10N\n(0.5x)',
-                        'D=20N\n(1x)', 'D=40N\n(2x)', 'D=80N\n(4x)', 'D=160N\n(8x)',
-                        'D=320N\n(16x)'],
+    ax.set_yticklabels(['1', '2', '5', '10', '20', '40', '80', '160', '320'],
                        fontsize=font_tick)
 
     # Customize tick labels for x-axis
@@ -472,14 +484,12 @@ def create_prediction_contour_plot(ax, N, x_lim, x_ticks, x_ticklabels, x_label,
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.set_xlabel(x_label, fontsize=font_label, fontweight='bold')
-    ax.set_ylabel('Fresh Data D (TTP, Chinchilla x)',
+    ax.set_ylabel('Fresh Data D (TTP, D/N)',
                   fontsize=font_label, fontweight='bold')
 
     y_ticks = [0.05, 0.1, 0.25, 0.5, 1, 2, 4, 8, 16]
     ax.set_yticks(y_ticks)
-    ax.set_yticklabels(['D=1N\n(0.05x)', 'D=2N\n(0.1x)', 'D=5N\n(0.25x)',
-                        'D=10N\n(0.5x)', 'D=20N\n(1x)', 'D=40N\n(2x)',
-                        'D=80N\n(4x)', 'D=160N\n(8x)', 'D=320N\n(16x)'],
+    ax.set_yticklabels(['1', '2', '5', '10', '20', '40', '80', '160', '320'],
                        fontsize=font_tick)
     ax.set_xticks(x_ticks)
     ax.set_xticklabels(x_ticklabels, fontsize=font_tick)
@@ -499,11 +509,26 @@ def create_prediction_contour_plot(ax, N, x_lim, x_ticks, x_ticklabels, x_label,
 # ── Per-model-size plotting configurations ────────────────────────────────────
 # x-axis (flops/epochs) ranges and ticks differ across model sizes because the
 # sweeps cover different chinchilla multipliers and epoch counts.
+# FLOPs = 6 · N · D_total = 120 · N^2 · flops_multiplier (since chinchilla
+# compute-optimal C* = 120 N^2). The plot's x-axis is internally still
+# flops_multiplier, but ticks are placed at flops_mult positions corresponding
+# to round absolute FLOPs values, and labelled with those FLOPs.
+def _flops_ticks(N_val, flops_decades):
+    C_star = 120.0 * N_val ** 2
+    positions = [f / C_star for f in flops_decades]
+    labels = [rf'$10^{{{int(round(np.log10(f)))}}}$' for f in flops_decades]
+    return positions, labels
+
+
+_30M_TICKS, _30M_LBLS = _flops_ticks(3.0e7, [1e16, 1e17, 1e18, 1e19])
+_370M_TICKS, _370M_LBLS = _flops_ticks(3.7e8, [1e18, 1e19, 1e20])
+
+
 PLOT_CONFIGS = {
     '30m': {
         'module': 'dolma_30m',
-        'flops_x_ticks': [0.05, 0.1, 0.5, 1, 4, 8, 16, 32, 64, 128, 256],
-        'flops_x_ticklabels': ['0.05', '0.1', '0.5', '1', '4', '8', '16', '32', '64', '128', '256'],
+        'flops_x_ticks': _30M_TICKS,
+        'flops_x_ticklabels': _30M_LBLS,
         'flops_x_lim': (0.05, 256),
         'epochs_x_ticks': [1, 2, 4, 8, 16, 32, 64, 128],
         'epochs_x_ticklabels': ['1', '2', '4', '8', '16', '32', '64', '128'],
@@ -511,8 +536,8 @@ PLOT_CONFIGS = {
     },
     '370m': {
         'module': 'dolma_370m',
-        'flops_x_ticks': [0.05, 0.1, 0.5, 1, 2, 4, 8, 16],
-        'flops_x_ticklabels': ['0.05', '0.1', '0.5', '1', '2', '4', '8', '16'],
+        'flops_x_ticks': _370M_TICKS,
+        'flops_x_ticklabels': _370M_LBLS,
         'flops_x_lim': (0.05, 16),
         'epochs_x_ticks': [1, 2, 4, 8, 16, 32, 64],
         'epochs_x_ticklabels': ['1', '2', '4', '8', '16', '32', '64'],
@@ -668,26 +693,28 @@ def make_combined_plot_for_size(size):
     levels = auto_contour_levels(val_loss)
     max_epochs = int(epochs_data.max())
 
-    fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(15, 8), sharey=True)
+    fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(15, 7), sharey=True)
     fig.patch.set_facecolor('white')
+
+    x_label = 'FLOPs'
 
     # Left panel: data-fitted contours (RBF + phantom-projected over-trained corner).
     scatter_left, glx_l, gly_l, gz_l = create_contour_plot(
         ax=ax_left,
         x_data=flops, y_data=data_amount, z_data=val_loss,
-        x_label='FLOPs (in Chinchilla x)',
+        x_label=x_label,
         x_ticks=cfg['flops_x_ticks'],
         x_ticklabels=cfg['flops_x_ticklabels'],
         x_lim=cfg['flops_x_lim'],
         diag_label='Single-epoch scaling path',
-        font_label=18, font_tick=16, diag_linewidth=5,
+        font_label=22, font_tick=18, diag_linewidth=5,
         levels=levels, mask_view='flops', max_epochs=max_epochs,
         fill_style='lines_only', interp='rbf',
     )
     add_descent_paths(ax_left, glx_l, gly_l, gz_l, [(0.05, 0.05)],
                       color='cyan', lw=4.0)
     ax_left.set_title('Empirical IsoLoss Contours',
-                      fontsize=20, fontweight='bold', pad=12)
+                      fontsize=22, fontweight='bold', pad=12)
 
     # Right panel: contours of the joint Chinchilla + η model. No data overlay
     # (left panel already shows the points) and no predicted-optimal star (the
@@ -697,14 +724,19 @@ def make_combined_plot_for_size(size):
         x_lim=cfg['flops_x_lim'],
         x_ticks=cfg['flops_x_ticks'],
         x_ticklabels=cfg['flops_x_ticklabels'],
-        x_label='FLOPs (in Chinchilla x)',
+        x_label=x_label,
+        font_label=22, font_tick=18, diag_linewidth=5,
         levels=levels,
     )
+    # Mirror the empirical (cyan) path on the right panel so readers can
+    # directly compare it against the predicted (magenta) path on the same axes.
+    add_descent_paths(ax_right, glx_l, gly_l, gz_l, [(0.05, 0.05)],
+                      color='cyan', lw=4.0)
     add_descent_paths(ax_right, glx_r, gly_r, gz_r, [(0.05, 0.05)],
                       color='magenta', lw=4.0,
                       label='Predicted optimal (C,D) scaling path')
     ax_right.set_title('Predicted IsoLoss Contours',
-                       fontsize=20, fontweight='bold', pad=12)
+                       fontsize=22, fontweight='bold', pad=12)
     ax_right.set_ylabel('')
 
     # Mirror the empirical reference stars on the right panel for direct
@@ -729,14 +761,19 @@ def make_combined_plot_for_size(size):
                 handles.append(h)
                 labels.append(l)
                 seen.add(l)
-    fig.legend(handles, labels, loc='lower center', ncol=min(len(labels), 4),
-               fontsize=14, frameon=False, bbox_to_anchor=(0.5, -0.02))
-
-    plt.subplots_adjust(right=0.90, wspace=0.06, bottom=0.18)
-    cbar_ax = fig.add_axes([0.915, 0.18, 0.015, 0.70])
+    plt.subplots_adjust(right=0.90, wspace=0.06, bottom=0.26, top=0.93)
+    cbar_ax = fig.add_axes([0.915, 0.26, 0.015, 0.67])
     cbar = fig.colorbar(scatter_left, cax=cbar_ax)
-    cbar.set_label('Validation Loss', fontsize=18, fontweight='bold')
-    cbar.ax.tick_params(labelsize=15)
+    cbar.set_label('Validation Loss', fontsize=20, fontweight='bold')
+    cbar.ax.tick_params(labelsize=17)
+
+    # Bottom legend across two rows (5 entries → 3 in row 1, 2 in row 2).
+    n_cols = (len(labels) + 1) // 2
+    fig.legend(handles, labels, loc='lower center',
+               bbox_to_anchor=(0.5, -0.02),
+               ncol=n_cols, fontsize=20, frameon=False,
+               handlelength=2.5, handletextpad=0.6,
+               columnspacing=1.6, labelspacing=0.6)
 
     out_pdf = (f'/n/home05/sqin/OLMo-core/results/'
                f'isoloss_contour_combined_{size}.pdf')
