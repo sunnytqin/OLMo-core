@@ -167,7 +167,8 @@ def make_forward_rep_only(N_arr, D_arr, Dp_arr, is_multi_arr):
 # Data
 # ──────────────────────────────────────────────────────────────────────
 
-def collect_pooled_triple(scale_min_para: float = 0.5exclude_sizes_1ep=("14m",),
+def collect_pooled_triple(scale_min_para: float = 0.5,
+                           exclude_sizes_1ep=("14m",),
                            exclude_sizes_rep=("14m",),
                            exclude_sizes_para=()):
     """1-ep + multi-ep (repetition) + paraphrase pooled across sizes.
