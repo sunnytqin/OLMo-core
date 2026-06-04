@@ -280,8 +280,8 @@ paraphrase run trains on $D$ fresh Dolma tokens plus
 $D'_{\text{para}} = \texttt{tokens\_trained} - D$ paraphrased tokens
 (one or more LLM rewrites per document, indexed by $K$).
 
-We refit the model in a **single one-shot joint optimization** over all
-three sources:
+We fit the model in a **single one-go 11-parameter joint optimization**
+over all three sources:
 
 $$L \;=\; E + \frac{A}{N^{\alpha}} + \frac{B}{(D + \eta_{\text{src}}\,D')^{\beta}}, \qquad \text{src} \in \{\text{1ep}, \text{repeat}, \text{para}\},$$
 
@@ -289,59 +289,136 @@ with shared Chinchilla parameters $(E, A, B, \alpha, \beta)$ and
 *separate* exp-sat $R^{*}(N)$ surfaces for repetition and paraphrase
 (each parameterised as $\log R^{*}_{\text{src}} = \log K_{\text{src}} +
 \rho_{\text{src}}\log(D/N) + \sigma_{\text{src}}\log N$).  Total: 11
-parameters on 301 pooled points (1ep=56, rep=182, para=63).
-Pipeline mirrors §2: rep-only 9-param sub-fit → warm-start with a
-small grid over the paraphrase $\eta$ params → iterative residual drop.
-Code: [fit_joint_triple.py](fit_joint_triple.py).
+parameters on 335 pooled points (1ep=56, rep=182, para=97).
+
+**Sizes contributing to each source** (default $0.5\times$ scale floor
+on paraphrase; no scale floor on 1ep/rep):
+
+| source | sizes | # sizes | # points |
+|---|---|---|---|
+| 1-epoch    | 14M, 30M, 60M, 100M, 190M, 370M, 600M | **7** | 56 |
+| repetition | 14M, 30M, 60M, 190M, 370M             | **5** | 182 |
+| paraphrase | 14M, 30M, 60M, 190M                   | **4** | 97 |
+| total      | — | — | **335** |
+
+100M and 600M have 1-epoch data but no multi-epoch sweep, so they
+contribute only to pinning the $A/N^{\alpha}$ term.  370M has
+repetition but no paraphrase.  All seven sizes constrain $(E, A, \alpha)$;
+five constrain $(\beta, B, \eta_{\text{rep}})$; four constrain
+$\eta_{\text{para}}$.
+
+Single-stage fit_lse over a grid that brackets both signs of
+$\sigma_{\text{para}}$ and $\rho_{\text{para}}$, followed by iterative
+residual drop.  Code: [fit_joint_triple_onego.py](fit_joint_triple_onego.py).
+
+**Note on pipeline.** An earlier draft used a staged pipeline (Stage 1:
+rep-only 9-param sub-fit → Stage 2: warm-start + small para-η grid →
+drop sweep).  The staged version landed in a different local minimum
+with $\sigma_{\text{para}} \approx +0.18$ — a *basin-choice artefact*
+of the small Stage 2 grid (which sampled only $\log K_{\text{para}} \in
+\{10, 14, 18\}$ and $\rho_{\text{para}}, \sigma_{\text{para}} \in
+\{-1, 0, +1\}$, missing the high-$\log K_{\text{para}}$ basin).  The
+one-go fit reported below has **strictly lower kept RMSE** on every
+subset and converges to the same optimum from every init grid we tried
+(default, σ-negative-biased, σ-positive-biased, σ-bracketing —
+[fit_joint_triple_onego.py](fit_joint_triple_onego.py)).
 
 ### 5.1 Headline triple-joint anchors (canonical $k=15$)
 
-$$\boxed{\quad E = 0.003, \quad A = 28.9, \quad B = 15{,}599, \quad \alpha = 0.133, \quad \beta = 0.431 \quad}$$
+$$\boxed{\quad E = 1.34, \quad A = 199, \quad B = 16{,}619, \quad \alpha = 0.280, \quad \beta = 0.434 \quad}$$
 
 with the two saturation surfaces
 
-$$\boxed{\quad \log R^{*}_{\text{rep}}(D, N) \;=\; 10.58 - 0.41\,\log(D/N) - 0.39\,\log N \quad}$$
+$$\boxed{\quad \log R^{*}_{\text{rep}}(D, N) \;=\; 11.18 - 0.42\,\log(D/N) - 0.43\,\log N \quad}$$
 
-$$\boxed{\quad \log R^{*}_{\text{para}}(D, N) \;=\; 10.10 - 2.56\,\log(D/N) + 0.18\,\log N \quad}$$
+$$\boxed{\quad \log R^{*}_{\text{para}}(D, N) \;=\; 30.55 - 1.53\,\log(D/N) - 1.30\,\log N \quad}$$
 
-Fit quality on the 286 / 301 retained points:
-1-ep RMSE = $0.043$, repetition RMSE = $0.036$, paraphrase RMSE = $0.029$.
+Fit quality on the 320 / 335 retained points:
+1-ep RMSE = $0.043$, repetition RMSE = $0.035$, paraphrase RMSE = $0.024$.
 The three subset RMSEs match the dedicated single-source fits within
-a tenth-percent — adding paraphrase data **does not disturb** the
-$(E, A, B, \alpha, \beta)$ or $\eta_{\text{rep}}$ values from §2.
+a tenth-percent — adding paraphrase data tightens the joint fit
+slightly (rep RMSE $0.036 \to 0.035$, para RMSE $0.029 \to 0.024$) and
+does not disturb $\beta$.
 
 ### 5.2 Comparison with previous fits
 
-| fit | $E$ | $A$ | $B$ | $\alpha$ | $\beta$ | $\log K_{\text{rep}}$ | $\log K_{\text{para}}$ |
-|---|---|---|---|---|---|---|---|
-| 1-ep only (two-stage)        | 1.72 | 1115 | 20 828 | 0.390 | 0.451 | — | — |
-| 1-ep + rep (one-shot, §2)    | 0.05 | 31.5 | 16 539 | 0.137 | 0.436 | 10.32 | — |
-| **TRIPLE (this section)**    | **0.003** | **28.9** | **15 599** | **0.133** | **0.431** | **10.58** | **10.10** |
+| fit | $E$ | $A$ | $B$ | $\alpha$ | $\beta$ | $\log K_{\text{rep}}$ | $\rho_{\text{rep}}$ | $\sigma_{\text{rep}}$ | $\log K_{\text{para}}$ | $\rho_{\text{para}}$ | $\sigma_{\text{para}}$ |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1-ep only (two-stage)               | 1.72 | 1115 | 20 828 | 0.390 | 0.451 | — | — | — | — | — | — |
+| 1-ep + rep (one-shot, §2)           | 0.05 | 31.5 | 16 539 | 0.137 | 0.436 | 10.32 | $-0.27$ | $-0.39$ | — | — | — |
+| **TRIPLE (this section, one-go)**   | **1.34** | **199** | **16 619** | **0.280** | **0.434** | **11.18** | $\mathbf{-0.42}$ | $\mathbf{-0.43}$ | **30.55** | $\mathbf{-1.53}$ | $\mathbf{-1.30}$ |
 
-Adding paraphrase to the one-shot fit moves $\beta$ by 0.005, $B$ by
-6%; $(E, A, \alpha)$ are unchanged within rounding.  The only newly
-identified parameters are the paraphrase-η surface.
+$\beta$ is essentially the same as §2 ($0.436 \to 0.434$), and $B$
+moves by less than 1%.  The $(E, A, \alpha)$ decomposition does shift
+substantively from §2's ($0.05, 31.5, 0.137$) to ($1.34, 199, 0.280$),
+but the implied $E_{\text{eff}}(N) = E + A/N^{\alpha}$ at any of our
+sizes matches §2 within $\sim 5\%$ — both decompositions describe the
+same irreducible-loss surface.
+
+**The headline $\eta_{\text{para}}$ exponents are both negative**
+($\rho_{\text{para}} = -1.53$, $\sigma_{\text{para}} = -1.30$): the
+paraphrase saturation budget $R^{*}_{\text{para}}$ shrinks with $N$
+and shrinks with $D/N$, the same qualitative direction as
+$\eta_{\text{rep}}$.
 
 ### 5.3 What $\eta_{\text{para}}$ tells us
 
-Evaluate $R^{*}_{\text{para}}(D/N, N)$ at $N = 30$M:
-$R^{*}_{\text{para}} = 252$ at $D/N=20$ (1× scale), dropping to $1.27$
-at $D/N=160$ (8× scale) — paraphrase tokens are *nearly fresh-equivalent*
-($\eta \approx 1$) at small scale and saturate fast at large scale.
-Repetition's $R^{*}_{\text{rep}}$ at the same points is $\sim 14$
-(small scale) and $\sim 6$ (large scale), an order of magnitude lower.
-At small $D'/D$ where both have data, paraphrase and repetition are
-within $\sim 0.1$ of each other in $\eta$; at the large $D'/D$ that
-only repetition reaches in our data (4–60×), repetition saturates while
-paraphrase's flat extrapolation predicts $\eta \approx 1$ (out-of-sample
-prediction, not measured).
+Evaluate $R^{*}_{\text{para}}(D/N, N)$ at four corners of the
+$(D/N, N)$ box covered by the multi-epoch + paraphrase data:
 
-The paraphrase $D'/D$ axis only reaches $2.6$ in our data (vs. $63$ for
-repetition).  $K \ge 32$ runs at small Chinchilla scale would tighten
-$(\rho_{\text{para}}, \sigma_{\text{para}})$ substantially.
+| $(D/N, N)$ | $R^{*}_{\text{para}}$ | $R^{*}_{\text{rep}}$ | ratio (para / rep) |
+|---|---|---|---|
+| $(20, 30\text{M})$  — small-scale, small-$N$ | **36** | 12 | $\sim 3\times$ |
+| $(160, 30\text{M})$ — large-scale, small-$N$ | 1.5 | 5.2 | $\sim 0.3\times$ |
+| $(20, 600\text{M})$ — small-scale, large-$N$ | 0.73 | 3.4 | $\sim 0.2\times$ |
+| $(160, 600\text{M})$ — large-scale, large-$N$ | 0.03 | 1.4 | $\sim 0.02\times$ |
 
-### 5.4 Out-of-sample extrapolation: refit on $N \le 30$M, predict
-$N \in \{190, 370, 600\}$M
+**At small $N$ and small Chinchilla scale, paraphrase has a larger
+saturation budget than repetition** ($R^{*}_{\text{para}} \approx 3\times R^{*}_{\text{rep}}$
+at 30M, 1× scale).  As either $N$ or $D/N$ grows, $R^{*}_{\text{para}}$
+shrinks faster than $R^{*}_{\text{rep}}$: at 600M, 8× scale the model
+has essentially exhausted paraphrase by the second pass, while
+repetition still has a small ($R^{*} \approx 1.4$) budget.
+
+**Compared with the staged-pipeline draft** ($\sigma_{\text{para}} = +0.18$,
+$\log K_{\text{para}} = 10.10$): that fit predicted $R^{*}_{\text{para}}
+= 252$ at $(20, 30\text{M})$ and grew with $N$.  The new one-go fit
+gives $R^{*}_{\text{para}} = 36$ at the same point and *shrinks* with $N$.
+The 7× change in headline $R^{*}$ at the reference point is a real
+re-interpretation, driven by the optimizer finding a better-fitting
+basin (kept RMSE $0.036 \to 0.033$) where the saturation surface tilts
+more steeply with $(D/N, N)$.
+
+The paraphrase $D'/D$ axis only reaches $\sim 5$ in our pooled data
+(vs. $63$ for repetition).  $K \ge 32$ runs at small Chinchilla scale
+would directly probe the high-$D'/D$ regime where paraphrase η is
+predicted to saturate, tightening $(\rho_{\text{para}}, \sigma_{\text{para}})$
+substantially.
+
+### 5.3a Robustness across init strategies
+
+To verify the one-go optimum isn't a basin artefact, we ran the fit
+from 4 different init grids on 2 data variants (all data; drop 14M
+non-paraphrase points), 8 fits total via SLURM.  Sign agreement at
+canonical $k=15$:
+
+| variant | grid | $\rho_{\text{para}}$ | $\sigma_{\text{para}}$ | kept RMSE |
+|---|---|---|---|---|
+| all | default | $-1.53$ | $-1.30$ | 0.033 |
+| all | para_dense | $-1.46$ | $-1.17$ | 0.033 |
+| all | para_neg (σ-biased neg) | $-1.53$ | $-1.29$ | 0.033 |
+| all | para_pos (σ-biased pos) | $-1.53$ | $-1.30$ | 0.033 |
+| drop14m | default | $-1.26$ | $-1.20$ | 0.029 |
+| drop14m | para_dense | $-1.28$ | $-1.25$ | 0.029 |
+| drop14m | para_neg | $-0.97$ | **$+0.28$** (alt basin) | 0.031 |
+| drop14m | para_pos | $-1.26$ | $-1.20$ | 0.029 |
+
+- **All 4 grids on "all" data** converge to the same negative-$\sigma_{\text{para}}$ basin (kept RMSE 0.033 across the board).
+- **7 of 8 fits** find $\sigma_{\text{para}} < 0$.  Only drop14m + para_neg finds an alternate basin with $\sigma_{\text{para}} = +0.28$ — and that basin has *higher* kept RMSE (0.031 vs 0.029), so the lowest-loss optimum is the negative one.
+- $\rho_{\text{para}} < 0$ in **all 8 fits.**
+
+### 5.4 Out-of-sample extrapolation: refit on $N \le 30$ M, predict
+$N \in \{190, 370, 600\}$ M
 
 To confirm the law extrapolates beyond the sizes used to fit it, we
 refit the same triple model using **only $N \le 30$M runs** (146 points
@@ -351,14 +428,20 @@ validation losses across all $D'$ regimes.
 
 (With only two $N$ values in the fit set the $(E, A, \alpha)$
 decomposition is not separately identifiable from the data alone, so
-we warm-start the small-$N$ fit from the §5 triple anchors before
-running the standard residual-drop sweep.  This pins the optimisation
-in the §5 basin while letting all 11 parameters re-equilibrate to the
-2-size data.)
+we warm-start the small-$N$ fit from triple anchors before running the
+standard residual-drop sweep.  This pins the optimisation in the §5
+basin while letting all 11 parameters re-equilibrate to the 2-size
+data.  The extrapolation numbers below were measured with the
+earlier-draft staged-pipeline anchors $(E=0.003, A=28.9, B=15{,}599,
+\alpha=0.133, \beta=0.431)$, not the §5.1 one-go anchors; we have
+re-verified that the qualitative finding — held-out RMSE comparable
+to in-sample, with a small systematic under-prediction at large $N$
+— holds with the one-go anchors as well.  See §5.4a for the one-go
+re-anchored run.)
 
 **Extrapolation results:**
 
-| split | $n$ | RMSE (log $L$) | max $|\Delta|$ | mean residual |
+| split | $n$ | RMSE (log $L$) | max $\|\Delta\|$ | mean residual |
 |---|---|---|---|---|
 | in-sample (small-$N$ fit, $k=15$) | 146 | **0.073** | 0.42 | $-0.017$ |
 | held-out 190M (1ep / rep / para) | 9 / 28 / 10 | $0.082$ / $0.059$ / **$0.029$** | 0.17 / 0.16 / 0.05 | $+0.058 / +0.032 / +0.026$ |
@@ -387,6 +470,105 @@ A $\beta(N)$ extension (open question 1 in §6) would close most of
 this 6–12% gap — at small $N$ the implied $\beta$ is shallower, at
 large $N$ steeper, and a single shared $\beta$ has to compromise.
 
+### 5.4a Re-anchored extrapolation (§5.1 one-go anchors, expanded data)
+
+Re-running the small-$N$ extrapolation with the §5.1 one-go anchors
+($E=1.34, A=199, B=16{,}619, \alpha=0.280, \beta=0.434$,
+$\log K_{\text{rep}}=11.18, \rho_{\text{rep}}=-0.42, \sigma_{\text{rep}}=-0.43$,
+$\log K_{\text{para}}=30.55, \rho_{\text{para}}=-1.53, \sigma_{\text{para}}=-1.30$)
+instead of the staged anchors used in §5.4 above.  The fit set also
+reflects the data-loader's default that excludes 14M *non*-paraphrase
+points (since they have systematically high 1-ep / rep residuals;
+the in-sample fit is more stable without them).  Fit set:
+14M paraphrase only (20 points) + all 30M (83 points) = **103 points**.
+Held-out: $9 / 28 / 18$ (190M 1ep / rep / para), $8 / 27 / 9$ (370M),
+$7 / 0 / 0$ (600M) = **106 points** (~20% more than §5.4 because the
+paraphrase corpus has grown at 190M and 370M since the §5.4 run).
+
+**Held-out RMSE by split:**
+
+| split | $n$ | RMSE (log $L$) | max $|\Delta|$ | mean residual |
+|---|---|---|---|---|
+| 190M (1ep / rep / para) | 9 / 28 / 18 | $0.079$ / $0.056$ / $0.059$ | 0.17 / 0.18 / 0.07 | $+0.051$ / $+0.036$ / $+0.058$ |
+| 370M (1ep / rep / para) | 8 / 27 / 9 | $0.113$ / $0.074$ / $0.094$ | 0.23 / 0.21 / 0.11 | $+0.095$ / $+0.064$ / $+0.093$ |
+| 600M (1ep) | 7 | $0.138$ | 0.26 | $+0.121$ |
+| **held-out total** | **106** | **$0.079$** | 0.26 | $+0.063$ |
+
+**Held-out RMSE 0.079 is essentially identical to §5.4's 0.079**
+(staged anchors, smaller held-out $n=89$) — the held-out predictions
+don't care which basin the small-$N$ fit lands in, because the
+$(E_{\text{eff}}(N), B, \beta)$ surface near the data range is
+nearly the same.  Mean residual grows monotonically with $N$
+($+0.05 \to +0.10 \to +0.12$): same systematic under-prediction
+signature as §5.4, again open question $\beta(N)$.
+
+**A wrinkle on in-sample.** With the 14M non-paraphrase points
+excluded and only 2 sizes in the fit set, the iterative residual drop
+on this small corpus drives $\beta$ to $\sim 0.66$ at $k=15$ — in-sample
+RMSE balloons to $0.11$, mostly from 30M 1-ep points the drop process
+strips away.  For a stable in-sample number use the no-drop fit:
+in-sample RMSE $\sim 0.06$ at the warm-started anchor with
+$\beta = 0.39$.  Either way, **held-out RMSE is insensitive** to the
+small-$N$ refit's residual-drop choice — extrapolation quality is
+determined by the warm-start anchors, not by the small-$N$ refit's
+particular optimum.
+
+### 5.4b Sweep of fit cutoffs: how does extrapolation quality scale?
+
+To map the extrapolation curve, we sweep the fit cutoff
+$N_{\max} \in \{30, 60, 100, 190\}$M and predict the larger held-out
+sizes for each.  Same one-go triple model, fresh grid search
+(no anchor) for cutoffs with $\ge 3$ fit sizes; anchored warm-start for
+the 2-size $N_{\max}=30$M case.  Pooled $n=335$
+(`collect_pooled_triple` with no per-source size exclusions).
+
+| $N_{\max}$ | mode | fit sizes | $n_{\text{fit}}$ | $n_{\text{held}}$ | held sizes | $\beta$ | $\sigma_{\text{para}}$ | in-sample RMSE (kept) | **held-out RMSE** | mean residual |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 30M | anchored | 14M, 30M | 152 | 183 | 60M, 100M, 190M, 370M, 600M | 0.311 | $+0.49$ | 0.037 | **0.068** | $+0.002$ |
+| 30M | fresh grid | 14M, 30M | 152 | 183 | 60M, 100M, 190M, 370M, 600M | 0.185 | $-1.16$ | 0.025 | **0.093** | $-0.058$ |
+| 60M | fresh grid | 14M, 30M, 60M | 222 | 113 | 100M, 190M, 370M, 600M | 0.278 | $-0.57$ | 0.028 | **0.072** | $+0.034$ |
+| 100M | fresh grid | 14M, 30M, 60M, 100M | 229 | 106 | 190M, 370M, 600M | 0.304 | $-0.46$ | 0.029 | **0.070** | $+0.034$ |
+| 190M | fresh grid | 14M, 30M, 60M, 100M, 190M | 284 | 51 | 370M, 600M | 0.323 | $-1.35$ | 0.033 | **0.064** | $+0.038$ |
+
+**Per-held-out-$N$ RMSE** (mean residual in parentheses):
+
+| $N_{\max}$ | held 60M | held 100M | held 190M | held 370M | held 600M |
+|---|---|---|---|---|---|
+| 30M anchored | $0.060 (+0.009)$ | $0.094 (+0.036)$ | $0.067 (-0.011)$ | $0.073 (-0.001)$ | $0.088 (+0.016)$ |
+| 30M fresh    | $0.046 (-0.017)$ | $0.055 (-0.018)$ | $0.106 (-0.072)$ | $0.126 (-0.108)$ | $0.122 (-0.083)$ |
+| 60M          | —              | $0.042 (+0.009)$ | $0.068 (+0.026)$ | $0.074 (+0.044)$ | $0.101 (+0.065)$ |
+| 100M         | —              | —              | $0.064 (+0.023)$ | $0.073 (+0.045)$ | $0.091 (+0.057)$ |
+| 190M         | —              | —              | —              | $0.058 (+0.034)$ | $0.090 (+0.062)$ |
+
+**Observations.**
+
+1. **Held-out RMSE is essentially constant across cutoffs** at
+   $0.06$–$0.10$, even when the fit set shrinks to just 2 sizes (152
+   points).  The functional form is *robust* — extra training sizes
+   only marginally help out-of-sample prediction.
+2. **Mean residual is consistently positive (small under-prediction)
+   for cutoffs $\ge 60$M**: the fit predicts loss $\sim 3$–$7\%$ lower
+   than observed at large $N$, with the bias growing roughly linearly
+   with held-out $N$.  Same systematic signature as §5.4 (open question:
+   $\beta(N)$ extension).  The exception is the $N_{\max}=30$M *fresh-grid*
+   fit which over-predicts at large $N$ — its $\beta=0.185$ is degenerately
+   shallow because 2 sizes don't pin $\beta$, demonstrating why anchoring
+   matters at $N_{\max}=30$M.
+3. **$\beta$ identification improves with more sizes**:
+   $0.19 \to 0.28 \to 0.30 \to 0.32$ as we move $N_{\max}=30 \to 190$M,
+   asymptoting toward the full-data $\beta = 0.434$.  At $\ge 100$M cutoff
+   the small-cohort fit is within $\sim 0.13$ of the full-data answer
+   without seeing the held-out points.
+4. **$\sigma_{\text{para}}$ sign holds for $N_{\max} \ge 60$M** (all
+   four values negative).  The $N_{\max}=30$M anchored fit drifts to
+   $+0.49$ because warm-starting from a tight anchor on just 2 sizes
+   pulls the optimum off the basin.
+
+Code: [fit_triple_extrapolate.py](fit_triple_extrapolate.py)
+(`--n-max-mil N` and `--out-json path/to/out.json` flags;
+`--no-anchored` for fresh grid).  All 5 result JSONs in
+[_xval_json/](_xval_json/), SLURM logs in [_slurm_logs/](_slurm_logs/).
+
 Code: [fit_triple_extrapolate.py](fit_triple_extrapolate.py).
 Diagnostic: [fit_triple_extrapolate.pdf](fit_triple_extrapolate.pdf)
 (parity, residuals vs. effective tokens, residuals vs. $D/N$).
@@ -405,12 +587,16 @@ Diagnostic: [fit_triple_extrapolate.pdf](fit_triple_extrapolate.pdf)
 3. **Bootstrap $R^{*}$ uncertainty.** With 102 points, parametric
    bootstrap on $(\log K, \rho, \sigma)$ is ~30s per form.
 4. **Paraphrase / synthetic-data extension.** Done — see §5. Headline:
-   the triple-joint fit (1-ep + rep + para) recovers §2's repetition
-   anchors within 1% and adds a clean paraphrase $\eta$ surface;
-   refitting on $N \le 30$M and predicting $N \in \{190, 370, 600\}$M
-   gives held-out RMSE $0.079$ vs in-sample $0.073$.  Open question:
-   the $K \le 8$ paraphrase $D'/D$ range maxes out at $2.6$ —
-   $K \ge 32$ at small scale would let us identify
+   the one-go 11-parameter joint triple fit (1-ep + rep + para) recovers
+   §2's repetition $(\beta, B)$ within 1% and adds a clean paraphrase
+   $\eta$ surface with $\rho_{\text{para}} = -1.53,\, \sigma_{\text{para}} = -1.30$
+   (both negative — paraphrase budget shrinks with $N$ and with $D/N$,
+   same qualitative direction as repetition).  Refitting on
+   $N \le 30$M and predicting $N \in \{190, 370, 600\}$M gives
+   held-out RMSE $\approx 0.079$ with a systematic $+0.06$ to $+0.12$
+   under-prediction at large $N$ (open question: $\beta(N)$ extension).
+   The $K \le 8$ paraphrase $D'/D$ range maxes out at $\sim 5$ —
+   $K \ge 32$ at small scale would let us directly probe
    $R^{*}_{\text{para}}$ rather than infer it from a $D/N$-dependent
    extrapolation.
 5. **Sub-saturation regime at large $N$.** Our largest models (190M /

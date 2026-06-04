@@ -54,15 +54,18 @@ from fit_lse import fit_lse  # noqa: E402
 # small-N (only 2-point N axis) fit doesn't wander into a degenerate
 # (E, A, α) basin where α drifts to physically-implausible values.
 TRIPLE_ANCHOR = dict(
-    E=0.003, A=28.9, B=15599, alpha=0.133, beta=0.431,
-    log_K_rep=10.58, rho_rep=-0.414, sigma_rep=-0.394,
-    log_K_para=10.10, rho_para=-2.555, sigma_para=+0.177,
+    # One-go joint fit, k=15, default grid (§6.1a of writeup)
+    E=1.34, A=199, B=16619, alpha=0.280, beta=0.434,
+    log_K_rep=11.18, rho_rep=-0.416, sigma_rep=-0.429,
+    log_K_para=30.55, rho_para=-1.532, sigma_para=-1.302,
 )
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SMALL_N_CUT = 30e6 + 1.0   # include 14M + 30M, exclude 60M
+SMALL_N_CUT = 30e6 + 1.0   # default: include 14M + 30M, exclude 60M
 HELDOUT_TAGS = ("190m", "370m", "600m")
 ALL_HELDOUT_TAGS = ("60m", "100m", "190m", "370m", "600m")  # for context
+
+import argparse  # noqa: E402
 
 
 def filter_data(data, mask):
@@ -165,26 +168,43 @@ def fit_triple_on_subset(data, k_canonical=15, anchored=True):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--n-max-mil", type=float, default=30.0,
+                     help="Fit cutoff in millions of params (default: 30 = include 14M+30M)")
+    ap.add_argument("--anchored", action="store_true", default=True,
+                     help="Warm-start from §5.1 one-go anchors (default: on)")
+    ap.add_argument("--no-anchored", action="store_false", dest="anchored",
+                     help="Disable anchoring (fresh grid search)")
+    ap.add_argument("--out-json", type=str, default=None,
+                     help="Optional path for structured-output JSON")
+    args = ap.parse_args()
+
+    N_MAX = args.n_max_mil * 1e6 + 1.0
     print("=" * 96)
-    print("Extrapolation test: fit on N ≤ 30M, predict held-out 190M / 370M / 600M")
+    print(f"Extrapolation: fit on N ≤ {args.n_max_mil:.0f}M, "
+          f"predict held-out N > {args.n_max_mil:.0f}M  "
+          f"(anchored={args.anchored})")
     print("=" * 96)
 
     full = collect_pooled_triple(scale_min_para=0.5)
-    is_small = full["N"] <= SMALL_N_CUT
-    is_held = ~is_small  # 60M and above
-    is_target = np.isin(full["tags"], HELDOUT_TAGS)
+    is_small = full["N"] <= N_MAX
+    is_target = full["N"] > N_MAX  # everything above the cut
 
-    print(f"\nSmall-N fit set (N ≤ 30M): n={int(is_small.sum())}")
-    for tag in ["14m", "30m"]:
+    fit_sizes = sorted(set(full["tags"][is_small]), key=lambda t: SIZES[t][0])
+    held_sizes = sorted(set(full["tags"][is_target]), key=lambda t: SIZES[t][0])
+    print(f"\nFit set (N ≤ {args.n_max_mil:.0f}M): "
+          f"n={int(is_small.sum())} across {len(fit_sizes)} sizes "
+          f"{fit_sizes}")
+    for tag in fit_sizes:
         m = full["tags"] == tag
-        if not m.any(): continue
         print(f"  {tag}: 1ep={int(((full['source']==SOURCE_NONE)&m).sum())}, "
               f"rep={int(((full['source']==SOURCE_REPEAT)&m).sum())}, "
               f"para={int(((full['source']==SOURCE_PARA)&m).sum())}")
-    print(f"\nHeld-out targets {{190M, 370M, 600M}}: n={int(is_target.sum())}")
-    for tag in HELDOUT_TAGS:
+    print(f"\nHeld-out (N > {args.n_max_mil:.0f}M): "
+          f"n={int(is_target.sum())} across {len(held_sizes)} sizes "
+          f"{held_sizes}")
+    for tag in held_sizes:
         m = full["tags"] == tag
-        if not m.any(): continue
         print(f"  {tag}: 1ep={int(((full['source']==SOURCE_NONE)&m).sum())}, "
               f"rep={int(((full['source']==SOURCE_REPEAT)&m).sum())}, "
               f"para={int(((full['source']==SOURCE_PARA)&m).sum())}")
@@ -193,18 +213,52 @@ def main():
     held_data = filter_data(full, is_target)
 
     # ── Fit on small-N only ────────────────────────────────────────
-    params_small = fit_triple_on_subset(fit_data, k_canonical=15)
+    params_small = fit_triple_on_subset(fit_data, k_canonical=15,
+                                          anchored=args.anchored)
 
     # ── Compare with full-data §6 anchors (re-fit for sanity check) ─
     print("\n" + "=" * 96)
-    print("In-sample (small-N fit, k=15) RMSE on the fit set:")
+    print(f"In-sample (N ≤ {args.n_max_mil:.0f}M fit, k=15) RMSE on the fit set:")
     print("=" * 96)
-    pred_fit = report_table(fit_data, params_small, "small-N in-sample")
+    pred_fit = report_table(fit_data, params_small, "in-sample")
 
     print("\n" + "=" * 96)
-    print("Out-of-sample RMSE on held-out N ∈ {190M, 370M, 600M}:")
+    print(f"Out-of-sample RMSE on held-out N > {args.n_max_mil:.0f}M:")
     print("=" * 96)
     pred_held = report_table(held_data, params_small, "held-out predictions")
+
+    # ── Optional JSON output (for downstream multi-cutoff synthesis) ─
+    if args.out_json is not None:
+        log_L_h = np.log(held_data["L"])
+        pl_h = predict_log_L(params_small, held_data["N"], held_data["D"],
+                              held_data["Dp"], held_data["source"])
+        resid_h = log_L_h - pl_h
+        log_L_f = np.log(fit_data["L"])
+        pl_f = predict_log_L(params_small, fit_data["N"], fit_data["D"],
+                              fit_data["Dp"], fit_data["source"])
+        resid_f = log_L_f - pl_f
+        per_size = {}
+        for tag in held_sizes:
+            m = held_data["tags"] == tag
+            r = resid_h[m]
+            per_size[tag] = dict(n=int(m.sum()),
+                                  rmse=float(np.sqrt(np.mean(r ** 2))),
+                                  mean=float(np.mean(r)))
+        import json
+        out_dict = dict(
+            n_max_mil=args.n_max_mil,
+            anchored=args.anchored,
+            fit_sizes=fit_sizes, held_sizes=held_sizes,
+            n_fit=int(len(fit_data["L"])), n_held=int(len(held_data["L"])),
+            canonical_params={k: float(v) for k, v in params_small.items()},
+            in_sample_kept_rmse=float(np.sqrt(np.mean(resid_f ** 2))),
+            held_out_rmse_total=float(np.sqrt(np.mean(resid_h ** 2))),
+            held_out_mean_total=float(np.mean(resid_h)),
+            held_out_per_size=per_size,
+        )
+        with open(args.out_json, "w") as fh:
+            json.dump(out_dict, fh, indent=2, default=float)
+        print(f"\nWrote {args.out_json}")
 
     # ── Parity plot ────────────────────────────────────────────────
     fig, axes = plt.subplots(1, 3, figsize=(18, 5.6))

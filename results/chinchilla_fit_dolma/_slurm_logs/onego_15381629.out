@@ -1,0 +1,39 @@
+Job 15381629  variant=all  grid=para_neg  tag=all_para_neg
+Node: node3113
+OutJSON: /home/hamidieh/projects/syn_pt/OLMo-core/results/chinchilla_fit_dolma/_onego_json/onego_all_para_neg.json
+Started: Wed Jun  3 15:08:49 EDT 2026
+# One-go joint triple fit
+#   variant      = all
+#   init grid    = para_neg (6144 inits)
+#   scale_min_p  = 0.5
+#   canonical k  = 15
+# Pooled n=335 (1ep=56, rep=182, para=97)
+
+[Stage 0] One-go 11-param joint fit with para_neg grid...
+  In-sample RMSE: 0.0477
+  Chinchilla: E=0.9310  A=519.44  B=1198.27  α=0.3524  β=0.2906
+  η_rep:      log K=15.68  ρ=-0.850  σ=-0.622
+  η_para:     log K=30.84  ρ=-1.704  σ=-1.296
+
+[Stage 1] Iterative residual drop, k ∈ [0, 5, 10, 15, 20, 25, 30]...
+
+    k  n_kept        E        A          B       α       β  |   lK_r    ρ_r    σ_r |   lK_p    ρ_p    σ_p |   1ep    rep    par
+    0     335    0.931    519.4       1198   0.352   0.291  |  15.68  -0.85  -0.62 |  30.84  -1.70  -1.30 | 0.074  0.046  0.028
+    5     330    1.248    489.8       3656   0.346   0.351  |  15.56  -0.78  -0.63 |  30.84  -1.68  -1.30 | 0.061  0.043  0.024
+   10     325    1.420    306.3      11267   0.315   0.411  |  11.75  -0.59  -0.44 |  30.58  -1.73  -1.27 | 0.051  0.038  0.023
+   15     320    1.340    196.9      16853   0.279   0.435  |  11.02  -0.41  -0.42 |  30.37  -1.53  -1.29 | 0.043  0.035  0.024
+   20     315    1.376    208.5      24197   0.280   0.456  |  10.96  -0.28  -0.43 |  30.37  -1.42  -1.31 | 0.036  0.032  0.024
+   25     310    1.467    267.8      31677   0.296   0.471  |  10.91  -0.19  -0.43 |  30.39  -1.32  -1.33 | 0.035  0.029  0.023
+   30     305    1.594    411.2      38225   0.324   0.482  |  10.86  -0.14  -0.43 |  30.40  -1.30  -1.33 | 0.031  0.027  0.020
+
+  Canonical k=15:
+    Chinchilla: E=1.3399  A=196.86  B=16853.22  α=0.2794  β=0.4352
+    η_rep:      log K=11.02  ρ=-0.412  σ=-0.420
+    η_para:     log K=30.37  ρ=-1.532  σ=-1.292
+    RMSE — 1ep:0.0433  rep:0.0345  para:0.0238  |  kept:0.0332
+
+  >> σ_para sign: NEG (-1.292)
+  >> ρ_para sign: NEG (-1.532)
+
+Wrote /home/hamidieh/projects/syn_pt/OLMo-core/results/chinchilla_fit_dolma/_onego_json/onego_all_para_neg.json
+Finished: Wed Jun  3 15:14:44 EDT 2026

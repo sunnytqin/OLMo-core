@@ -1,0 +1,61 @@
+Job 15382838  cutoff=190M  grid=default  anchored=no
+Out: /home/hamidieh/projects/syn_pt/OLMo-core/results/chinchilla_fit_dolma/_xval_json/xval_cut190_default.json
+Started: Wed Jun  3 15:43:02 EDT 2026
+# Triple fit cross-validation
+#   cutoff N ≤ 190M
+#   grid default (6144 inits)
+#   anchored: False
+#   canonical k 15
+
+Fit sizes (5): [np.str_('14m'), np.str_('30m'), np.str_('60m'), np.str_('100m'), np.str_('190m')] n=284
+  14m: 1ep=8, rep=41, para=20
+  30m: 1ep=9, rep=46, para=28
+  60m: 1ep=8, rep=40, para=22
+  100m: 1ep=7, rep=0, para=0
+  190m: 1ep=9, rep=28, para=18
+
+Held-out sizes (2): [np.str_('370m'), np.str_('600m')] n=51
+  370m: 1ep=8, rep=27, para=9
+  600m: 1ep=7, rep=0, para=0
+
+[One-go fit] grid=default...
+  Pre-drop: E=0.329  α=0.296  β=0.249  log_K_p=31.54  ρ_p=-1.771  σ_p=-1.323
+
+[Canonical k=15]
+  E=0.363  A=78.1  B=2307  α=0.217  β=0.323
+  log K_rep=17.56  ρ_rep=-1.012  σ_rep=-0.704
+  log K_para=31.59  ρ_para=-1.712  σ_para=-1.353
+  In-sample (kept) RMSE: 1ep=0.0448  rep=0.0338  para=0.0243  kept_total=0.0327
+
+  HELD-OUT (N > 190M)  (n=51)
+    tag/src            n      RMSE       max      mean
+    370m   1ep        8    0.0895    0.1598   +0.0553
+    370m   rep       27    0.0535    0.1272   +0.0295
+    370m   para       9    0.0316    0.0436   +0.0269
+    600m   1ep        7    0.0904    0.1508   +0.0616
+    TOTAL             51    0.0638    0.1598   +0.0375
+
+  IN-SAMPLE (N ≤ 190M)  (n=284)
+    tag/src            n      RMSE       max      mean
+    14m    1ep        8    0.1445    0.3025   -0.0897
+    14m    rep       41    0.0623    0.2348   -0.0141
+    14m    para      20    0.0139    0.0243   +0.0063
+    30m    1ep        9    0.1163    0.3031   -0.0566
+    30m    rep       46    0.0446    0.1517   +0.0022
+    30m    para      28    0.0233    0.0477   -0.0061
+    60m    1ep        8    0.0545    0.1160   +0.0012
+    60m    rep       40    0.0398    0.1401   +0.0117
+    60m    para      22    0.0347    0.0646   -0.0175
+    100m   1ep        7    0.0432    0.0852   +0.0074
+    190m   1ep        9    0.0717    0.1449   +0.0391
+    190m   rep       28    0.0535    0.1506   +0.0074
+    190m   para      18    0.0189    0.0442   -0.0027
+    TOTAL            284    0.0537    0.3031   -0.0039
+
+[Per-N rollup]
+  size       n      RMSE      mean
+  370m      44    0.0585   +0.0337
+  600m       7    0.0904   +0.0616
+
+Wrote /home/hamidieh/projects/syn_pt/OLMo-core/results/chinchilla_fit_dolma/_xval_json/xval_cut190_default.json
+Finished: Wed Jun  3 15:48:48 EDT 2026

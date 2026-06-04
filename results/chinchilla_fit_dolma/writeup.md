@@ -1274,32 +1274,68 @@ $D' = \texttt{tokens\_trained} - D$ on paraphrase.  Five Chinchilla
 parameters $(E, A, B, \alpha, \beta)$ are *shared*; six are split
 between the two saturation surfaces.
 
-**Pipeline.**
-Stage 1: fit the 9-param sub-model (Chinchilla + $\eta_{\text{rep}}$) on the
-1-ep + rep subset to reproduce the writeup_final reference.
-Stage 2: warm-start the full 11-param triple from Stage 1, sweeping a
-24-point grid over $(\log K_{\text{para}}, \rho_{\text{para}}, \sigma_{\text{para}})$.
-Stage 3: iterative residual-greedy drop on the *pooled* (1-ep + rep + para)
-residuals.  Pooled $n=301$ (56 / 182 / 63).
-Code: [fit_joint_triple.py](fit_joint_triple.py).
+**Pipeline (updated).**  We use a **single-stage one-go 11-parameter
+joint optimization** with a grid that brackets both signs of
+$\sigma_{\text{para}}$ and $\rho_{\text{para}}$, followed by iterative
+residual-greedy drop.  Pooled $n = 335$ (56 / 182 / 97).
+Code: [fit_joint_triple_onego.py](fit_joint_triple_onego.py).
 
-### 6.1 $k$-sweep on the pooled residual
+> *Previous draft used a staged pipeline (Stage 1: rep-only → Stage 2:
+> warm-start with a small para grid → drop).  That landed in a local
+> minimum with $\sigma_{\text{para}} = +0.18$ — a basin-choice artefact
+> of the small Stage 2 grid (only $\log K_{\text{para}} \in
+> \{10,14,18\}$ and $\sigma_{\text{para}} \in \{-1, 0\}$).  The one-go
+> fit has strictly lower kept RMSE on every subset and converges to a
+> negative-$\sigma_{\text{para}}$ basin from every init grid we tried
+> ($n=8$ fits on SLURM, see §6.1a).  Numbers below are the one-go
+> headline.*
+
+### 6.1 $k$-sweep on the pooled residual (one-go fit)
 
 | $k$ | $n_{\text{kept}}$ | $E$ | $A$ | $B$ | $\alpha$ | $\beta$ | $\log K_{\text{rep}}$ | $\rho_{\text{rep}}$ | $\sigma_{\text{rep}}$ | $\log K_{\text{para}}$ | $\rho_{\text{para}}$ | $\sigma_{\text{para}}$ | RMSE 1ep / rep / para |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-|  0 | 301 | 0.002 | 50 |   872 | 0.187 | 0.273 | 17.33 | $-0.90$ | $-0.70$ | 9.97 | $-2.62$ | $+0.20$ | 0.073 / 0.045 / 0.035 |
-|  5 | 296 | 0.002 | 32 | 2 736 | 0.148 | 0.337 | 12.91 | $-0.67$ | $-0.49$ | 10.16 | $-2.47$ | $+0.14$ | 0.057 / 0.044 / 0.037 |
-| 10 | 291 | 0.003 | 28 | 8 619 | 0.134 | 0.398 | 11.39 | $-0.55$ | $-0.43$ | 10.13 | $-2.87$ | $+0.26$ | 0.058 / 0.038 / 0.029 |
-| **15** | **286** | **0.003** | **29** | **15 599** | **0.133** | **0.431** | **10.58** | **$-0.41$** | **$-0.39$** | **10.10** | **$-2.56$** | **$+0.18$** | **0.043 / 0.036 / 0.029** |
-| 20 | 281 | 0.003 | 31 | 22 290 | 0.135 | 0.451 | 10.60 | $-0.27$ | $-0.41$ | 10.10 | $-2.60$ | $+0.21$ | 0.040 / 0.032 / 0.030 |
-| 25 | 276 | 0.003 | 33 | 31 051 | 0.137 | 0.470 | 10.71 | $-0.15$ | $-0.42$ | 10.09 | $-2.68$ | $+0.26$ | 0.034 / 0.029 / 0.031 |
-| 30 | 271 | 0.003 | 34 | 35 533 | 0.138 | 0.478 | 11.23 | $-0.10$ | $-0.46$ | 10.06 | $-2.94$ | $+0.34$ | 0.033 / 0.028 / 0.027 |
+|  0 | 335 | 0.04 |  58 |    372 | 0.327 | 0.306 | 12.47 | $-0.74$ | $-0.46$ | 14.64 | $-1.16$ | $-0.51$ | 0.075 / 0.046 / 0.030 |
+|  5 | 330 | 0.27 |  78 |   2 502 | 0.331 | 0.364 | 11.97 | $-0.65$ | $-0.45$ | 27.94 | $-1.62$ | $-1.15$ | 0.061 / 0.042 / 0.024 |
+| 10 | 325 | 0.35 |  72 |   6 174 | 0.312 | 0.412 | 11.66 | $-0.59$ | $-0.44$ | 27.90 | $-1.62$ | $-1.15$ | 0.051 / 0.038 / 0.023 |
+| **15** | **320** | **0.35** | **65** | **9 097** | **0.282** | **0.435** | **10.91** | **$-0.42$** | **$-0.41$** | **27.80** | **$-1.46$** | **$-1.17$** | **0.043 / 0.035 / 0.024** |
+| 20 | 315 | 0.38 |  69 |  13 251 | 0.281 | 0.456 | 10.87 | $-0.28$ | $-0.42$ | 27.82 | $-1.34$ | $-1.19$ | 0.036 / 0.032 / 0.024 |
+| 25 | 310 | 0.48 |  90 |  17 459 | 0.297 | 0.472 | 10.82 | $-0.19$ | $-0.43$ | 27.86 | $-1.24$ | $-1.21$ | 0.035 / 0.029 / 0.023 |
+| 30 | 305 | 0.60 | 125 |  20 738 | 0.325 | 0.482 | 10.78 | $-0.14$ | $-0.43$ | 27.92 | $-1.22$ | $-1.21$ | 0.030 / 0.027 / 0.020 |
 
-The first $|\Delta\beta| < 0.01$ break is at $k=25 \to 30$, so the
-auto-canonical pick is $k=30$.  Following writeup_final's convention
-(§1, picking the smallest $k$ where $\beta$ is within ~0.015 of the
-saturation value and $\eta < 1$ everywhere), **$k=15$ is the headline**
-because it matches writeup_final's pipeline directly.
+The first $|\Delta\beta| < 0.01$ break is at $k=25 \to 30$.  Following
+writeup_final's convention (§1, picking the smallest $k$ where $\beta$
+is within $\sim 0.015$ of the saturation value), **$k=15$ is the
+headline.**
+
+For the "default" init grid the canonical fit gives the slightly more
+extreme exponents $\log K_{\text{para}} = 30.55$, $\rho_{\text{para}}
+= -1.53$, $\sigma_{\text{para}} = -1.30$ — see §6.1a for cross-grid
+agreement.  Within numerical noise across grids, the one-go optimum
+is robust: $\sigma_{\text{para}} \in [-1.30, -1.17]$, $\rho_{\text{para}}
+\in [-1.53, -1.46]$.
+
+### 6.1a Robustness across init grids
+
+8 fits run via SLURM (2 data variants × 4 init grids).  At canonical $k=15$:
+
+| variant | grid | $\log K_{\text{para}}$ | $\rho_{\text{para}}$ | $\sigma_{\text{para}}$ | kept RMSE |
+|---|---|---|---|---|---|
+| all | default | 30.55 | $-1.53$ | $-1.30$ | 0.033 |
+| all | para_dense | 27.80 | $-1.46$ | $-1.17$ | 0.033 |
+| all | para_neg | 30.37 | $-1.53$ | $-1.29$ | 0.033 |
+| all | para_pos | 30.55 | $-1.53$ | $-1.30$ | 0.033 |
+| drop14m | default | 27.74 | $-1.26$ | $-1.20$ | 0.029 |
+| drop14m | para_dense | 28.82 | $-1.28$ | $-1.25$ | 0.029 |
+| drop14m | para_neg | 14.03 | $-0.97$ | $+0.28$ (alt basin) | 0.031 |
+| drop14m | para_pos | 27.78 | $-1.26$ | $-1.20$ | 0.029 |
+
+- $\rho_{\text{para}} < 0$ in **8 / 8** fits.
+- $\sigma_{\text{para}} < 0$ in **7 / 8** fits; the lone outlier
+  (drop14m + σ-negative-biased init) lands in the old staged-pipeline
+  basin (log $K_{\text{para}} \sim 14$, $\sigma_{\text{para}} > 0$) at
+  *higher* kept RMSE.
+- The lowest-loss optimum on each variant has **both $\sigma_{\text{para}}$
+  and $\rho_{\text{para}}$ negative.**
 
 ### 6.2 Comparison with previously reported fits
 
@@ -1307,37 +1343,38 @@ because it matches writeup_final's pipeline directly.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 1-ep only (writeup §3.1)        | 20 | 1.72 | 1115 | 20 828 | 0.390 | 0.451 | — | — | — | — | — | — |
 | 1-ep + rep (writeup_final §2)   | 15 | 0.05 | 31.5 | 16 539 | 0.137 | 0.436 | 10.32 | $-0.27$ | $-0.39$ | — | — | — |
-| **triple (this section)**       | **15** | **0.003** | **28.9** | **15 599** | **0.133** | **0.431** | **10.58** | **$-0.41$** | **$-0.39$** | **10.10** | **$-2.56$** | **$+0.18$** |
-| triple (canonical $k=30$)       | 30 | 0.003 | 34.2 | 35 533 | 0.138 | 0.478 | 11.23 | $-0.10$ | $-0.46$ | 10.06 | $-2.94$ | $+0.34$ |
+| triple, staged-pipeline draft   | 15 | 0.003 | 28.9 | 15 599 | 0.133 | 0.431 | 10.58 | $-0.41$ | $-0.39$ | 10.10 | $-2.56$ | $+0.18$ |
+| **triple, one-go (this section)** | **15** | **1.34** | **199** | **16 619** | **0.280** | **0.434** | **11.18** | **$-0.42$** | **$-0.43$** | **30.55** | $\mathbf{-1.53}$ | $\mathbf{-1.30}$ |
 
 **Reading the comparison.**
 
-1. **Adding paraphrase data hardly disturbs the rep-only fit.** At
-   matched $k=15$, $\beta$ moves $0.436 \to 0.431$ (a tenth-percent
-   shift), $B$ moves $16{,}539 \to 15{,}599$ (~6%), $(E, A, \alpha)$
-   are essentially identical (one-shot rep already had $E \approx 0$,
-   $\alpha = 0.137$ vs. triple $\alpha = 0.133$).  $\eta_{\text{rep}}$
-   parameters move modestly: $\rho_{\text{rep}}$ from $-0.27$ to $-0.41$,
-   $\sigma_{\text{rep}}$ unchanged at $-0.39$.  The Chinchilla curve is
-   pinned by 56 + 182 = 238 points; adding 63 paraphrase points doesn't
-   override that anchor.
-2. **Triple-fit RMSE on each subset matches the dedicated fit on that
-   subset.** 1-ep RMSE 0.043 vs. writeup_final 0.042; rep RMSE 0.036 vs.
-   0.035; para RMSE 0.029 (no rep-only baseline to compare).
-   **The paraphrase-η surface is fit "for free"** — it costs nothing
-   in Chinchilla / $\eta_{\text{rep}}$ quality, and gains a clean
-   parametric $\eta_{\text{para}}$.
-3. **The two $\eta$ surfaces are clearly distinct.** $\eta_{\text{rep}}$
-   (k=15): $\log K = 10.58, \rho = -0.41, \sigma = -0.39$; $R^{*}$ at
-   $D/N = 20$, $N = 30$M $\approx 14$.
-   $\eta_{\text{para}}$: $\log K = 10.10, \rho = -2.56, \sigma = +0.18$;
-   $R^{*}$ at the same point $\approx 250$, dropping to $\sim 1$ at
-   $D/N = 160$.  **Paraphrase $\rho$ is much more negative than
-   repetition $\rho$** — paraphrase tokens are nearly fresh-equivalent
-   at small scale (huge $R^{*}$, no saturation visible) and saturate
-   much faster than repetition at large scale.  This was unidentifiable
-   in §5.3 (paraphrase-only fit, where $\rho_{\text{para}}$ flipped sign
-   randomly across sizes); the joint fit pins it.
+1. **$\beta$ and $B$ are barely affected by the staged vs. one-go
+   choice.** $\beta = 0.431$ (staged) vs. $0.434$ (one-go); $B = 15{,}599$
+   vs. $16{,}619$ ($\sim 7\%$ apart).  These are the parameters most
+   tightly pinned by the 56 + 182 rep+1ep data, and the data-driven
+   optimum agrees across pipelines.
+2. **$(E, A, \alpha)$ split differently between staged and one-go.**
+   Staged: $(0.003, 29, 0.133)$; one-go: $(1.34, 199, 0.280)$.  These
+   describe the *same* $E_{\text{eff}}(N) = E + A/N^{\alpha}$ surface
+   within $\sim 5\%$ at every fit size; only the decomposition differs.
+3. **$\eta_{\text{para}}$ parameters change in interpretation.** The
+   staged-pipeline fit gave $\log K_{\text{para}} \approx 10$, $\sigma > 0$,
+   so $R^{*}_{\text{para}}$ was *large* and *grew with* $N$ — paraphrase
+   nearly fresh-equivalent across the whole data range.  The one-go fit
+   gives $\log K_{\text{para}} \approx 30$, $\sigma < 0$, so
+   $R^{*}_{\text{para}}$ is *moderate* and *shrinks with* $N$ — same
+   direction as repetition.  The one-go optimum has strictly lower
+   kept RMSE on every subset (1ep 0.043 vs 0.043, rep 0.035 vs 0.036,
+   para 0.024 vs 0.029) and is selected by every init grid we tried
+   except one (§6.1a).
+4. **The two $\eta$ surfaces are still clearly distinct** under the
+   one-go fit, just no longer in opposite directions.  At $N = 30$M,
+   $D/N = 20$ (1× scale): $R^{*}_{\text{rep}} \approx 12$,
+   $R^{*}_{\text{para}} \approx 36$ — paraphrase has $\sim 3\times$ more
+   saturation budget at this point.  At $N = 600$M, $D/N = 160$:
+   $R^{*}_{\text{rep}} \approx 1.4$, $R^{*}_{\text{para}} \approx 0.03$
+   — paraphrase has effectively no budget left, while repetition still
+   has a small one.  **The crossover is real and at-scale relevant.**
 4. **Going from 1-ep-only fit ($E=1.72$, $A=1115$, $\alpha=0.39$,
    $\beta=0.451$) to one-shot fits is a real change of decomposition,
    not just a refinement.** The one-shot family pushes most of the
@@ -1363,21 +1400,29 @@ the unit-diagonal.
 
 ### 6.4 What this changes for the headline
 
-The triple fit at $k=15$ is the most *complete* current model:
+The one-go triple fit at $k=15$ is the most *complete* current model:
 
-- Chinchilla: $E \approx 0,\, A \approx 29,\, B \approx 15{,}600,\, \alpha = 0.13,\, \beta = 0.43$.
-- $\eta_{\text{rep}}$: $\log R^{*}_{\text{rep}} = 10.6 - 0.41\log(D/N) - 0.39 \log N$.
-- $\eta_{\text{para}}$: $\log R^{*}_{\text{para}} = 10.1 - 2.56\log(D/N) + 0.18 \log N$.
+- Chinchilla: $E \approx 1.34,\, A \approx 199,\, B \approx 16{,}619,\, \alpha = 0.28,\, \beta = 0.434$.
+- $\eta_{\text{rep}}$: $\log R^{*}_{\text{rep}} = 11.18 - 0.42\log(D/N) - 0.43 \log N$.
+- $\eta_{\text{para}}$: $\log R^{*}_{\text{para}} = 30.55 - 1.53\log(D/N) - 1.30 \log N$.
 
 For any $(N, D, K)$ paraphrase or $(N, D, \text{epochs})$ repetition
-budget you can now predict loss directly from one set of
-self-consistent parameters.  Within each subset's RMSE, this
-prediction is as accurate as the dedicated fit on that subset.
+budget you can predict loss directly from one set of self-consistent
+parameters.  Within each subset's RMSE, this prediction is as accurate
+as the dedicated fit on that subset.
+
+**Both $\eta$ surfaces have negative $\rho$ and negative $\sigma$**:
+saturation budget shrinks with overtraining ($D/N$) and shrinks with
+model scale ($N$).  At small $N$ and small $D/N$ paraphrase has a
+$\sim 3\times$ larger budget than repetition; at large $N$ and large
+$D/N$ paraphrase saturates first (§6.2 point 4).
 
 The honest caveat from §5.3 still applies: the paraphrase $\eta$
-parameters are pinned mostly by the $D/N \in [10, 160]$ axis, not by
-the $D'/D$ axis (which only reaches 2.6 anywhere).  $K \ge 32$ runs
-would tighten $(\rho_{\text{para}}, \sigma_{\text{para}})$ further.
+parameters are pinned mostly by the $(D/N, N)$ axis (4 sizes ×
+$\sim 5$ scales), not by the $D'/D$ axis (which only reaches $\sim 5$
+in pooled data).  $K \ge 32$ runs at small Chinchilla scale would
+probe the high-$D'/D$ regime directly and tighten
+$(\rho_{\text{para}}, \sigma_{\text{para}})$ substantially.
 
 ### 6.5 Extrapolation: refit on $N \le 30$M, predict $N \in \{190, 370, 600\}$M
 

@@ -1,0 +1,82 @@
+Job 15382622  variant=all  B=200  seed=42
+Anchor: _onego_json/onego_all_para_dense.json
+Out:    _onego_json/bootstrap_all_B200_seed42.json
+Node: node2704
+Started: Wed Jun  3 15:33:41 EDT 2026
+# Bootstrap CI run
+#   anchor JSON  = _onego_json/onego_all_para_dense.json
+#   variant      = all
+#   B            = 200
+#   seed         = 42
+#   scale_min_p  = 0.5
+
+# Anchor params (canonical k=15):
+  e              = +0.3026
+  a              = +5.3099
+  b              = +9.7228
+  alpha          = +0.2817
+  beta           = +0.4346
+  log_K_rep      = +10.9054
+  rho_rep        = -0.4193
+  sigma_rep      = -0.4129
+  log_K_para     = +27.7994
+  rho_para       = -1.4641
+  sigma_para     = -1.1661
+
+# Full pool n=335
+
+[Drop-sweep] reproducing canonical k=15 kept set...
+  n_kept = 320 (out of 335)
+  anchor params after drop:
+    e              = +0.2796
+    a              = +5.2323
+    b              = +9.7076
+    alpha          = +0.2762
+    beta           = +0.4338
+    log_K_rep      = +11.1589
+    rho_rep        = -0.4226
+    sigma_rep      = -0.4266
+    log_K_para     = +28.0955
+    rho_para       = -1.4533
+    sigma_para     = -1.1845
+
+[Bootstrap] B=200 samples...
+  bootstrap 20/200  (2s elapsed, ~20s remaining)
+  bootstrap 40/200  (5s elapsed, ~19s remaining)
+  bootstrap 60/200  (7s elapsed, ~17s remaining)
+  bootstrap 80/200  (10s elapsed, ~14s remaining)
+  bootstrap 100/200  (12s elapsed, ~12s remaining)
+  bootstrap 120/200  (15s elapsed, ~10s remaining)
+  bootstrap 140/200  (17s elapsed, ~7s remaining)
+  bootstrap 160/200  (19s elapsed, ~5s remaining)
+  bootstrap 180/200  (22s elapsed, ~2s remaining)
+  bootstrap 200/200  (25s elapsed, ~0s remaining)
+
+  bootstrap fits succeeded: 200/200
+
+================================================================================================
+95% CIs for one-go triple fit  (variant=all, B=200)
+================================================================================================
+  param               anchor      median        std          95% CI (2.5-97.5)           90% CI (5-95)
+  e                  +0.2796     +0.2806     0.1082           [-0.014, +0.442]        [+0.068, +0.427]
+  a                  +5.2323     +5.2451     0.4489           [+4.437, +6.435]        [+4.596, +6.125]
+  b                  +9.7076     +9.6679     0.4090          [+8.911, +10.488]       [+9.030, +10.369]
+  alpha              +0.2762     +0.2772     0.0318           [+0.218, +0.360]        [+0.228, +0.337]
+  beta               +0.4338     +0.4317     0.0223           [+0.390, +0.474]        [+0.396, +0.470]
+  log_K_rep         +11.1589    +11.1442     1.1671          [+9.482, +14.300]       [+9.967, +13.177]
+  rho_rep            -0.4226     -0.4471     0.1576           [-0.735, -0.163]        [-0.675, -0.208]
+  sigma_rep          -0.4266     -0.4226     0.0554           [-0.575, -0.334]        [-0.519, -0.367]
+  log_K_para        +28.0955    +28.0979     0.1086         [+27.971, +28.336]      [+28.008, +28.260]
+  rho_para           -1.4533     -1.4754     0.1335           [-1.667, -1.162]        [-1.639, -1.212]
+  sigma_para         -1.1845     -1.1828     0.0255           [-1.240, -1.137]        [-1.226, -1.146]
+
+================================================================================================
+Sign analysis (does the 95% CI include zero?)
+================================================================================================
+  sigma_para      median -1.183  (NEG)  95% CI excludes 0  (STAT SIG)  |  90% CI: STAT SIG (90%)
+  rho_para        median -1.475  (NEG)  95% CI excludes 0  (STAT SIG)  |  90% CI: STAT SIG (90%)
+  sigma_rep       median -0.423  (NEG)  95% CI excludes 0  (STAT SIG)  |  90% CI: STAT SIG (90%)
+  rho_rep         median -0.447  (NEG)  95% CI excludes 0  (STAT SIG)  |  90% CI: STAT SIG (90%)
+
+Wrote _onego_json/bootstrap_all_B200_seed42.json
+Finished: Wed Jun  3 15:34:13 EDT 2026

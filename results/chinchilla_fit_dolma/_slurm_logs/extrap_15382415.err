@@ -1,0 +1,6 @@
+/orcd/home/002/hamidieh/projects/syn_pt/OLMo-core/results/chinchilla_fit_dolma/fit_triple_extrapolate.py:234: UserWarning: You passed a edgecolor/edgecolors ('none') for an unfilled marker ('x').  Matplotlib is ignoring the edgecolor in favor of the facecolor.  This behavior may change in the future.
+  ax_par.scatter(L_pred_held[mm], held_data["L"][mm], s=60,
+/orcd/home/002/hamidieh/projects/syn_pt/OLMo-core/results/chinchilla_fit_dolma/fit_triple_extrapolate.py:239: UserWarning: You passed a edgecolor/edgecolors ('none') for an unfilled marker ('x').  Matplotlib is ignoring the edgecolor in favor of the facecolor.  This behavior may change in the future.
+  ax_res.scatter(held_data["D"][mm] + held_data["Dp"][mm],
+/orcd/home/002/hamidieh/projects/syn_pt/OLMo-core/results/chinchilla_fit_dolma/fit_triple_extrapolate.py:242: UserWarning: You passed a edgecolor/edgecolors ('none') for an unfilled marker ('x').  Matplotlib is ignoring the edgecolor in favor of the facecolor.  This behavior may change in the future.
+  ax_dn.scatter(held_data["D"][mm] / held_data["N"][mm],
