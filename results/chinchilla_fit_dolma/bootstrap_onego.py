@@ -53,17 +53,35 @@ PARAM_NAMES = [
 ]
 
 
-def get_data(variant, scale_min_para=0.5):
+def get_data(variant, scale_min_para=0.5, n_max_mil=None):
     full = collect_pooled_triple(scale_min_para=scale_min_para,
                                    exclude_sizes_1ep=(),
                                    exclude_sizes_rep=(),
                                    exclude_sizes_para=())
-    if variant == "all":
-        return full
     if variant == "drop14m":
         keep = ~((full["tags"] == "14m") & (full["source"] != SOURCE_PARA))
-        return {k: v[keep] for k, v in full.items()}
-    raise ValueError(f"unknown variant: {variant}")
+        full = {k: v[keep] for k, v in full.items()}
+    elif variant != "all":
+        raise ValueError(f"unknown variant: {variant}")
+    if n_max_mil is not None:
+        keep = full["N"] <= n_max_mil * 1e6 + 1.0
+        full = {k: v[keep] for k, v in full.items()}
+    return full
+
+
+def load_anchor(anchor_json_path):
+    """Load anchor params from either an onego JSON or an xval JSON.
+
+    Returns a dict of the 11 raw params (e, a, b, alpha, beta,
+    log_K_rep, rho_rep, sigma_rep, log_K_para, rho_para, sigma_para).
+    """
+    with open(anchor_json_path) as f:
+        d = json.load(f)
+    if "canonical" in d and "params" in d["canonical"]:
+        return d["canonical"]["params"]
+    if "canonical_params" in d:
+        return d["canonical_params"]
+    raise ValueError(f"unknown anchor JSON schema in {anchor_json_path}")
 
 
 def fit_one(data, init_params, delta=DELTA, max_iter=200):
@@ -142,8 +160,10 @@ def summarize(results, anchor_params):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--anchor-json", required=True,
-                     help="Path to onego fit JSON to use as anchor")
-    ap.add_argument("--variant", required=True, choices=["all", "drop14m"])
+                     help="Path to onego or xval fit JSON to use as anchor")
+    ap.add_argument("--variant", default="all", choices=["all", "drop14m"])
+    ap.add_argument("--n-max-mil", type=float, default=None,
+                     help="Optional N≤cutoff subset (for xval bootstrap)")
     ap.add_argument("--B", type=int, default=200,
                      help="Number of bootstrap samples")
     ap.add_argument("--seed", type=int, default=42)
@@ -158,17 +178,17 @@ def main():
     print(f"#   seed         = {args.seed}")
     print(f"#   scale_min_p  = {args.scale_min_para}")
 
-    # Load anchor params
-    with open(args.anchor_json) as f:
-        anchor_json = json.load(f)
-    anchor_params = anchor_json["canonical"]["params"]
+    # Load anchor params (supports both onego and xval JSON schemas)
+    anchor_params = load_anchor(args.anchor_json)
     print(f"\n# Anchor params (canonical k=15):")
     for k in PARAM_NAMES:
         print(f"  {k:<14} = {anchor_params[k]:+.4f}")
 
-    # Get data
-    data = get_data(args.variant, args.scale_min_para)
-    print(f"\n# Full pool n={len(data['L'])}")
+    # Get data (optionally filtered to N ≤ n_max_mil for xval bootstraps)
+    data = get_data(args.variant, args.scale_min_para,
+                     n_max_mil=args.n_max_mil)
+    print(f"\n# Full pool n={len(data['L'])}" +
+          (f" (N ≤ {args.n_max_mil}M)" if args.n_max_mil else ""))
 
     # Get the kept set from the canonical fit (reproduces the drop sweep)
     print(f"\n[Drop-sweep] reproducing canonical k=15 kept set...")

@@ -45,8 +45,8 @@ plt.rcParams.update({
 
 VARIANTS = ["all", "drop14m"]
 COLOR = {"all": "#1f77b4", "drop14m": "#d62728"}
-LABEL = {"all": "all data (n=320 kept of 335)",
-         "drop14m": "drop 14M non-para (n=271 kept of 286)"}
+LABEL = {"all": "all data (n=356, n_kept=341)",
+         "drop14m": "drop 14M non-para"}
 
 PARAMS_ROWS = [
     # (json_key, latex_label, exp_format)
@@ -93,7 +93,14 @@ def forest_row(ax, y, summary, color, param, offset=0.0):
 
 
 def plot_4panel(out):
-    runs = {v: load(v) for v in VARIANTS}
+    # Only the "all" variant exists at n=356 right now (drop14m wasn't redone
+    # with updated data); render just that one in the 4-panel layout.
+    runs = {}
+    for v in VARIANTS:
+        try:
+            runs[v] = load(v)
+        except FileNotFoundError:
+            continue
     fig, axes = plt.subplots(2, 2, figsize=(13, 8.5))
     (ax_chi_const, ax_chi_exp), (ax_logK, ax_eta) = axes
     delta = 0.18
@@ -114,11 +121,17 @@ def plot_4panel(out):
           r"η exponents ($\rho$, $\sigma$): zero-line shown for sign analysis",
           False),
     ]
+    available = list(runs.keys())
     for ax, params, title, has_e_anno in panels:
         for i, (p, _) in enumerate(params):
-            for j, v in enumerate(VARIANTS):
+            for j, v in enumerate(available):
+                # Center the offsets when only one variant is present
+                if len(available) == 1:
+                    off = 0.0
+                else:
+                    off = delta * (j - 0.5) * 2
                 forest_row(ax, len(params) - i - 1, runs[v]["summary"],
-                            COLOR[v], p, offset=delta * (j - 0.5) * 2)
+                            COLOR[v], p, offset=off)
         ax.set_yticks(range(len(params)))
         ax.set_yticklabels([lbl for _, lbl in params[::-1]])
         ax.set_xlabel("value" if not has_e_anno else "value (log-space)")
@@ -133,18 +146,19 @@ def plot_4panel(out):
 
     # Exp annotations on Chinchilla constants panel
     for i, p in enumerate(["e", "a", "b"]):
-        med_all = runs["all"]["summary"][p]["median"]
-        med_drop = runs["drop14m"]["summary"][p]["median"]
+        annotations = []
+        for v in available:
+            med = runs[v]["summary"][p]["median"]
+            annotations.append(f"{v}={np.exp(med):.2g}")
         ax_chi_const.text(
             0.02, 0.98 - i * 0.16,
-            f"exp({p}): all={np.exp(med_all):.2g}, "
-            f"drop14m={np.exp(med_drop):.2g}",
+            f"exp({p}): " + ", ".join(annotations),
             transform=ax_chi_const.transAxes, fontsize=9,
             verticalalignment="top", color="0.3", fontfamily="serif")
 
     handles = [Line2D([0], [0], marker="o", linestyle="", color=COLOR[v],
                        markersize=7, markeredgecolor="k",
-                       markeredgewidth=0.5, label=LABEL[v]) for v in VARIANTS]
+                       markeredgewidth=0.5, label=LABEL[v]) for v in available]
     ax_eta.legend(handles=handles, loc="upper right", fontsize=9,
                    framealpha=0.95)
     fig.suptitle(
@@ -211,10 +225,72 @@ def plot_rows(variant, out):
     print(f"Saved {out}")
 
 
+def plot_xval_cuts(out):
+    """Forest plot showing σ_para and ρ_para across all xval cutoffs +
+    the full-data anchor.  One panel each, two rows (σ_para, ρ_para).
+    """
+    cuts = [
+        ("full (n=356)",   "_onego_json/bootstrap_all_B200_seed42.json"),
+        ("xval cut30 anc", "_xval_json/bootstrap_xval_cut30_anchored_B200_seed42.json"),
+        ("xval cut30",     "_xval_json/bootstrap_xval_cut30_B200_seed42.json"),
+        ("xval cut60",     "_xval_json/bootstrap_xval_cut60_B200_seed42.json"),
+        ("xval cut100",    "_xval_json/bootstrap_xval_cut100_B200_seed42.json"),
+        ("xval cut190",    "_xval_json/bootstrap_xval_cut190_B200_seed42.json"),
+    ]
+    rows = []
+    for lab, p in cuts:
+        path = os.path.join(SCRIPT_DIR, p)
+        if not os.path.exists(path):
+            continue
+        with open(path) as f:
+            rows.append((lab, json.load(f)))
+
+    fig, axes = plt.subplots(2, 1, figsize=(9.5, 6.5), sharey=True)
+    PARAMS = [("sigma_para", r"$\sigma_{\mathrm{para}}$"),
+                ("rho_para",  r"$\rho_{\mathrm{para}}$")]
+    y_labels = [r[0] for r in rows][::-1]
+    for ax, (key, label) in zip(axes, PARAMS):
+        for i, (lab, d) in enumerate(rows):
+            y = len(rows) - 1 - i
+            s = d["summary"][key]
+            ax.errorbar([s["median"]], [y],
+                        xerr=[[s["median"] - s["ci_2_5"]],
+                              [s["ci_97_5"] - s["median"]]],
+                        fmt="o", color="#1f77b4", ecolor="#1f77b4",
+                        capsize=5, lw=2, markersize=8,
+                        markeredgecolor="k", markeredgewidth=0.5)
+        ax.axvline(0, color="0.4", linestyle="-", linewidth=1.3,
+                    alpha=0.8, zorder=0)
+        ax.set_yticks(range(len(rows)))
+        ax.set_yticklabels(y_labels)
+        ax.set_xlabel("value")
+        ax.set_title(f"{label} — median + 95% CI across xval cutoffs")
+        ax.grid(axis="x", alpha=0.3)
+        ax.set_ylim(-0.5, len(rows) - 0.5)
+        # Annotate
+        for i, (lab, d) in enumerate(rows):
+            y = len(rows) - 1 - i
+            s = d["summary"][key]
+            ax.text(1.02, y, f"{s['median']:+.3f}  [{s['ci_2_5']:+.3f}, {s['ci_97_5']:+.3f}]",
+                    transform=ax.get_yaxis_transform(),
+                    fontsize=9.5, va="center", ha="left",
+                    color="0.2", fontfamily="monospace")
+
+    fig.suptitle(
+        r"Cross-validation bootstrap CIs on $\sigma_{\mathrm{para}}$ and $\rho_{\mathrm{para}}$ "
+        r"($B=200$ per row)",
+        fontsize=13.5, y=0.99)
+    fig.tight_layout()
+    fig.savefig(out, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved {out}")
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--layout", choices=["4panel", "rows"], default="4panel")
-    ap.add_argument("--variant", choices=VARIANTS, default="drop14m",
+    ap.add_argument("--layout",
+                     choices=["4panel", "rows", "xval"], default="4panel")
+    ap.add_argument("--variant", choices=VARIANTS, default="all",
                      help="Used only when --layout rows")
     ap.add_argument("--out", default=None,
                      help="Output PDF path (default: auto-named)")
@@ -223,11 +299,15 @@ def main():
     if args.layout == "4panel":
         out = args.out or os.path.join(SCRIPT_DIR, "bootstrap_forest.pdf")
         plot_4panel(out)
-    else:
+    elif args.layout == "rows":
         out = (args.out or
                os.path.join(SCRIPT_DIR,
                              f"bootstrap_forest_{args.variant}.pdf"))
         plot_rows(args.variant, out)
+    else:  # xval
+        out = (args.out or
+               os.path.join(SCRIPT_DIR, "bootstrap_forest_xval.pdf"))
+        plot_xval_cuts(out)
 
 
 if __name__ == "__main__":

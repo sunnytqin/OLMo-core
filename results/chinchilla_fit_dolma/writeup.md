@@ -1454,9 +1454,115 @@ because $(E, A, \alpha)$ isn't separately identifiable from 2 N-values.
 $\sigma_{\text{para}}$ stays negative on all 5 fits (range $-0.60$ to
 $-1.18$), confirming the §6.1 headline.
 
+**Bootstrap CIs on $\sigma_{\text{para}}$ and $\rho_{\text{para}}$ per
+cutoff** ($B=200$, same methodology as §6.6, warm-started from each
+xval anchor, resampling the kept set of that fit):
+
+| $N_{\max}$ | mode | $n_{\text{kept}}$ | $\sigma_{\text{para}}$ — median [95% CI] | $\rho_{\text{para}}$ — median [95% CI] |
+|---|---|---|---|---|
+| 30M  | anchored   | 137 | $-1.26\;[-1.41, -0.57]$ | $-1.63\;[-3.08, -1.08]$ |
+| 30M  | fresh      | 137 | $-1.17\;[-1.31, -1.02]$ | $-1.94\;[-2.53, -1.70]$ |
+| 60M  | fresh      | 207 | $-0.65\;[-0.72, -0.55]$ | $-1.82\;[-2.24, -1.59]$ |
+| 100M | fresh      | 214 | $-0.66\;[-0.72, -0.55]$ | $-1.86\;[-2.25, -1.62]$ |
+| 190M | fresh      | 269 | $-1.16\;[-1.24, -1.08]$ | $-1.51\;[-1.87, -1.05]$ |
+| full | (n=356)    | 341 | $-1.30\;[-1.35, -1.26]$ | $-1.52\;[-1.71, -1.22]$ |
+
+**Both $\sigma_{\text{para}}$ and $\rho_{\text{para}}$ remain
+statistically negative (95%) at every cutoff** — the sign result of
+§6.6 is robust to which $N_{\max}$ you train on.  Magnitude wanders
+($\sigma_{\text{para}}$ at $N_{\max}=60$M/$100$M shrinks to $\sim -0.65$
+because $\sigma$ trades off with $\log K_{\text{para}}$ at limited
+$N$-axis range), but the sign never flips.
+
+$\rho_{\text{rep}}$ is the only parameter whose 95% CI crosses zero in
+some cutoffs (cut30 anchored: $[-0.51, +0.11]$; cut190: $[-0.82, +0.01]$
+— borderline).  $\sigma_{\text{rep}}$, $\sigma_{\text{para}}$,
+$\rho_{\text{para}}$ are always significantly negative.
+
 Code: [fit_triple_extrapolate.py](fit_triple_extrapolate.py)
 (`--n-max-mil`, `--no-anchored`, `--out-json` flags).
+Bootstrap: [bootstrap_onego.py](bootstrap_onego.py) with
+`--anchor-json _xval_json/xval_cutXX.json --n-max-mil XX`.
 JSONs in [_xval_json/](_xval_json/), SLURM logs in [_slurm_logs/](_slurm_logs/).
+
+### 6.6 Bootstrap 95% CIs
+
+We compute 95% confidence intervals on every fitted parameter via a
+parametric bootstrap modeled on
+[extended_lse_synergy_model.py](../../../../datasyn/synest/synergy_lse/extended_lse_synergy_model.py):
+
+1. Run the canonical $k=15$ one-go fit on the full data to get the
+   "anchor" point (this is the §6.1 headline).
+2. Subset the data to the kept rows from that anchor fit (320 of 335
+   for the `all` variant; 271 of 286 for `drop14m`).
+3. For $B=200$ bootstrap samples:
+   - Resample the kept rows with replacement.
+   - Re-fit the 11-parameter model warm-started from the anchor (single
+     LBFGS pass; no fresh grid).
+   - Collect the optimized parameter vector.
+4. Report the median, mean, std, and 2.5%/97.5% percentile across the
+   bootstrap distribution per parameter.  (The reference uses 5/95
+   = 90% CI; we report the conventional 95% bracket.)
+
+Code: [bootstrap_onego.py](bootstrap_onego.py); SLURM wrapper:
+[_sbatch_bootstrap.sh](_sbatch_bootstrap.sh); raw bootstrap JSONs in
+[_onego_json/bootstrap_{all,drop14m}_B200_seed42.json](_onego_json/).
+
+**95% CIs — full data (n=356, matches §6.1 headline anchor):**
+
+| param        | median  | std   | 95% CI [2.5, 97.5]      | (exp form)          |
+|---|---|---|---|---|
+| $\log E$     | $+0.301$  | $0.099$ | $[+0.006, +0.470]$    | $E \approx 1.35$    |
+| $\log A$     | $+5.322$  | $0.479$ | $[+4.502, +6.516]$    | $A \approx 205$     |
+| $\log B$     | $+9.717$  | $0.408$ | $[+8.946, +10.448]$   | $B \approx 1.7\times 10^{4}$ |
+| $\alpha$     | $+0.283$  | $0.034$ | $[+0.224, +0.366]$    | — |
+| $\beta$      | $+0.435$  | $0.020$ | $[+0.395, +0.470]$    | — |
+| $\log K_{\text{rep}}$  | $+10.933$ | $0.953$ | $[+9.672, +13.514]$   | — |
+| $\rho_{\text{rep}}$    | $-0.425$  | $0.146$ | $[-0.713, -0.147]$    | **sig at 95%** |
+| $\sigma_{\text{rep}}$  | $-0.414$  | $0.049$ | $[-0.551, -0.353]$    | **sig at 95%** |
+| $\log K_{\text{para}}$ | $+30.504$ | $0.111$ | $[+30.395, +30.829]$  | — |
+| $\rho_{\text{para}}$   | $-1.519$  | $0.119$ | $[-1.710, -1.224]$    | **sig at 95%** |
+| $\sigma_{\text{para}}$ | $-1.303$  | $0.022$ | $[-1.347, -1.261]$    | **sig at 95%** |
+
+**Sign analysis — does the 95% CI exclude zero?**
+
+All four $\eta$ exponents on the full data are statistically negative
+at 95%:
+
+| param | 95% CI | tightness |
+|---|---|---|
+| $\sigma_{\text{para}}$ | $[-1.35, -1.26]$ ✓ **NEG** | very tight (width 0.09) |
+| $\rho_{\text{para}}$   | $[-1.71, -1.22]$ ✓ **NEG** | moderate (width 0.49) |
+| $\sigma_{\text{rep}}$  | $[-0.55, -0.35]$ ✓ **NEG** | tight (width 0.20) |
+| $\rho_{\text{rep}}$    | $[-0.71, -0.15]$ ✓ **NEG** | moderate (width 0.57) |
+
+The qualitative §6.1 finding (both $\rho$ and $\sigma$ negative for
+both rep and para) is robust to sampling uncertainty.  See §6.5 for
+the same analysis across the cross-validation cutoffs.
+
+**Looseness profile (what's identified vs. fluffy):**
+- *Very tight* ($\text{CI width} \le 0.1$): $\sigma_{\text{para}}$,
+  $\log K_{\text{para}}$, $\beta$.
+- *Tight* (CI width $\le 0.3$): $\alpha$, $\sigma_{\text{rep}}$.
+- *Moderate* (CI width $\sim 0.5$): $\rho_{\text{para}}$,
+  $\rho_{\text{rep}}$, $\log E$.
+- *Loose* (CI width $\sim 1$–$4$): $\log K_{\text{rep}}$, $\log A$,
+  $\log B$.  $\log A$ and $\log B$ are correlated (both enter
+  $E_{\text{eff}}(N)$ and $B/D^{\beta}$ through combinations).
+
+Figures:
+- [bootstrap_forest.pdf](bootstrap_forest.pdf) — 4-panel forest plot
+  (grouped by parameter scale).
+- [bootstrap_forest_all.pdf](bootstrap_forest_all.pdf) —
+  single-figure forest plot of all 11 parameters, each on its own
+  natural-scale row.
+- [bootstrap_forest_xval.pdf](bootstrap_forest_xval.pdf) —
+  $\sigma_{\text{para}}$ and $\rho_{\text{para}}$ CIs across the
+  cross-validation cutoffs of §6.5; shows the sign result is robust
+  across $N_{\max}$.
+
+Code: [bootstrap_forest.py](bootstrap_forest.py)
+(`--layout {4panel, rows, xval}`, `--variant {all, drop14m}` flags).
 
 ---
 
