@@ -220,7 +220,7 @@ def _render_panel_a(ax, model_size, N, norm):
                linewidth=3.0, alpha=0.95, zorder=12,
                label=r"CD-law: $D \to \infty$")
 
-    ax.set_xlabel('TTP (D/N)',
+    ax.set_xlabel('TPP (D/N)',
                   fontsize=FONT_LABEL, fontweight='bold')
     ax.set_ylabel('Validation Loss',
                   fontsize=FONT_LABEL, fontweight='bold')
@@ -406,8 +406,8 @@ def plot_combined():
     plt.setp(axes['B60'].get_yticklabels(), visible=False)
     plt.setp(axes['B370'].get_yticklabels(), visible=False)
 
-    axes['B190'].set_xlabel('TTP', fontsize=FONT_LABEL, fontweight='bold')
-    axes['B370'].set_xlabel('TTP', fontsize=FONT_LABEL, fontweight='bold')
+    axes['B190'].set_xlabel('TPP', fontsize=FONT_LABEL, fontweight='bold')
+    axes['B370'].set_xlabel('TPP', fontsize=FONT_LABEL, fontweight='bold')
 
     # Single shared FLOPs colorbar on the right (actual FLOPs = 6·N·D_total).
     # Pick decade ticks that fall inside the joint norm range so the bar fills.

@@ -9,7 +9,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=4:00:00
-#SBATCH --mem=250G
+#SBATCH --mem=240G
 #SBATCH -o ../slurm_out/slurm-eval-para-k-%A_%a.out
 #SBATCH -e ../slurm_out/slurm-eval-para-k-%A_%a.out
 #SBATCH --array=0-3

@@ -29,6 +29,8 @@
 #SBATCH --account=kempner_dam_lab
 #SBATCH --job-name=para-s2sm
 
+set -eo pipefail
+
 module purge
 module load cuda cudnn
 

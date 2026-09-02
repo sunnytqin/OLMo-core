@@ -151,7 +151,7 @@ def make_figure(data, output_path, model_size):
     for r, chin in enumerate(CHIN_VALUES):
         ttp = int(round(chin * TTP_PER_CHIN))
         axes[r][0].annotate(
-            f'TTP = {ttp}',
+            f'TPP = {ttp}',
             xy=(-0.45, 0.5), xycoords='axes fraction',
             fontsize=12, fontweight='bold', ha='center', va='center',
             rotation=90,
@@ -166,7 +166,7 @@ def make_figure(data, output_path, model_size):
         )
 
     fig.suptitle(
-        f'{model_size} — Validation loss across (WD, LR) per (TTP, Epochs).  '
+        f'{model_size} — Validation loss across (WD, LR) per (TPP, Epochs).  '
         'Red box marks the optimum per cell.',
         fontsize=11, y=1.02,
     )

@@ -1,25 +1,21 @@
 """
 Figure 3 for the NeurIPS submission (paper section 4.4):
-  Reducible validation loss  L_red = L - (E + A/N^α)  vs *effective* tokens
-  D_eff = D + η_src·D' on log-log axes. Under the triple-joint fit
-  L = E + A/N^α + B/D_eff^β, so L_red = B/D_eff^β is a single straight line
-  of slope -β across all N — and 1-epoch, repetition, and paraphrase
-  points all collapse onto it under D → D + η_src·D'.
+  Reducible validation loss  L_red = L - (E + A/N^α)  vs tokens on log-log
+  axes. Under the triple-joint fit L = E + A/N^α + B/D_eff^β, the reducible
+  loss B/D_eff^β is a single straight line of slope -β across all N.
 
-  Panel (a): 1-epoch kept points only (D_eff = D). All sit on the line.
-             Validates that the triple fit's backbone is consistent with
-             the 1-epoch envelope despite repetition+paraphrase points
-             contributing to β.
-  Panel (b): all kept pooled points (1-ep filled circles, repetition
-             open squares, paraphrase open triangles). All three sources
-             join the same line under D → D + η_src·D'.
+  Panel (a): raw tokens D. 1-epoch points sit on the classic scaling-law
+             line; repetition (squares) and paraphrase (triangles) points
+             fall BELOW it — at the same fresh D they trained on more
+             effective tokens, so their reducible loss is lower.
+  Panel (b): effective tokens D_eff = D + η_src·D'. All three sources
+             collapse back onto the same line, validating the η correction.
 
-  We exclude the points dropped by the canonical k=15 residual trim
-  (approximated here as the top-k pooled-residual points against the
-  published joint-fit prediction; iterative greedy drop and one-shot
-  top-k drop coincide for the largest residuals).
+  Points dropped by the canonical k=15 residual trim (approximated as the
+  top-k pooled-residual points against the headline joint-fit prediction)
+  are excluded.
 
-Saves to the syn_data_scaling figures dir as fig3_loss_vs_D.pdf and PNG.
+Saves fig3_loss_vs_D.pdf and PNG in this directory.
 """
 
 import glob
@@ -40,21 +36,16 @@ from fit_joint_triple import (  # noqa: E402
 OUT_DIR = os.path.dirname(os.path.abspath(__file__))
 os.makedirs(OUT_DIR, exist_ok=True)
 
-# Canonical one-shot triple-joint fit (writeup.md §6, k=15)
-# 1-epoch + repetition + paraphrase, pooled n=301, kept 286
+# ── Headline triple-joint fit (final results) ──────────────────────────
+#   backbone  L = E + A/N^α + B/D_eff^β
+#   per-strategy saturation  R*(N, D) = exp(logK + ρ·log(D/N) + σ·log N),
+#                            η = R*(1 - e^{-x/R*}) / x,   x = D'/D
 CANON = dict(
-    E=0.003, A=28.9, B=15_599.0, alpha=0.133, beta=0.431,
-    log_K_rep=10.58,  rho_rep=-0.41,  sigma_rep=-0.39,
-    log_K_para=10.10, rho_para=-2.56, sigma_para=+0.18,
+    E=1.35, A=205.0, B=16_597.0, alpha=0.283, beta=0.435,
+    log_K_rep=10.93,  rho_rep=-0.42,  sigma_rep=-0.41,
+    log_K_para=30.50, rho_para=-1.52, sigma_para=-1.30,
 )
 CANONICAL_K = 15  # drop top-15 worst-residual points before plotting
-
-# Paraphrase η anchors: frozen-Chinchilla fit with η > 1 violator filter +
-# k=5 residual drop (fit_joint_freeze_filtered.py).  Same exp-sat R*(D, N)
-# form as repetition; only the (log K, ρ, σ) triplet differs.
-CANON_PARA = dict(log_K=8.87, rho=-0.140, sigma=-0.403)
-CANONICAL_K_PARA = 5
-PARA_EXCLUDE_SIZES = {"14m"}
 
 
 # ── Palatino (URW P052 clone) — match paper_figures.py styling ──────
@@ -113,72 +104,17 @@ def eta_per_source(N, D, Dp, source, p=CANON):
     if is_rep.any():
         R = Rstar(N[is_rep], D[is_rep],
                   p["log_K_rep"], p["rho_rep"], p["sigma_rep"])
-        x = Dp[is_rep] / D[is_rep]
-        out[is_rep] = _eta_form(R, x)
+        out[is_rep] = _eta_form(R, Dp[is_rep] / D[is_rep])
     if is_para.any():
         R = Rstar(N[is_para], D[is_para],
                   p["log_K_para"], p["rho_para"], p["sigma_para"])
-        x = Dp[is_para] / D[is_para]
-        out[is_para] = _eta_form(R, x)
+        out[is_para] = _eta_form(R, Dp[is_para] / D[is_para])
     return out
 
 
 def L_pred(N, D, Dp, source, p=CANON):
-    e = eta_per_source(N, D, Dp, source, p)
-    D_eff = D + e * Dp
+    D_eff = D + eta_per_source(N, D, Dp, source, p) * Dp
     return p["E"] + p["A"] / N ** p["alpha"] + p["B"] / D_eff ** p["beta"]
-
-
-def Rstar_para(N, D, p=CANON_PARA):
-    return np.exp(p["log_K"] + p["rho"] * np.log(D / N) + p["sigma"] * np.log(N))
-
-
-def eta_para(N, D, Dp, p=CANON_PARA):
-    """exp-sat with paraphrase R*(N, D); 0 when Dp == 0."""
-    out = np.zeros_like(D, dtype=np.float64)
-    mask = Dp > 0
-    R = Rstar_para(N[mask], D[mask], p)
-    x = Dp[mask] / D[mask]
-    out[mask] = R * (1.0 - np.exp(-x / R)) / x
-    return out
-
-
-def per_point_eta_pp(D, Dp, L, L1, p=CANON):
-    """Per-point η from ΔL solver under shared (B, β); NaN on solver fail.
-    Used to identify physically inconsistent paraphrase points (η > 1)."""
-    dL = L1 - L
-    denom = (1.0 / D ** p["beta"]) - (dL / p["B"])
-    if denom <= 0:
-        return float("nan")
-    D_eff = denom ** (-1.0 / p["beta"])
-    return (D_eff - D) / Dp
-
-
-def collect_para():
-    """Pool paraphrase points across sizes (excluding PARA_EXCLUDE_SIZES) and
-    drop per-point η > 1 violators — matches fit_joint_freeze_filtered.py."""
-    tags, Ns, Ds, Dps, Ls = [], [], [], [], []
-    for size in SIZES:
-        if size in PARA_EXCLUDE_SIZES:
-            continue
-        N, datasets, parap = load_with_para(size)
-        if not parap:
-            continue
-        s_, D_, _K, Dp_, L_, L1_ = extract_paraphrase(
-            datasets, parap, N, scale_min=0.0)
-        for d, dp, l, l1 in zip(D_, Dp_, L_, L1_):
-            eta_pp = per_point_eta_pp(d, dp, l, l1)
-            if np.isnan(eta_pp) or eta_pp > 1.0:
-                continue
-            tags.append(size); Ns.append(N); Ds.append(d); Dps.append(dp)
-            Ls.append(l)
-    return dict(
-        tags=np.array(tags),
-        N=np.array(Ns, dtype=np.float64),
-        D=np.array(Ds, dtype=np.float64),
-        Dp=np.array(Dps, dtype=np.float64),
-        L=np.array(Ls, dtype=np.float64),
-    )
 
 
 def cmap_for(n):
@@ -200,145 +136,92 @@ def plot_fig3():
 
     # ── Identify the points dropped by the canonical k=15 fit ──────────
     # Approximation: drop the points with the largest |log L - log L_pred|
-    # under the canonical triple-joint anchors. Iterative greedy drop and
-    # the one-shot top-k drop coincide for the largest residuals; the few
-    # discrepancies don't matter for a paper figure.
+    # under the headline anchors. Iterative greedy drop and the one-shot
+    # top-k drop coincide for the largest residuals.
     pred = L_pred(Ns, Ds, Dps, src)
     log_resid = np.log(Ls) - np.log(pred)
     drop_idx = np.argsort(np.abs(log_resid))[::-1][:CANONICAL_K]
     keep = np.ones(len(Ls), dtype=bool)
     keep[drop_idx] = False
 
-    # Reducible loss y = L - (E + A/N^α). For the joint fit y_pred = B/D_eff^β.
-    L_red_obs = Ls - L_inf(Ns)
-    L_red_obs = np.clip(L_red_obs, 1e-6, None)  # guard against tiny negatives
-
-    # ── Paraphrase pool: η > 1 filter + k=5 residual drop, η_para anchors ─
-    para = collect_para()
-    L_pred_para = (
-        L_inf(para["N"])
-        + CANON["B"]
-        / (para["D"] + eta_para(para["N"], para["D"], para["Dp"]) * para["Dp"])
-        ** CANON["beta"]
-    )
-    log_resid_para = np.log(para["L"]) - np.log(L_pred_para)
-    drop_idx_para = np.argsort(np.abs(log_resid_para))[::-1][:CANONICAL_K_PARA]
-    keep_para = np.ones(len(para["L"]), dtype=bool)
-    keep_para[drop_idx_para] = False
-    L_red_para = np.clip(para["L"] - L_inf(para["N"]), 1e-6, None)
-    D_eff_para = (
-        para["D"]
-        + eta_para(para["N"], para["D"], para["Dp"]) * para["Dp"]
-    )
-
-    sizes = sorted(
-        set(tags.tolist()) | set(para["tags"].tolist()),
-        key=lambda t: SIZES[t][0],
-    )
-    colors = {t: c for t, c in zip(sizes, cmap_for(len(sizes)))}
+    # Reducible loss y = L - (E + A/N^α); backbone prediction y = B/D_eff^β.
+    L_red_obs = np.clip(Ls - L_inf(Ns), 1e-6, None)
 
     # Effective tokens D_eff = D + η_src·D' (= D for 1-epoch points)
     eta_arr = eta_per_source(Ns, Ds, Dps, src)
     D_eff = Ds + eta_arr * Dps
 
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6.2), sharey=True)
-    ax_1ep, ax_all = axes
+    sizes = sorted(set(tags.tolist()), key=lambda t: SIZES[t][0])
+    colors = {t: c for t, c in zip(sizes, cmap_for(len(sizes)))}
 
-    # The shared linear backbone in log-log:
-    #   log(L - L_inf) = log B - β log D_eff
-    D_eff_lo = min(D_eff.min(), D_eff_para.min()) * 0.6
-    D_eff_hi = max(D_eff.max(), D_eff_para.max()) * 1.6
-    D_smooth = np.geomspace(D_eff_lo, D_eff_hi, 240)
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6.2), sharey=True)
+    ax_raw, ax_eff = axes
+
+    # Shared linear backbone: log(L - L_inf) = log B - β log D
+    x_lo = min(Ds.min(), D_eff.min()) * 0.6
+    x_hi = max(Ds.max(), D_eff.max()) * 1.6
+    D_smooth = np.geomspace(x_lo, x_hi, 240)
     line_red = CANON["B"] / D_smooth ** CANON["beta"]
 
-    # ── Panel (a): raw D — 1-epoch points sit on the line; all kept
-    # multi-epoch and paraphrase at the same fresh D fall BELOW (they
-    # trained on more tokens than D, so reducible loss drops below the
-    # 1-epoch line at the same D).
-    for tag in sizes:
-        m1 = (tags == tag) & is_1ep & keep
-        ax_1ep.scatter(D_eff[m1], L_red_obs[m1], s=44, color=colors[tag],
-                       edgecolors="k", linewidths=0.4, zorder=5,
-                       label=f"{tag}")
-        mm = (tags == tag) & is_multi & keep
-        if mm.any():
-            ax_1ep.scatter(Ds[mm], L_red_obs[mm], s=30, marker="s",
-                            facecolors="none", edgecolors=colors[tag],
-                            linewidths=1.0, alpha=0.85, zorder=4)
-        mp = (para["tags"] == tag) & keep_para
-        if mp.any():
-            ax_1ep.scatter(para["D"][mp], L_red_para[mp], s=44, marker="D",
-                            facecolors="none", edgecolors=colors[tag],
-                            linewidths=1.1, alpha=0.9, zorder=4)
-    ax_1ep.plot(D_smooth, line_red, "-", color="0.2", linewidth=2.0, zorder=3)
-    ax_1ep.set_xscale("log", base=10)
-    ax_1ep.set_yscale("log")
-    ax_1ep.xaxis.set_major_formatter(FuncFormatter(fmt_tokens))
-    ax_1ep.set_xlabel(r"effective tokens $D + \eta_{\mathrm{src}}\,D'$  (= $D$ for 1-epoch)")
-    ax_1ep.set_ylabel(r"reducible loss $\;L - (E + A/N^{\alpha})$")
-    ax_1ep.set_title(r"(a) 1-epoch kept points, backbone validation")
-    ax_1ep.legend(title=r"$N$", loc="lower left", ncol=2,
-                  columnspacing=0.8, handletextpad=0.4, fontsize=9)
+    y_label = "Data-Reducible Loss\n" + r"$L - (E + A/N^{\alpha})$"
 
-    keep_1ep = is_1ep & keep
-    rmse_1ep = float(np.sqrt(np.mean(log_resid[keep_1ep] ** 2)))
-    n_kept_1ep = int(keep_1ep.sum())
-    n_total_1ep = int(is_1ep.sum())
-    ax_1ep.text(0.04, 0.92,
-                rf"RMSE($\log L$) = {rmse_1ep:.3f}  ($n = {n_kept_1ep}/{n_total_1ep}$)",
-                transform=ax_1ep.transAxes, va="top", fontsize=9,
-                bbox=dict(facecolor="white", alpha=0.85, edgecolor="none"))
-
-    # ── Panel (b): all kept pooled points on the same effective axis ──
-    for tag in sizes:
-        m = (tags == tag) & keep
-        m1 = m & is_1ep
-        ax_all.scatter(D_eff[m1], L_red_obs[m1], s=44, color=colors[tag],
-                       edgecolors="k", linewidths=0.4, zorder=5)
-        mr = m & is_rep
-        ax_all.scatter(D_eff[mr], L_red_obs[mr], s=30, marker="s",
+    def scatter_panel(ax, x_vals):
+        for tag in sizes:
+            m = (tags == tag) & keep
+            m1 = m & is_1ep
+            ax.scatter(x_vals[m1], L_red_obs[m1], s=64, color=colors[tag],
+                       edgecolors="k", linewidths=0.4, zorder=5, label=tag)
+            mr = m & is_rep
+            ax.scatter(x_vals[mr], L_red_obs[mr], s=30, marker="s",
                        facecolors="none", edgecolors=colors[tag],
                        linewidths=1.0, alpha=0.85, zorder=4)
-        mp = m & is_para
-        ax_all.scatter(D_eff[mp], L_red_obs[mp], s=42, marker="^",
+            mp = m & is_para
+            ax.scatter(x_vals[mp], L_red_obs[mp], s=42, marker="^",
                        facecolors="none", edgecolors=colors[tag],
                        linewidths=1.1, alpha=0.9, zorder=4)
-    ax_all.plot(D_smooth, line_red, "-", color="0.2", linewidth=2.0,
-                zorder=3, label=r"$B/D_{\mathrm{eff}}^{\beta}$")
-    ax_all.set_xscale("log", base=10)
-    ax_all.set_yscale("log")
-    ax_all.xaxis.set_major_formatter(FuncFormatter(fmt_tokens))
-    ax_all.set_xlabel(r"effective tokens $D + \eta_{\mathrm{src}}\,D'$")
-    ax_all.set_ylabel(r"reducible loss $\;L - (E + A/N^{\alpha})$")
-    ax_all.set_title("(b) all kept points (1-ep filled, repeat squares, para triangles)")
+        ax.plot(D_smooth, line_red, "-", color="0.2", linewidth=2.0, zorder=3,
+                label="Classic Scaling Law Fit")
+        ax.set_xscale("log", base=10)
+        ax.set_yscale("log")
+        ax.xaxis.set_major_formatter(FuncFormatter(fmt_tokens))
+
+    # ── Panel (a): raw tokens D — extra-data points fall below the line ─
+    scatter_panel(ax_raw, Ds)
+    ax_raw.set_xlabel(r"Tokens $D$")
+    ax_raw.set_ylabel(y_label)
+
+    # ── Panel (b): effective tokens D_eff — all sources collapse ───────
+    scatter_panel(ax_eff, D_eff)
+    ax_eff.set_xlabel(r"Effective Tokens $D_{\mathrm{eff}} = D + \eta_{\mathrm{strat}}\,D'$")
+
+    # ── Legends: left panel gets the shape/style legend, right the N ───
     style_handles = [
         plt.Line2D([0], [0], marker="o", color="w",
                    markerfacecolor="0.6", markeredgecolor="k",
-                   markersize=11, label="1-Epoch"),
+                   markersize=13, label="1-Epoch"),
         plt.Line2D([0], [0], marker="s", color="w",
                    markerfacecolor="none", markeredgecolor="0.4",
-                   markersize=8, label="repetition"),
+                   markersize=8, label="Repetition"),
         plt.Line2D([0], [0], marker="^", color="w",
                    markerfacecolor="none", markeredgecolor="0.4",
-                   markersize=8, label="paraphrase"),
-        plt.Line2D([0], [0], color="0.2", linewidth=2.0,
-                   label=rf"$B/D_{{\mathrm{{eff}}}}^{{\beta}}$, $\beta={CANON['beta']:.3f}$"),
+                   markersize=8, label="Paraphrase"),
     ]
-    ax_all.legend(handles=style_handles, loc="lower left",
-                  fontsize=16, handletextpad=0.5, framealpha=0.9)
+    shape_leg = ax_raw.legend(handles=style_handles, loc="lower left",
+                              fontsize=16, handletextpad=0.5, frameon=False)
+    ax_raw.add_artist(shape_leg)
+    fit_handle = [plt.Line2D([0], [0], color="0.2", linewidth=2.0,
+                             label="Classic Scaling Law Fit")]
+    ax_raw.legend(handles=fit_handle, loc="upper right",
+                  fontsize=16, handletextpad=0.5, frameon=False)
 
-    # Per-source RMSE annotations on kept points
-    rmse_rep  = float(np.sqrt(np.mean(log_resid[is_rep  & keep] ** 2))) if (is_rep  & keep).any() else float("nan")
-    rmse_para = float(np.sqrt(np.mean(log_resid[is_para & keep] ** 2))) if (is_para & keep).any() else float("nan")
-    rmse_all = float(np.sqrt(np.mean(log_resid[keep] ** 2)))
-    n_kept = int(keep.sum())
-    n_total = int(len(Ls))
-    ax_all.text(
-        0.04, 0.92,
-        rf"RMSE($\log L$): 1ep {rmse_1ep:.3f}, rep {rmse_rep:.3f}, para {rmse_para:.3f}"
-        f"\n$n = {n_kept}/{n_total}$",
-        transform=ax_all.transAxes, va="top", fontsize=9,
-        bbox=dict(facecolor="white", alpha=0.85, edgecolor="none"))
+    size_handles = [
+        plt.Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[t],
+                   markeredgecolor="k", markersize=10, label=t)
+        for t in sizes
+    ]
+    ax_eff.legend(handles=size_handles, title=r"$N$", loc="lower left",
+                  ncol=2, columnspacing=0.8, handletextpad=0.4, fontsize=14,
+                  frameon=False)
 
     fig.tight_layout()
     out_pdf = os.path.join(OUT_DIR, "fig3_loss_vs_D.pdf")
@@ -348,10 +231,9 @@ def plot_fig3():
     plt.close(fig)
     print(f"saved {out_pdf}")
     print(f"saved {out_png}")
-    print(f"dropped (top-k={CANONICAL_K} residuals): {len(drop_idx)} of {len(Ls)} pooled")
-    print(f"  → kept {keep.sum()} pooled = {keep_1ep.sum()} 1-ep + {(is_multi & keep).sum()} multi-ep")
-    print(f"1-ep kept RMSE(log L)   = {rmse_1ep:.4f}")
-    print(f"pooled kept RMSE(log L) = {rmse_all:.4f}")
+    print(f"dropped top-k={CANONICAL_K} residuals; kept {keep.sum()}/{len(Ls)} "
+          f"= {(is_1ep & keep).sum()} 1-ep + {(is_rep & keep).sum()} rep + "
+          f"{(is_para & keep).sum()} para")
 
 
 if __name__ == "__main__":

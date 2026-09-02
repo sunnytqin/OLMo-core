@@ -205,6 +205,18 @@
       "has_eval": true
     },
     {
+      "run_name": "30M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.05",
+      "model_size": "30M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.05/30M_seed42_dolma_para_K64_wd0.1_lr3e-3/step306",
+      "last_step": 306,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "30M_seed42_dolma_para_K8_wd0.1_lr3e-3",
       "chinchilla_dir": "chinchilla_0.05",
       "model_size": "30M",
@@ -325,6 +337,18 @@
       "has_eval": true
     },
     {
+      "run_name": "60M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.05",
+      "model_size": "60M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.05/60M_seed42_dolma_para_K64_wd0.1_lr3e-3/step616",
+      "last_step": 616,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "60M_seed42_dolma_para_K8_wd0.1_lr3e-3",
       "chinchilla_dir": "chinchilla_0.05",
       "model_size": "60M",
@@ -405,6 +429,18 @@
       "lr": "3e-3",
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.05/190M_seed42_dolma_para_K4_wd0.1_lr3e-3/step208",
       "last_step": 208,
+      "complete": true,
+      "has_eval": true
+    },
+    {
+      "run_name": "190M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.05",
+      "model_size": "190M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.05/190M_seed42_dolma_para_K64_wd0.1_lr3e-3/step1924",
+      "last_step": 1924,
       "complete": true,
       "has_eval": true
     },
@@ -505,6 +541,18 @@
       "has_eval": true
     },
     {
+      "run_name": "370M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.05",
+      "model_size": "370M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.05/370M_seed42_dolma_para_K64_wd0.1_lr3e-3/step3780",
+      "last_step": 3780,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "370M_seed42_dolma_para_K8_wd0.1_lr3e-3",
       "chinchilla_dir": "chinchilla_0.05",
       "model_size": "370M",
@@ -526,7 +574,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.05/600M_seed42_dolma_para_K16_wd0.1_lr3e-3/step1800",
       "last_step": 1800,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "600M_seed42_dolma_para_K1_wd0.1_lr3e-3",
@@ -538,7 +586,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.05/600M_seed42_dolma_para_K1_wd0.1_lr3e-3/step375",
       "last_step": 375,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "600M_seed42_dolma_para_K2_wd0.1_lr3e-3",
@@ -550,7 +598,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.05/600M_seed42_dolma_para_K2_wd0.1_lr3e-3/step471",
       "last_step": 471,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "600M_seed42_dolma_para_K32_wd0.1_lr3e-3",
@@ -562,7 +610,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.05/600M_seed42_dolma_para_K32_wd0.1_lr3e-3/step3230",
       "last_step": 3230,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "600M_seed42_dolma_para_K4_wd0.1_lr3e-3",
@@ -574,7 +622,19 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.05/600M_seed42_dolma_para_K4_wd0.1_lr3e-3/step659",
       "last_step": 659,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
+    },
+    {
+      "run_name": "600M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.05",
+      "model_size": "600M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.05/600M_seed42_dolma_para_K64_wd0.1_lr3e-3/step6144",
+      "last_step": 6144,
+      "complete": true,
+      "has_eval": true
     },
     {
       "run_name": "600M_seed42_dolma_para_K8_wd0.1_lr3e-3",
@@ -586,7 +646,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.05/600M_seed42_dolma_para_K8_wd0.1_lr3e-3/step1034",
       "last_step": 1034,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "14M_seed42_dolma_para_K1_wd0.1_lr3e-3",
@@ -781,6 +841,18 @@
       "has_eval": true
     },
     {
+      "run_name": "30M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.1",
+      "model_size": "30M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.1/30M_seed42_dolma_para_K64_wd0.1_lr3e-3/step616",
+      "last_step": 616,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "30M_seed42_dolma_para_K8_wd0.1_lr3e-3",
       "chinchilla_dir": "chinchilla_0.1",
       "model_size": "30M",
@@ -901,6 +973,18 @@
       "has_eval": true
     },
     {
+      "run_name": "60M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.1",
+      "model_size": "60M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.1/60M_seed42_dolma_para_K64_wd0.1_lr3e-3/step1236",
+      "last_step": 1236,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "60M_seed42_dolma_para_K8_wd0.1_lr3e-3",
       "chinchilla_dir": "chinchilla_0.1",
       "model_size": "60M",
@@ -985,6 +1069,18 @@
       "has_eval": true
     },
     {
+      "run_name": "190M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.1",
+      "model_size": "190M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.1/190M_seed42_dolma_para_K64_wd0.1_lr3e-3/step3883",
+      "last_step": 3883,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "190M_seed42_dolma_para_K8_wd0.1_lr3e-3",
       "chinchilla_dir": "chinchilla_0.1",
       "model_size": "190M",
@@ -1054,7 +1150,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.1/370M_seed42_dolma_para_K32_wd0.1_lr3e-3/step3979",
       "last_step": 3979,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "370M_seed42_dolma_para_K4_wd0.1_lr3e-3",
@@ -1065,6 +1161,18 @@
       "lr": "3e-3",
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.1/370M_seed42_dolma_para_K4_wd0.1_lr3e-3/step813",
       "last_step": 813,
+      "complete": true,
+      "has_eval": true
+    },
+    {
+      "run_name": "370M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.1",
+      "model_size": "370M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.1/370M_seed42_dolma_para_K64_wd0.1_lr3e-3/step7569",
+      "last_step": 7569,
       "complete": true,
       "has_eval": true
     },
@@ -1090,7 +1198,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.1/600M_seed42_dolma_para_K16_wd0.1_lr3e-3/step3603",
       "last_step": 3603,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "600M_seed42_dolma_para_K1_wd0.1_lr3e-3",
@@ -1102,7 +1210,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.1/600M_seed42_dolma_para_K1_wd0.1_lr3e-3/step750",
       "last_step": 750,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "600M_seed42_dolma_para_K2_wd0.1_lr3e-3",
@@ -1114,7 +1222,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.1/600M_seed42_dolma_para_K2_wd0.1_lr3e-3/step941",
       "last_step": 941,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "600M_seed42_dolma_para_K32_wd0.1_lr3e-3",
@@ -1126,7 +1234,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.1/600M_seed42_dolma_para_K32_wd0.1_lr3e-3/step6462",
       "last_step": 6462,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "600M_seed42_dolma_para_K4_wd0.1_lr3e-3",
@@ -1138,7 +1246,19 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.1/600M_seed42_dolma_para_K4_wd0.1_lr3e-3/step1319",
       "last_step": 1319,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
+    },
+    {
+      "run_name": "600M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.1",
+      "model_size": "600M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.1/600M_seed42_dolma_para_K64_wd0.1_lr3e-3/step12296",
+      "last_step": 12296,
+      "complete": true,
+      "has_eval": true
     },
     {
       "run_name": "600M_seed42_dolma_para_K8_wd0.1_lr3e-3",
@@ -1150,7 +1270,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.1/600M_seed42_dolma_para_K8_wd0.1_lr3e-3/step2068",
       "last_step": 2068,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "14M_seed42_dolma_para_K1_wd0.1_lr3e-3",
@@ -1345,6 +1465,18 @@
       "has_eval": true
     },
     {
+      "run_name": "30M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.25",
+      "model_size": "30M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/30M_seed42_dolma_para_K64_wd0.1_lr3e-3/step1532",
+      "last_step": 1532,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "30M_seed42_dolma_para_K8_wd0.1_lr3e-3",
       "chinchilla_dir": "chinchilla_0.25",
       "model_size": "30M",
@@ -1465,6 +1597,18 @@
       "has_eval": true
     },
     {
+      "run_name": "60M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.25",
+      "model_size": "60M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/60M_seed42_dolma_para_K64_wd0.1_lr3e-3/step3061",
+      "last_step": 3061,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "60M_seed42_dolma_para_K8_wd0.1_lr3e-3",
       "chinchilla_dir": "chinchilla_0.25",
       "model_size": "60M",
@@ -1549,6 +1693,18 @@
       "has_eval": true
     },
     {
+      "run_name": "190M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.25",
+      "model_size": "190M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/190M_seed42_dolma_para_K64_wd0.1_lr3e-3/step9704",
+      "last_step": 9704,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "190M_seed42_dolma_para_K8_wd0.1_lr3e-3",
       "chinchilla_dir": "chinchilla_0.25",
       "model_size": "190M",
@@ -1570,7 +1726,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/600M_seed42_dolma_para_K16_wd0.1_lr3e-3/step9004",
       "last_step": 9004,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "600M_seed42_dolma_para_K1_wd0.1_lr3e-3",
@@ -1582,7 +1738,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/600M_seed42_dolma_para_K1_wd0.1_lr3e-3/step1872",
       "last_step": 1872,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "600M_seed42_dolma_para_K2_wd0.1_lr3e-3",
@@ -1594,7 +1750,19 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/600M_seed42_dolma_para_K2_wd0.1_lr3e-3/step2349",
       "last_step": 2349,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
+    },
+    {
+      "run_name": "600M_seed42_dolma_para_K32_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.25",
+      "model_size": "600M",
+      "K": 32,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/600M_seed42_dolma_para_K32_wd0.1_lr3e-3/step16148",
+      "last_step": 16148,
+      "complete": true,
+      "has_eval": true
     },
     {
       "run_name": "600M_seed42_dolma_para_K4_wd0.1_lr3e-3",
@@ -1606,7 +1774,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/600M_seed42_dolma_para_K4_wd0.1_lr3e-3/step3294",
       "last_step": 3294,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "600M_seed42_dolma_para_K8_wd0.1_lr3e-3",
@@ -1618,7 +1786,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.25/600M_seed42_dolma_para_K8_wd0.1_lr3e-3/step5167",
       "last_step": 5167,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "14M_seed42_dolma_para_K1_wd0.1_lr3e-3",
@@ -2077,6 +2245,18 @@
       "has_eval": true
     },
     {
+      "run_name": "60M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.5",
+      "model_size": "60M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/60M_seed42_dolma_para_K64_wd0.1_lr3e-3/step6144",
+      "last_step": 6144,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "60M_seed42_dolma_para_K8_wd0.1_lr1e-3",
       "chinchilla_dir": "chinchilla_0.5",
       "model_size": "60M",
@@ -2257,6 +2437,18 @@
       "has_eval": true
     },
     {
+      "run_name": "190M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.5",
+      "model_size": "190M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/190M_seed42_dolma_para_K64_wd0.1_lr3e-3/step19470",
+      "last_step": 19470,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "190M_seed42_dolma_para_K8_wd0.2_lr3e-3",
       "chinchilla_dir": "chinchilla_0.5",
       "model_size": "190M",
@@ -2314,7 +2506,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/370M_seed42_dolma_para_K32_wd0.1_lr3e-3/step19942",
       "last_step": 19942,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "370M_seed42_dolma_para_K4_wd0.1_lr3e-3",
@@ -2341,6 +2533,18 @@
       "has_eval": true
     },
     {
+      "run_name": "600M_seed42_dolma_para_K16_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.5",
+      "model_size": "600M",
+      "K": 16,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/600M_seed42_dolma_para_K16_wd0.1_lr3e-3/step17966",
+      "last_step": 17966,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "600M_seed42_dolma_para_K1_wd0.1_lr3e-3",
       "chinchilla_dir": "chinchilla_0.5",
       "model_size": "600M",
@@ -2350,7 +2554,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/600M_seed42_dolma_para_K1_wd0.1_lr3e-3/step3739",
       "last_step": 3739,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "600M_seed42_dolma_para_K2_wd0.1_lr3e-3",
@@ -2362,7 +2566,19 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/600M_seed42_dolma_para_K2_wd0.1_lr3e-3/step4691",
       "last_step": 4691,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
+    },
+    {
+      "run_name": "600M_seed42_dolma_para_K32_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.5",
+      "model_size": "600M",
+      "K": 32,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/600M_seed42_dolma_para_K32_wd0.1_lr3e-3/step32209",
+      "last_step": 32209,
+      "complete": true,
+      "has_eval": true
     },
     {
       "run_name": "600M_seed42_dolma_para_K4_wd0.1_lr3e-3",
@@ -2374,7 +2590,19 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/600M_seed42_dolma_para_K4_wd0.1_lr3e-3/step6576",
       "last_step": 6576,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
+    },
+    {
+      "run_name": "600M_seed42_dolma_para_K8_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_0.5",
+      "model_size": "600M",
+      "K": 8,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_0.5/600M_seed42_dolma_para_K8_wd0.1_lr3e-3/step10313",
+      "last_step": 10313,
+      "complete": true,
+      "has_eval": true
     },
     {
       "run_name": "14M_seed42_dolma_para_K1_wd0.1_lr3e-3",
@@ -2641,6 +2869,18 @@
       "has_eval": true
     },
     {
+      "run_name": "30M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_1",
+      "model_size": "30M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_1/30M_seed42_dolma_para_K64_wd0.1_lr3e-3/step6144",
+      "last_step": 6144,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "30M_seed42_dolma_para_K8_wd0.1_lr1e-3",
       "chinchilla_dir": "chinchilla_1",
       "model_size": "30M",
@@ -2857,6 +3097,18 @@
       "has_eval": true
     },
     {
+      "run_name": "60M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_1",
+      "model_size": "60M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_1/60M_seed42_dolma_para_K64_wd0.1_lr3e-3/step12296",
+      "last_step": 12296,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "60M_seed42_dolma_para_K8_wd0.1_lr1e-3",
       "chinchilla_dir": "chinchilla_1",
       "model_size": "60M",
@@ -3058,7 +3310,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_1/370M_seed42_dolma_para_K16_wd0.1_lr3e-3/step22165",
       "last_step": 22165,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "370M_seed42_dolma_para_K1_wd0.1_lr3e-3",
@@ -3118,7 +3370,7 @@
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_1/370M_seed42_dolma_para_K32_wd0.1_lr3e-3/step39740",
       "last_step": 39740,
       "complete": true,
-      "has_eval": false
+      "has_eval": true
     },
     {
       "run_name": "370M_seed42_dolma_para_K4_wd0.1_lr3e-3",
@@ -3421,6 +3673,18 @@
       "has_eval": true
     },
     {
+      "run_name": "30M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_2",
+      "model_size": "30M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_2/30M_seed42_dolma_para_K64_wd0.1_lr3e-3/step12296",
+      "last_step": 12296,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "30M_seed42_dolma_para_K8_wd0.1_lr1e-3",
       "chinchilla_dir": "chinchilla_2",
       "model_size": "30M",
@@ -3633,6 +3897,18 @@
       "lr": "3e-3",
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_2/60M_seed42_dolma_para_K4_wd0.2_lr3e-3/step2635",
       "last_step": 2635,
+      "complete": true,
+      "has_eval": true
+    },
+    {
+      "run_name": "60M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_2",
+      "model_size": "60M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_2/60M_seed42_dolma_para_K64_wd0.1_lr3e-3/step24577",
+      "last_step": 24577,
       "complete": true,
       "has_eval": true
     },
@@ -4093,6 +4369,18 @@
       "has_eval": true
     },
     {
+      "run_name": "30M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_4",
+      "model_size": "30M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_4/30M_seed42_dolma_para_K64_wd0.1_lr3e-3/step24577",
+      "last_step": 24577,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "30M_seed42_dolma_para_K8_wd0.1_lr1e-3",
       "chinchilla_dir": "chinchilla_4",
       "model_size": "30M",
@@ -4305,6 +4593,18 @@
       "lr": "3e-3",
       "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_4/60M_seed42_dolma_para_K4_wd0.2_lr3e-3/step5261",
       "last_step": 5261,
+      "complete": true,
+      "has_eval": true
+    },
+    {
+      "run_name": "60M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_4",
+      "model_size": "60M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_4/60M_seed42_dolma_para_K64_wd0.1_lr3e-3/step49038",
+      "last_step": 49038,
       "complete": true,
       "has_eval": true
     },
@@ -4621,6 +4921,18 @@
       "has_eval": true
     },
     {
+      "run_name": "30M_seed42_dolma_para_K64_wd0.1_lr3e-3",
+      "chinchilla_dir": "chinchilla_8",
+      "model_size": "30M",
+      "K": 64,
+      "wd": "0.1",
+      "lr": "3e-3",
+      "checkpoint_path": "/n/netscratch/barak_lab/Lab/sqin/olmo/checkpoints/chinchilla_8/30M_seed42_dolma_para_K64_wd0.1_lr3e-3/step49038",
+      "last_step": 49038,
+      "complete": true,
+      "has_eval": true
+    },
+    {
       "run_name": "30M_seed42_dolma_para_K8_wd0.1_lr1e-3",
       "chinchilla_dir": "chinchilla_8",
       "model_size": "30M",
@@ -4766,17 +5078,17 @@
     }
   ],
   "summary": {
-    "total_complete": 397,
-    "already_evaluated": 373,
-    "needs_evaluation": 24,
+    "total_complete": 423,
+    "already_evaluated": 423,
+    "needs_evaluation": 0,
     "by_model_size": {
       "14M": 73,
-      "30M": 118,
-      "60M": 102,
+      "30M": 125,
+      "60M": 109,
       "100M": 0,
-      "190M": 54,
-      "370M": 30,
-      "600M": 20
+      "190M": 58,
+      "370M": 32,
+      "600M": 26
     }
   }
 }

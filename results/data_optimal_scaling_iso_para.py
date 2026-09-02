@@ -12,8 +12,8 @@ instead of repetition:
   * region labels (Compute-bound / Data-bound / Model-bound)
   * action arrows ("add paraphrases", "add fresh data")
 
-Scaling-law anchors are the frozen-backbone η_para fit (k=15, 14M excluded)
-from results/chinchilla_fit_dolma/fit_joint_freeze.py.
+Scaling-law anchors are the one-shot triple fit (1-epoch + repetition +
+paraphrase, k=15) from results/chinchilla_fit_dolma/writeup.md §6.
 
 Saves one PDF + PNG per size to results/.
 """
@@ -29,19 +29,22 @@ from matplotlib.lines import Line2D
 sys.path.insert(0, os.path.dirname(__file__))
 
 
-# === Scaling-law parameters (fit_joint_freeze.py, frozen backbone, k=15) ===
-# Chinchilla backbone pinned to the writeup_final rep+1ep headline values.
-# η_para fitted on the paraphrase-only pool with 14M excluded (n_total=142,
-# sizes 30M/60M/190M/370M). Canonical residual-drop k=15.
-SL_E     = 0.050
-SL_A     = 31.0
-SL_B     = 16539.0
-SL_ALPHA = 0.137
-SL_BETA  = 0.436
+# === Scaling-law parameters (one-shot triple fit, writeup.md §6, k=15) ===
+# One-go 11-parameter joint fit on 1-epoch + repetition + paraphrase
+# (n=370, updated with K=64 paraphrase corpus), with shared Chinchilla
+# backbone and separate exp-sat R*(N) surfaces for repetition and
+# paraphrase. Values from the `default` grid in
+# results/chinchilla_fit_dolma/_onego_json/triple_onego_k64_update.json,
+# matching the writeup §6.1 canonical k=15 headline.
+SL_E     = 1.395827
+SL_A     = 225.303886
+SL_B     = 17737.710663
+SL_ALPHA = 0.289137
+SL_BETA  = 0.437825
 # η_para surface
-SL_LOG_K_PARA = 11.348948
-SL_RHO_PARA   = -0.290130
-SL_SIGMA_PARA = -0.477855
+SL_LOG_K_PARA = 26.868495
+SL_RHO_PARA   = -1.303025
+SL_SIGMA_PARA = -1.149994
 
 
 def E_eff(N):
@@ -150,6 +153,8 @@ SIZES = [
     ('dolma_30m',  29_102_336),
     ('dolma_60m',  57_422_208),
     ('dolma_190m', 190_354_176),
+    ('dolma_370m', 371_262_464),
+    ('dolma_600m', 547_964_160),
 ]
 
 
@@ -258,34 +263,40 @@ def _render_panel(ax, model_size, N, norm):
             zorder=15)
 
     # === Action arrows ===
-    arrow_x = 0.25 * 20 * N
-    if arrow_x > XLEFT and arrow_x < XRIGHT:
-        y_top = float(L_1ep(arrow_x, N)) - 0.15
-        y_bot = float(L_inf_para(arrow_x, N)) + 0.20
-        if y_top > y_bot:
-            ax.annotate('', xy=(arrow_x, y_bot), xytext=(arrow_x, y_top),
-                        arrowprops=dict(arrowstyle='-|>', color=COLOR_ARROW,
-                                        lw=3.0, mutation_scale=28),
-                        zorder=15)
-            ax.text(arrow_x * 1.20, (y_top + y_bot) / 2,
-                    'add paraphrases\n(more K)',
-                    fontsize=FONT_ANNOT, ha='left', va='center',
-                    color=COLOR_TEXT, fontweight='bold', zorder=15)
+    # Anchor to the left portion of each panel's own x-range (fraction of
+    # the log span) rather than a fixed Chinchilla scale. The compute-bound
+    # band is tallest on the left for every N, so this keeps the arrows
+    # long and the labels clear of the region text — which crowds the right
+    # side, especially at large N where the band collapses.
+    def _xfrac(f):
+        return XLEFT * (XRIGHT / XLEFT) ** f
 
-    x_a, x_b = 0.08 * 20 * N, 0.5 * 20 * N
-    if x_a > XLEFT and x_b < XRIGHT:
-        y_a, y_b = float(L_inf_para(x_a, N)), float(L_inf_para(x_b, N))
-        ax.annotate('', xy=(x_b, y_b), xytext=(x_a, y_a),
-                    arrowprops=dict(arrowstyle='-|>',
-                                    color=COLOR_DATA_HIGHLIGHT,
+    arrow_x = _xfrac(0.30)
+    y_top = float(L_1ep(arrow_x, N)) - 0.15
+    y_bot = float(L_inf_para(arrow_x, N)) + 0.20
+    if y_top > y_bot:
+        ax.annotate('', xy=(arrow_x, y_bot), xytext=(arrow_x, y_top),
+                    arrowprops=dict(arrowstyle='-|>', color=COLOR_ARROW,
                                     lw=3.0, mutation_scale=28),
                     zorder=15)
-        # Place label above the arrow rather than below, since paraphrase
-        # R* is large enough that the D'/D->inf curve sits close to e_eff.
-        ax.text(np.sqrt(x_a * x_b), max(y_a, y_b) + 0.25,
-                'add fresh data',
-                fontsize=FONT_ANNOT, ha='center', va='bottom',
-                color=COLOR_DATA_HIGHLIGHT, fontweight='bold', zorder=15)
+        ax.text(arrow_x * 1.25, (y_top + y_bot) / 2,
+                'add paraphrases\n(more K)',
+                fontsize=FONT_ANNOT, ha='left', va='center',
+                color=COLOR_TEXT, fontweight='bold', zorder=15)
+
+    x_a, x_b = _xfrac(0.04), _xfrac(0.26)
+    y_a, y_b = float(L_inf_para(x_a, N)), float(L_inf_para(x_b, N))
+    ax.annotate('', xy=(x_b, y_b), xytext=(x_a, y_a),
+                arrowprops=dict(arrowstyle='-|>',
+                                color=COLOR_DATA_HIGHLIGHT,
+                                lw=3.0, mutation_scale=28),
+                zorder=15)
+    # Place label above the arrow rather than below, since paraphrase
+    # R* is large enough that the D'/D->inf curve sits close to e_eff.
+    ax.text(np.sqrt(x_a * x_b), max(y_a, y_b) + 0.25,
+            'add fresh data',
+            fontsize=FONT_ANNOT, ha='center', va='bottom',
+            color=COLOR_DATA_HIGHLIGHT, fontweight='bold', zorder=15)
 
     return sc
 

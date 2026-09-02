@@ -6,15 +6,31 @@ list of evaluated checkpoints + their dolma validation loss, then finds the
 corresponding lm_eval results under results/<manifest_id>/.
 
 Produces:
-  figures/val_loss_vs_benchmarks.pdf  — one panel per benchmark (4x5 grid)
+  figures/val_loss_vs_benchmarks_acc.pdf   — accuracy/EM breakdown grid
+  figures/val_loss_vs_benchmarks_bpb.pdf   — BPB breakdown grid
+  figures/val_loss_vs_benchmarks_paper.pdf — 2-panel aggregated figure
 """
+import glob
 import json
 import math
+import os
 from collections import defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 import numpy as np
+
+# Palatino Linotype — matches isoloss_contour.py styling.
+_FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         '..', 'results', 'fonts')
+for _f in glob.glob(os.path.join(_FONT_DIR, 'palatinolinotype_*.ttf')):
+    font_manager.fontManager.addfont(_f)
+plt.rcParams.update({
+    'font.family':      'serif',
+    'font.serif':       ['Palatino Linotype', 'P052', 'Palatino', 'serif'],
+    'mathtext.fontset': 'cm',
+})
 
 # nats/token -> bits/byte. Measured on C4 val with allenai/dolma2-tokenizer.
 BYTES_PER_TOKEN = 4.6954
@@ -55,23 +71,33 @@ BENCHMARK_METRICS = {
     "ifeval_lm":           ("bits_per_byte,none",      "BPB",        False),
 }
 
-# Order by category for the grid layout
-PANEL_ORDER = [
-    # row 1 — perplexity / BPB on natural text
-    "c4", "wikitext",
-    # row 1 cont — accuracy tasks
-    "lambada_openai", "hellaswag", "openbookqa",
-    # row 2 — accuracy/exact-match
-    "race", "squad_completion-1", "webqs", "gsm8k",
-    # row 2 cont — code BPB
-    "humaneval_lm",
-    # row 3 — math BPB
-    "asdiv_lm", "gsm8k_lm", "mbpp_lm",
-    # row 3 cont — QA BPB
-    "nq_open_lm", "triviaqa_lm",
-    # row 4 — QA BPB cont + instruct BPB
-    "webqs_lm", "squad_completion_lm", "ifeval_lm",
+ACC_PANEL_ORDER = [
+    "lambada_openai", "hellaswag", "openbookqa", "race", "squad_completion-1",
 ]
+
+BPB_PANEL_ORDER = [
+    "c4", "wikitext",
+    "gsm8k_lm", "humaneval_lm", "mbpp_lm",
+    "nq_open_lm", "triviaqa_lm", "webqs_lm", "squad_completion_lm", "ifeval_lm",
+]
+
+BENCH_DISPLAY_NAME = {
+    "c4":                  "C4",
+    "wikitext":            "WikiText-103",
+    "lambada_openai":      "LAMBADA",
+    "hellaswag":           "HellaSwag",
+    "openbookqa":          "OpenBookQA",
+    "race":                "RACE",
+    "squad_completion-1":  "SQuAD",
+    "gsm8k_lm":            "GSM8K (LM)",
+    "humaneval_lm":        "HumanEval (LM)",
+    "mbpp_lm":             "MBPP (LM)",
+    "nq_open_lm":          "NQ Open (LM)",
+    "triviaqa_lm":         "TriviaQA (LM)",
+    "webqs_lm":            "WebQS (LM)",
+    "squad_completion_lm": "SQuAD (LM)",
+    "ifeval_lm":           "IFEval (LM)",
+}
 
 # Model size -> colormap index (smaller = lighter, larger = darker).
 # Each source gets its own colormap so we can compare loss-to-downstream
@@ -80,7 +106,7 @@ SIZE_ORDER = ["14M", "30M", "60M", "100M", "190M", "370M", "600M"]
 # Use the 0.25–0.95 range so the lightest end is still readable
 _LO, _HI = 0.25, 0.95
 SOURCE_CMAP = {"multiepoch": plt.cm.Blues, "para": plt.cm.Reds}
-SOURCE_LABEL = {"multiepoch": "multi-epoch (D × n)", "para": "paraphrase (D + D'×K)"}
+SOURCE_LABEL = {"multiepoch": "multi-epoch", "para": "paraphrase"}
 
 
 def size_color(size: str, source: str):
@@ -131,14 +157,14 @@ def collect_rows():
     return rows
 
 
-def plot_grid(rows, out_path: Path):
-    n_panels = len(PANEL_ORDER)
+def plot_grid(rows, out_path: Path, panel_order, title=None, legend_fontsize=20, legend_y=-0.06):
+    n_panels = len(panel_order)
     ncols = 5
     nrows = int(np.ceil(n_panels / ncols))
-    fig, axes = plt.subplots(nrows, ncols, figsize=(4.2 * ncols, 3.2 * nrows))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(3.4 * ncols, max(4.0, 3.4 * nrows)))
     axes = np.asarray(axes).reshape(-1)
 
-    for ax, bench in zip(axes, PANEL_ORDER):
+    for ax, bench in zip(axes, panel_order):
         _, ylabel, higher_is_better = BENCHMARK_METRICS[bench]
         scale = 100 if ylabel.startswith("Acc") or ylabel in ("EM", "Contains") else 1
         for r in rows:
@@ -151,10 +177,10 @@ def plot_grid(rows, out_path: Path):
                 s=42,
                 edgecolors="k", linewidths=0.4, alpha=0.9, zorder=3,
             )
-        ax.set_title(bench, fontsize=11)
-        ax.set_xlabel("Val BPB", fontsize=9)
-        ax.set_ylabel(f"{ylabel}{' (%)' if scale == 100 else ''}", fontsize=9)
-        ax.tick_params(axis="both", labelsize=8)
+        ax.set_title(BENCH_DISPLAY_NAME.get(bench, bench), fontsize=20)
+        ax.set_xlabel("Val BPB", fontsize=17)
+        ax.set_ylabel(f"{ylabel}{' (%)' if scale == 100 else ''}", fontsize=17)
+        ax.tick_params(axis="both", labelsize=15)
         ax.grid(True, alpha=0.3)
         ax.invert_xaxis()  # left -> right means better (lower BPB)
 
@@ -171,19 +197,82 @@ def plot_grid(rows, out_path: Path):
         for sz in SIZE_ORDER:
             handles.append(
                 plt.Line2D([], [], marker="o", color=size_color(sz, source),
-                           linestyle="", markersize=8,
+                           linestyle="", markersize=10,
                            markeredgecolor="k", markeredgewidth=0.4,
                            label=f"N={sz}")
             )
     fig.legend(
         handles=handles,
-        loc="lower center", ncol=len(SIZE_ORDER) + 1, fontsize=9,
-        bbox_to_anchor=(0.5, -0.03), frameon=False,
+        loc="lower center", ncol=len(SIZE_ORDER) + 1, fontsize=legend_fontsize,
+        bbox_to_anchor=(0.5, legend_y), frameon=False,
     )
 
-    fig.suptitle("Validation BPB vs downstream benchmark performance "
-                 "(left → right = better model)", fontsize=14, y=1.0)
-    fig.tight_layout(rect=(0, 0.03, 1, 0.98))
+    suptitle = title or r"Validation BPB vs downstream benchmark performance (lower BPB $\rightarrow$ better model)"
+    fig.suptitle(suptitle, fontsize=18, y=1.0)
+    fig.tight_layout(rect=(0, 0.07, 1, 0.98))
+    fig.savefig(out_path, bbox_inches="tight", dpi=150)
+    plt.close(fig)
+    print(f"Saved {out_path}")
+
+
+BPB_TASKS = [
+    "c4", "wikitext", "gsm8k_lm", "humaneval_lm", "mbpp_lm",
+    "nq_open_lm", "triviaqa_lm", "webqs_lm", "squad_completion_lm", "ifeval_lm",
+]
+ACC_TASKS = [
+    "lambada_openai", "hellaswag", "openbookqa", "race", "squad_completion-1",
+]
+
+
+def plot_paper(rows, out_path: Path):
+    """Two-panel paper figure: averaged BPB and averaged accuracy vs val BPB."""
+    fig, axes = plt.subplots(1, 2, figsize=(8.0, 3.0))
+
+    panel_cfg = [
+        (axes[0], BPB_TASKS,  r"Avg. BPB ($\downarrow$)",  False),
+        (axes[1], ACC_TASKS,  r"Avg. Accuracy % ($\uparrow$)", True),
+    ]
+
+    for ax, tasks, ylabel, higher_is_better in panel_cfg:
+        for r in rows:
+            vals = [r[t] for t in tasks if r[t] is not None]
+            if not vals:
+                continue
+            avg = np.mean(vals)
+            if higher_is_better:
+                avg *= 100
+            ax.scatter(
+                r["val_bpb"], avg,
+                marker="o",
+                color=size_color(r["size"], r["source"]),
+                s=42,
+                edgecolors="k", linewidths=0.4, alpha=0.9, zorder=3,
+            )
+        ax.set_xlabel(r"Val BPB ($\downarrow$)", fontsize=13)
+        ax.set_ylabel(ylabel, fontsize=13)
+        ax.tick_params(axis="both", labelsize=11)
+        ax.grid(True, alpha=0.3)
+        ax.invert_xaxis()
+
+    handles = []
+    for source in ("multiepoch", "para"):
+        handles.append(
+            plt.Line2D([], [], linestyle="", marker="", label=SOURCE_LABEL[source])
+        )
+        for sz in SIZE_ORDER:
+            handles.append(
+                plt.Line2D([], [], marker="o", color=size_color(sz, source),
+                           linestyle="", markersize=7,
+                           markeredgecolor="k", markeredgewidth=0.4,
+                           label=f"N={sz}")
+            )
+    fig.legend(
+        handles=handles,
+        loc="lower center", ncol=len(SIZE_ORDER) + 1, fontsize=10,
+        bbox_to_anchor=(0.5, -0.10), frameon=False,
+    )
+
+    fig.tight_layout(rect=(0, 0.06, 1, 1.0))
     fig.savefig(out_path, bbox_inches="tight", dpi=150)
     plt.close(fig)
     print(f"Saved {out_path}")
@@ -203,8 +292,18 @@ def main():
     print(f"  by source: {dict(by_source)}")
     print(f"  by size:   {dict(by_size)}")
 
-    plot_grid(rows, OUT_DIR / "val_loss_vs_benchmarks.pdf")
-    plot_grid(rows, OUT_DIR / "val_loss_vs_benchmarks.png")
+    _acc_title = r"Val BPB vs Accuracy / EM Benchmarks" + "\n" + r"(Acc $\uparrow$, BPB $\downarrow$)"
+    _bpb_title = r"Val BPB vs BPB Benchmarks" + "\n" + r"(BPB $\downarrow$)"
+    plot_grid(rows, OUT_DIR / "val_loss_vs_benchmarks_acc.pdf",
+              panel_order=ACC_PANEL_ORDER, title=_acc_title, legend_y=-0.12)
+    plot_grid(rows, OUT_DIR / "val_loss_vs_benchmarks_acc.png",
+              panel_order=ACC_PANEL_ORDER, title=_acc_title, legend_y=-0.12)
+    plot_grid(rows, OUT_DIR / "val_loss_vs_benchmarks_bpb.pdf",
+              panel_order=BPB_PANEL_ORDER, title=_bpb_title, legend_fontsize=20)
+    plot_grid(rows, OUT_DIR / "val_loss_vs_benchmarks_bpb.png",
+              panel_order=BPB_PANEL_ORDER, title=_bpb_title, legend_fontsize=20)
+    plot_paper(rows, OUT_DIR / "val_loss_vs_benchmarks_paper.pdf")
+    plot_paper(rows, OUT_DIR / "val_loss_vs_benchmarks_paper.png")
 
 
 if __name__ == "__main__":

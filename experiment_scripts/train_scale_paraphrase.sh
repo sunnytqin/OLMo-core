@@ -36,7 +36,7 @@ else
 fi
 
 CHIN=${CHIN:-1}                   # Chinchilla multiplier — sets D's size
-NUM_SEEDS=${NUM_SEEDS:-1}         # K = number of paraphrase seeds (1..8); D' = K copies of paraphrased D
+NUM_SEEDS=${NUM_SEEDS:-1}         # K = number of paraphrase seeds (1..64); D' = K copies of paraphrased D
 MICROBATCH_MULT=${MICROBATCH_MULT:-16}  # 8=A100, 16=H100, 32=H200
 EVAL_ONLY=${EVAL_ONLY:-false}
 NGPU=${NGPU:-1}
@@ -55,7 +55,7 @@ mkdir -p logs
 
 export WANDB_API_KEY=ffd83b905980a40e959e79930c8a1eb1584f31b9
 DATA_ROOT="/n/netscratch/barak_lab/Everyone/sqin/olmo"
-WORK_DIR="/n/netscratch/dam_lab/Lab/sqin/olmo/dataset-cache"
+WORK_DIR="/n/netscratch/barak_lab/Lab/sqin/olmo/dataset-cache"
 
 # Paraphrase training: D + D' for 1 epoch, K paraphrase seeds
 TRAINING_SCRIPT="src/scripts/official/OLMo-scale-train-paraphrase-dolma.py"

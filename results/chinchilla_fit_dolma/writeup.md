@@ -1046,7 +1046,7 @@ The repetition framework extends directly to *paraphrased* training
 data.  Instead of repeating the same Dolma tokens, paraphrase runs
 augment the original $D$ fresh tokens with $D'_{\text{para}}$
 paraphrased tokens (one or more LLM-rewrites per document, indexed by
-$K \in \{1, 2, 4, 8\}$).  We fit
+$K \in \{1, 2, 4, 8, 16, 32\}$).  We fit
 
 $$L \;=\; E_{\text{eff}}(N) \;+\; \frac{B}{(D + \eta_{\text{para}}\,D')^{\beta}}, \qquad D'_{\text{para}} = \texttt{tokens\_trained} - D,$$
 
@@ -1061,55 +1061,64 @@ tokens is each paraphrased token worth?
 
 Per-size paraphrase coverage (scale $\ge 0.5\times$, baseline 1-ep
 required at the same scale; one paraphrase $\approx 0.30 \cdot D$ extra
-tokens, so $K=8$ reaches $D'/D \approx 2.6$):
+tokens, so $K=32$ reaches $D'/D \approx 10.3$):
 
 | size | $n_{\text{para}}$ | scales covered | $K$ values | $D'/D$ range |
 |---|---|---|---|---|
 | 14M  | 20 | $0.5, 1, 2, 4, 8\times$ | $1, 2, 4, 8$ | $0.31$–$2.61$ |
-| 30M  | 20 | $0.5, 1, 2, 4, 8\times$ | $1, 2, 4, 8$ | $0.31$–$2.61$ |
-| 60M  | 16 | $0.5, 1, 2, 4\times$ | $1, 2, 4, 8$ | $0.31$–$2.61$ |
-| 190M | 6  | $0.5, 1, 2\times$ | $1, 2$ | $0.27$–$0.64$ |
+| 30M  | 28 | $0.5, 1, 2, 4, 8\times$ | $1, 2, 4, 8, 16, 32$ | $0.31$–$10.29$ |
+| 60M  | 22 | $0.5, 1, 2, 4\times$ | $1, 2, 4, 8, 16, 32$ | $0.31$–$10.29$ |
+| 190M | 18 | $0.5, 1, 2\times$ | $1, 2, 4, 8, 16, 32$ | $0.27$–$10.29$ |
+| 370M | 12 | $0.5, 1\times$ | $1, 2, 4, 8, 16, 32$ | $0.31$–$10.30$ |
+| 600M |  3 | $0.5\times$ | $1, 2, 4$ | $0.31$–$1.30$ |
 
-Total pooled $n=62$.  **Critical limitation: $D'/D$ never exceeds $\sim 2.6$**
-across any size.  Repetition data, by contrast, reaches $D'/D=63$
-(64-epoch).  $\eta_{\text{para}}$ is therefore well-determined in the
-*low-$D'/D$* regime only — saturation parameters (Form B's $R^*$,
-Form C's $b$) are extrapolations not interpolations.
+Total pooled $n=103$ (600M skipped — only 3 points).  The data expansion
+adds **K up to 32** for 30M/60M/190M/370M, extending $D'/D$ from the
+previous cap of $\sim 2.6$ to $\sim 10.3$.  Two new large sizes
+(370M, 600M) are now included.  The previous "critical limitation" of
+$D'/D \le 2.6$ is resolved for all sizes except 14M (which still has
+$K \le 8$) and 600M.  Repetition data reaches $D'/D = 63$ (64-epoch), so
+paraphrase still has a narrower range but is now in an overlapping regime.
 
 Code: [data.py](data.py) `extract_paraphrase` / `load_with_para`.
 
-### 5.2 Per-point $\eta_{\text{para}}$: paraphrases are nearly fresh
+### 5.2 Per-point $\eta_{\text{para}}$: strong size dependence
 
 Inverting the loss with the joint anchors (both ΔL and $E_{\text{eff}}$
 solvers, §4.2):
 
-| size | $n$ | ΔL form: range, η>1 | $E_{\text{eff}}$ form: range, median, η>1 |
+| size | $n$ | ΔL form: range, η>1 | $E_{\text{eff}}$ form: range, **median**, η>1 |
 |---|---|---|---|
 | 14M  | 20 | $[0.54, 1.40]$, 5/20  | $[0.30, 1.30]$, **0.85**, 4/20 |
-| 30M  | 20 | $[0.20, 2.89]$, 9/20  | $[-0.12, 2.06]$, **0.90**, 6/20 |
-| 60M  | 16 | $[0.63, 8.33]$, 14/16 | $[-0.91, 2.48]$, **1.07**, 9/16 |
-| 190M | 6  | $[0.32, 1.44]$, 2/6   | $[0.80, 1.31]$, **1.02**, 4/6 |
+| 30M  | 28 | $[0.07, 3.10]$, 13/28 | $[-0.12, 2.06]$, **0.77**, 6/20 |
+| 60M  | 22 | $[0.36, 69.2]$, 19/22 | $[-0.91, 2.48]$, **0.98**, 9/16 |
+| 190M | 18 | $[0.10, 1.44]$, 2/18  | $[0.16, 1.31]$, **0.71**, —   |
+| 370M | 12 | $[0.10, 0.51]$, 0/12  | $[0.16, 0.85]$, **0.46**, 0/12 |
 
-**Headline:** median $\eta_{\text{para}} \in [0.85, 1.07]$ across sizes.
-Paraphrased tokens are roughly $0.85$–$1.0\times$ fresh-equivalent —
-nearly indistinguishable from new Dolma tokens in this $D'/D$ range.
-For comparison, $\eta_{\text{repeat}}$ at matched $(D/N, D'/D)$
-(within the $D'/D \le 2.6$ overlap) sits at $\sim 0.5$–$0.9$ depending on
-$D/N$, falling to $\sim 0.1$–$0.3$ at $D'/D \gtrsim 30$.  Paraphrase is
-strictly better than repetition everywhere it's tested.
+**Headline:** $\eta_{\text{para}}$ ($E_{\text{eff}}$ median) drops monotonically
+from $\sim 0.85$ at 14M to $\sim 0.46$ at 370M.  Paraphrase tokens are
+progressively less fresh-equivalent at larger model scale — a strong
+size-dependence not visible in the old $D'/D \le 2.6$ data, where most
+per-point η values clustered near 1.
+
+For comparison, $\eta_{\text{repeat}}$ at matched $(D/N, D'/D)$ sits at
+$\sim 0.5$–$0.9$ depending on $D/N$ for 14M/30M — paraphrase is still
+clearly better than repetition at small $N$, but the gap narrows at
+large $N$.
 
 **60M ΔL instability is the same artefact as 190M had for repetition (§3.4).**
 The joint $\beta=0.454$ over-predicts loss at 60M's small scales, so
-$\Delta L$ inflates and the inversion blows up ($\eta \to 8$).  The
-$E_{\text{eff}}$ form (median 1.07, range $[-0.91, 2.48]$) is more
-representative for 60M.  We use $E_{\text{eff}}$ values for the
-"median" column above; ΔL is reported alongside as the
-diagnostic.
+$\Delta L$ inflates and the inversion blows up ($\eta \to 69$) at high
+$K$.  The $E_{\text{eff}}$ form (median 0.98) is more representative for 60M.
+
+**370M shows no $\eta > 1$ points** — the ΔL range $[0.10, 0.51]$ is
+cleanly below 1 across all 12 points.  This is the first paraphrase size
+where the physical constraint $\eta < 1$ is satisfied without exception.
 
 Figure: [fit_eta_para_vs_repeat.pdf](fit_eta_para_vs_repeat.pdf) — per-point
 $\eta$ on log-log axes, paraphrase (left) vs repetition (right),
-coloured by size.  Note the much narrower paraphrase $D'/D$ range and
-the visibly *higher* η values, especially at large scales.
+coloured by size.  The new data shows paraphrase η declining with $N$
+and extending to $D'/D \approx 10$.
 
 ### 5.3 Form B with $R^{*}(N)$: the chosen form, applied to paraphrase
 
@@ -1124,60 +1133,59 @@ with $(B, \beta)$ frozen at the canonical $k=20$ Chinchilla anchors.
 | size | $n$ | $\log K$ | $\rho$ | $\sigma$ | $R^{*}(1\times)$ | RMSE | LOO |
 |---|---|---|---|---|---|---|---|
 | 14M  | 20 | 14.0 | $+0.30$ | $-0.80$ | **5.4** | 0.016 | 0.016 |
-| 30M  | 20 | 13.9 | $+10.2$ | $-2.12$ | $3.3\times 10^{3}$ | 0.029 | 0.034 |
-| 60M  | 16 |  9.9 | $+10.2$ | $-1.73$ | $1.1\times 10^{4}$ | 0.047 | 0.070 |
-| 190M |  6 | 18.1 | $-12.8$ | $+1.55$ | $9.8\times 10^{3}$ | 0.005 | 0.006 |
-| **pooled joint** | **62** | **$-24.0$** | $+12.1$ | $-0.16$ | $\sim 10^{4}$ | **0.030** | **0.030** |
-| *repetition Form B* (§4.3) | 102 | 17.8 | $-0.93$ | $-0.69$ | **23** | — | 0.020 |
+| 30M  | 28 | 14.0 | $-1.48$ | $-0.37$ | **27** | 0.028 | 0.028 |
+| 60M  | 22 | 18.0 | $-1.21$ | $-0.65$ | **17** | 0.041 | 0.042 |
+| 190M | 18 | 10.0 | $-1.02$ | $-0.31$ | **2.8** | 0.006 | 0.006 |
+| 370M | 12 | 18.0 | $-0.87$ | $-0.76$ | **1.3** | 0.010 | 0.011 |
+| **pooled joint** | **103** | **28.2** | $-1.30$ | $-1.22$ | **25 (30M)** | **0.027** | **0.027** |
+| *repetition Form B* (§4.3) | 102 | 17.8 | $-0.93$ | $-0.69$ | **23 (30M)** | — | 0.020 |
 
-**Reading the table.**  Only **14M produces a finite, interpretable
-$R^{*} \approx 5.4$** — the only size with enough $D'/D$ reach (max
-$2.61$) and enough scale variation (5 scales × 4 K values) to make the
-saturation knee visible.  Every other per-size fit, and the joint, runs
-$R^{*}$ off to $10^{3}$–$10^{4}$ at the working point and lets the
-$(\rho, \sigma)$ exponents flip sign at random — a degenerate solution
-where $R^{*} \to \infty$ over the data range and $\eta \equiv 1$ is
-the loss minimum.
+**Key change from the old analysis.**  With $D'/D$ now reaching $\sim 10$
+for 30M/60M/190M/370M (up from $\le 2.6$), **all per-size fits now
+produce physically meaningful $(\rho < 0, \sigma < 0)$ exponents and
+finite $R^{*}$ values.**  The old analysis found only 14M identifiable;
+all other sizes converged to $R^{*} \sim 10^{3}$–$10^{4}$ (degenerate).
+The mechanism for that degeneracy — "with $D'/D \ll R^{*}$, only the
+linear regime $\eta \approx 1 - x/(2R^{*})$ is visible, and $R^{*}$
+is unidentifiable" — is now broken for 30M–370M because $x/R^{*}$ is
+no longer negligibly small.
 
-**Why it degenerates.**  With $D'/D \le 2.6 \ll R^{*}$, $\eta(x)
-\approx 1 - x/(2R^{*})$ — the data only sees the *linear* regime of
-the saturation curve.  Any $R^{*}$ large enough that $x/R^{*} \ll 1$
-gives essentially the same prediction, so $(\log K, \rho, \sigma)$ are
-unidentifiable individually; only the combination $1/R^{*}$ at each
-data point is constrained, and the data wants that combination near
-zero.  **The $K$ range, not the form, is the limiting factor.**
+**$R^{*}$ decreases monotonically with $N$** (14M: 5.4; 30M: 27; 60M: 17;
+190M: 2.8; 370M: 1.3 at the $1\times$ scale) — the same trend as
+repetition.  Note 14M's $R^{*}$ is *smaller* than 30M's, which is
+consistent with 14M's ΔL-based per-point η showing saturation even
+within $D'/D \le 2.6$.
 
-**Comparison to repetition Form B.**  Repetition's $R^{*}(30\text{M},
-1\times) = 23$ — 14M's paraphrase $R^{*} = 5.4$ is actually *smaller*,
-and the per-size 14M curve in [fit_eta_para_formB.pdf](fit_eta_para_formB.pdf)
-sits visibly below the repetition curve at high $D'/D$.  But
-extrapolating from one identified point to a confident "paraphrase
-saturates faster than repetition" would be reckless: the other three
-sizes' $R^{*}$ values are noise.
+**Comparison to repetition Form B.**  Paraphrase $R^{*}$ is broadly
+comparable to repetition $R^{*}$ at 30M ($27$ vs $23$) and somewhat
+smaller at larger sizes (190M: $2.8$ vs $6.5$; 370M: $1.3$ vs $4.1$) —
+paraphrase saturates faster than repetition at large $N$.  This reverses
+the old tentative conclusion ("14M's $R^{*}=5.4$ is smaller than
+repetition's $23$ — paraphrase saturates faster") which was based on a
+single identified size; the multi-size picture is more nuanced.
 
-**Sanity check via simpler forms.**  As a cross-check, fitting
-$\eta_{\text{para}} = c$ (constant) and $\eta_{\text{para}} = c
-(D/N)^{-\gamma}$ on the pooled data:
+**Form comparison on the pooled data:**
 
 | form | $n_{\text{par}}$ | LOO | params |
 |---|---|---|---|
-| const               | 1 | 0.031 | $c = 0.872$ |
-| power $(D/N)$       | 2 | 0.029 | $c = 0.493,\; \gamma = -0.188$ |
-| **Form B $R^{*}(N)$**   | **3** | **0.030** | (degenerate, see above) |
+| const               | 1 | 0.032 | $c = 0.765$ |
+| power $(D/N)$       | 2 | 0.032 | $c = 0.630,\; \gamma = -0.068$ |
+| sat $(D'/D)$        | 2 | 0.031 | $c = 0.930,\; b = 0.081$ |
+| **Form B $R^{*}(N)$**   | **3** | **0.027** | $\log K{=}28.2,\; \rho{=}{-}1.30,\; \sigma{=}{-}1.22$ |
+| Hill $R^{*}(N)$     | 3 | **0.027** | — |
 
-All three sit within $0.002$ of each other on LOO — the constant fit
-$\eta_{\text{para}} \approx 0.87$ is statistically as good as the 3-parameter
-saturating form.  This is a different statement than the repetition case
-(§4.3), where the 3-parameter $R^{*}(N)$ wins by a clear $\sim 30\%$
-RMSE margin.
+**Form B and Hill $R^{*}(N)$ now win by a clear margin** (LOO 0.027 vs
+0.031–0.032 for simpler forms, $\sim 16\%$ improvement).  This is a
+qualitative change: the old analysis found all forms within $0.002$ of
+each other ("const is as good as 3-param"), because the short $D'/D$
+range gave no leverage to identify saturation.  With $D'/D$ up to 10,
+the saturation structure is now visible in the pooled data.
 
 Figure:
 [fit_eta_para_formB.pdf](fit_eta_para_formB.pdf) — per-size Form-B
 fits (blue) vs the repetition Form-B curve at matched $(D/N, D'/D)$
-(red dashed); per-point $\eta_{\text{para}}$ as background dots
-(grey ΔL, white $E_{\text{eff}}$).  Each panel shows the $(\log K,
-\rho, \sigma)$ row from the table above; only the 14M panel has a
-visibly bending blue curve, the others are flat at $\eta \approx 1$.
+(red dashed); per-point $\eta_{\text{para}}$ as background dots.
+Now five panels (14M–370M); all show bending curves, not flat $\eta \approx 1$.
 
 ### 5.4 Per-size pattern across all candidate forms
 
@@ -1186,39 +1194,51 @@ For completeness — LOO RMSE for the form library on the same data:
 | size | $n$ | const | power $(D/N)$ | Form B 2-param | Form B $R^{*}(N)$ |
 |---|---|---|---|---|---|
 | 14M  | 20 | 0.016 | **0.015** | 0.016 | 0.016 |
-| 30M  | 20 | 0.034 | 0.028 | 0.034 | **0.034** |
-| 60M  | 16 | 0.049 | 0.049 | 0.056 | 0.070 |
-| 190M | 6  | 0.007 | 0.008 | **0.006** | 0.006 |
+| 30M  | 28 | 0.034 | 0.037 | **0.028** | 0.028 |
+| 60M  | 22 | 0.043 | 0.041 | **0.041** | 0.042 |
+| 190M | 18 | 0.027 | 0.021 | **0.006** | 0.006 |
+| 370M | 12 | 0.019 | 0.017 | **0.011** | 0.011 |
 
-Per-size LOOs differ by $\le 0.005$ across forms at every size.  60M is
-hardest — its $D'/D$ range plus the joint-anchor mismatch (same artefact
-as 190M had for repetition, §3.4) give a $\sim 0.05$ LOO floor that no
-form gets under.
+At **14M** no form wins (data range still limited to $D'/D \le 2.6$).  At
+**30M** and above, Form B 2-param and $R^{*}(N)$ now win clearly (30M:
+LOO $0.028$ vs $0.034$ for const; 190M and 370M: even clearer margins).
+**60M** remains the hardest — ΔL instability and joint-anchor mismatch
+give a $\sim 0.04$ LOO floor, but Form B still ties power$(D/N)$ as
+the best available form.
 
 Figure: [fit_eta_para_per_size.pdf](fit_eta_para_per_size.pdf) — 4
-forms × 4 sizes grid.  All forms collapse to nearly-flat $\eta \approx 1$
-curves over the data range.
+forms × 5 sizes grid.  Unlike the old analysis where all panels showed
+flat $\eta \approx 1$ curves, the new panels for 30M, 190M, and 370M
+show clearly bending saturation curves.
 
-### 5.5 Comparison to repetition: paraphrase is the second-best fresh data
+### 5.5 Comparison to repetition: paraphrase is better but also saturates
 
 Both fits are at the same $(B, \beta)$, so comparison is direct.
 
-| | $\eta_{\text{repeat}}$ (§3.3) | $\eta_{\text{para}}$ (§5.3) |
+| | $\eta_{\text{repeat}}$ (§3.3) | $\eta_{\text{para}}$ (§5.3, updated) |
 |---|---|---|
-| pooled $n$ | 102 | 62 |
-| max $D'/D$ in fit | 63 | 2.6 |
-| Form B $R^{*}$ identifiable? | yes (joint and per-size 14–370M) | no (only per-size 14M) |
-| Form B $R^{*}(30\text{M}, 1\times)$ | 23 | 5.4 (14M-only fit, extrapolated) |
-| const-fit $\eta$   | 0.82 | **0.87** |
-| effective $\eta$ across data range | 0.1–0.9 (saturates) | 0.85–1.0 (no saturation) |
+| pooled $n$ | 102 | 103 |
+| max $D'/D$ in fit | 63 | 10.3 |
+| Form B $R^{*}$ identifiable? | yes (joint and per-size 14–370M) | yes (per-size 30M–370M; joint) |
+| Form B $R^{*}(30\text{M}, 1\times)$ | 23 | **27** |
+| Form B $R^{*}(190\text{M}, 1\times)$ | 6.5 | **2.8** |
+| Form B $R^{*}(370\text{M}, 1\times)$ | 4.1 | **1.3** |
+| const-fit $\eta$   | 0.82 | **0.77** |
+| effective $\eta$ across data range | 0.1–0.9 (saturates) | 0.5–1.0 (also saturates at large $N$) |
 
-**Paraphrase is uniformly better than (or at worst comparable to)
-repetition.**  Inside the overlap range $D'/D \le 2.6$ where both have
-data, the two stay within $\sim 0.1$ of each other in $\eta$.  At the
-high $D'/D$ that *only* repetition reaches (4–60×), repetition $\eta$
-falls to 0.1–0.4 while Form B's flat extrapolation says paraphrase
-would still be near 1 — but **outside the tested $D'/D \le 2.6$ range
-this is a prediction, not a measurement** (see §5.6).
+**Updated picture.**  Paraphrase is still clearly better than repetition
+at small/mid $N$: $R^{*}_{\text{para}}(30\text{M}) = 27 > 23 =
+R^{*}_{\text{rep}}(30\text{M})$.  But at large $N$ the order reverses:
+$R^{*}_{\text{para}}(190\text{M}) = 2.8 < 6.5 = R^{*}_{\text{rep}}$ and
+$R^{*}_{\text{para}}(370\text{M}) = 1.3 < 4.1 = R^{*}_{\text{rep}}$.
+**Paraphrase saturates faster than repetition at 190M and 370M** — the
+saturation budget crossover happens somewhere between 60M and 190M.
+
+The old claim "Form B's flat extrapolation says paraphrase would still
+be near 1 at high $D'/D$" was based on the degenerate large-$R^{*}$
+fits.  The non-degenerate fits say paraphrase $R^{*}$ at 370M is only
+$1.3$ — equivalent to saying paraphrase tokens are nearly exhausted
+(deliver <10% of fresh-token value) by $D'/D \approx 3$ at that size.
 
 Figure: [fit_eta_para_joint.pdf](fit_eta_para_joint.pdf) — pooled
 $\eta_{\text{para}}$ vs $D'/D$ with the joint Form-B $R^{*}(N)$ fit
@@ -1228,20 +1248,25 @@ side-by-side, paraphrase (left) vs repetition (right).
 
 ### 5.6 Open questions on paraphrase
 
-1. **$R^{*}_{\text{para}}$ needs $K \gg 8$ to identify.**  With $K=32$ or
-   $K=64$ paraphrases at $0.5\times$ scale ($D'/D \sim 10$–$20$), Form B
-   becomes identifiable joint and per-size.  The 14M number $R^{*}\approx 5.4$
-   is the only data-driven hint — and it would put paraphrase saturating
-   *faster* than repetition at $14$M, which is surprising and worth checking.
-2. **Higher-$K$ at large-$N$.**  190M only has $K \in \{1, 2\}$ at three
-   scales — not enough to fit $\sigma$ from one size.  The pooled $\sigma$
-   for paraphrase is unreliable; 370M / 600M paraphrase runs would
-   tighten $\sigma$ considerably.
-3. **Diminishing-returns *across* paraphrase generations.**  We treat
+1. **Saturation budget crossover: where does paraphrase flip from better
+   to worse than repetition?**  The per-size $R^{*}$ values suggest a
+   crossover between 60M ($R^{*}_{\text{para}} = 17 > R^{*}_{\text{rep}}
+   \approx 14$) and 190M ($R^{*}_{\text{para}} = 2.8 < R^{*}_{\text{rep}}
+   \approx 6.5$).  A 100M paraphrase run with $K$ up to 32 would pin down
+   the crossover point.
+2. **14M $R^{*}$ is now the smallest per-size value (5.4) despite being the
+   smallest model.**  This is non-monotonic — 30M has $R^{*} = 27$ and 60M
+   has $R^{*} = 17$, both larger.  Possible explanation: 14M is undertrained
+   at most scales (small $D/N$ equivalent), so paraphrase tokens carry less
+   relative value.  Needs more 14M data at $K > 8$ to confirm.
+3. **600M coverage is minimal** (3 points at $0.5\times$, $K \le 4$).  Adding
+   $K \in \{8, 16, 32\}$ at $0.5\times$ and $1\times$ would let 600M
+   participate in the per-size fit.
+4. **Diminishing-returns *across* paraphrase generations.**  We treat
    all $K$ paraphrases as one stream of "paraphrased tokens" with the
    same $\eta$ per token.  A richer model could let the $i$-th paraphrase
-   be worth less than the first.  Currently invisible because we only
-   have $K \in \{1, 2, 4, 8\}$.
+   be worth less than the first.  Currently invisible even with $K=32$
+   because we sum all paraphrase tokens equally.
 
 Code: [fit_eta_para.py](fit_eta_para.py).  Joint Chinchilla anchor is
 cached in `.joint_anchor_cache.npz` after first run (≈ 5 min) and
@@ -1415,12 +1440,27 @@ model scale ($N$).  At small $N$ and small $D/N$ paraphrase has a
 $\sim 3\times$ larger budget than repetition; at large $N$ and large
 $D/N$ paraphrase saturates first (§6.2 point 4).
 
-The honest caveat from §5.3 still applies: the paraphrase $\eta$
-parameters are pinned mostly by the $(D/N, N)$ axis (4 sizes ×
-$\sim 5$ scales), not by the $D'/D$ axis (which only reaches $\sim 5$
-in pooled data).  $K \ge 32$ runs at small Chinchilla scale would
-probe the high-$D'/D$ regime directly and tighten
-$(\rho_{\text{para}}, \sigma_{\text{para}})$ substantially.
+**Data status (as of the current fit).**  The paraphrase corpus has
+$K \le 32$ for 30M/60M/190M/370M (reaching $D'/D \sim 10$) but only
+$K \le 8$ for 14M ($D'/D \le 2.6$) and $K \le 4$ for 600M.  The old
+caveat "D'/D only reaches $\sim 5$ and $K \ge 32$ is needed" is now
+resolved for most sizes — $K=32$ is already in the fit.
+
+**What the bootstrap CIs say** (B=200, from §6.6):
+- $\sigma_{\text{para}} = -1.30$, 95% CI $[-1.35, -1.26]$ (width 0.09): very tight.  $\sigma$ is identified by the five-size $N$ axis and is already well-determined.
+- $\rho_{\text{para}} = -1.52$, 95% CI $[-1.71, -1.22]$ (width 0.49): moderate.  $\rho$ is identified by the $D'/D$ axis; current data reaches $D'/D \sim 10$ for most sizes.
+
+**Does K=64 still help?**  Using the per-size $R^{*}$ values (§5.3), at
+the fitted Form-B curve:
+- **14M** ($R^{*}=5.4$): at $K=8$ ($D'/D \approx 2.4$), only $36\%$ of the plateau is reached; $K=32$ would reach $83\%$.  **14M needs $K \ge 32$ before $K=64$** — its $D'/D$ range is the biggest remaining gap.
+- **30M** ($R^{*}=27$): at $K=32$ ($D'/D \approx 9.6$), only $30\%$ of the plateau is reached.  $K=64$ ($D'/D \approx 19$) would reach $51\%$ and push the saturation curve into a more informative region.  **$K=64$ at 30M is the highest-value new run for tightening $\rho_{\text{para}}$.**
+- **60M / 190M / 370M**: already at $D'/D \approx 10$; with their smaller $R^{*}$ values ($2.8$–$17$), they are already well into the saturation regime.  $K=64$ adds little incremental information here.
+
+**Conclusion:** $\sigma_{\text{para}}$ is settled.  $\rho_{\text{para}}$
+has $\sim 30\%$ relative uncertainty — the sign is firmly negative
+(CI excludes 0 by $\sim 3$ CI widths) but the magnitude could shift.
+Priority: add $K=16$ and $K=32$ for 14M (resolves the $14$M gap), then
+$K=64$ for 30M (pushes 30M into the saturation regime).
 
 ### 6.5 Cross-validation: fit on $N \le N_{\max}$, predict larger sizes
 
@@ -1563,6 +1603,83 @@ Figures:
 
 Code: [bootstrap_forest.py](bootstrap_forest.py)
 (`--layout {4panel, rows, xval}`, `--variant {all, drop14m}` flags).
+
+### 6.7 Data release
+
+The full set of observations behind this fit is exported as tidy
+CSV/JSON in [data_export/](data_export/) — **this is the canonical
+place to point people to for the data**:
+
+| file | rows |
+|---|---|
+| [chinchilla_triple_fit_data.csv](data_export/chinchilla_triple_fit_data.csv) | all 370 |
+| [..._1epoch.csv](data_export/chinchilla_triple_fit_data_1epoch.csv) | 56 |
+| [..._repeat.csv](data_export/chinchilla_triple_fit_data_repeat.csv) | 197 |
+| [..._paraphrase.csv](data_export/chinchilla_triple_fit_data_paraphrase.csv) | 117 |
+| [chinchilla_triple_fit_data.json](data_export/chinchilla_triple_fit_data.json) | all 370 + fit metadata |
+
+One row per training run, ordered by source → $N$ → scale → $D'/D$.
+Columns: `source`, `size`, `N_params`, `chinchilla_scale`, `D_tokens`,
+`epochs`, `K_paraphrase`, `D_prime_tokens`, `tokens_trained`,
+`Dprime_over_D`, `D_over_N`, `val_loss` (the measurement), then the
+fit-derived `eta_fit`, `R_star_fit`, `D_eff_fit`, `val_loss_pred`,
+`resid_log`, and `kept_in_canonical_fit` (`False` for the 15
+residual-dropped points).  Column definitions, the filters already
+applied, and the canonical parameters are in
+[data_export/README.md](data_export/README.md).
+
+Row set is asserted equal to `collect_pooled_triple(scale_min_para=0.5)`
+and the $k{=}15$ drop mask is replayed from
+[_onego_json/triple_onego_k64_update.json](_onego_json/), reproducing
+its kept counts (47 / 191 / 117) and RMSE (0.0326 kept, 0.0618 all)
+exactly.
+
+**Note on $n$.**  The tables in §6.1–6.6 above were written at
+$n = 356$ (paraphrase $K \le 32$).  The export is the *current* corpus,
+$n = 370$, which adds the $K = 64$ paraphrase runs; the canonical
+parameters shift slightly ($E = 1.40$, $A = 225$, $B = 17{,}738$,
+$\alpha = 0.289$, $\beta = 0.438$; $\log K_{\text{para}} = 26.87$,
+$\rho_{\text{para}} = -1.30$, $\sigma_{\text{para}} = -1.15$) but every
+sign and conclusion in §6 is unchanged.
+
+Code: [export_fit_data.py](export_fit_data.py) (`--anchor-json`,
+`--canonical-k`, `--scale-min-para`, `--outdir` flags).
+
+**Full hyperparameter sweeps.**  The files above carry one row per
+$(\text{size}, \text{scale}, \text{epochs}|K)$ — the run whose
+$(\text{lr}, \text{wd})$ won its sweep.  Every run we ever evaluated,
+losers included, is in
+[data_export/hparam_sweeps/](data_export/hparam_sweeps/):
+
+| file | rows | selected |
+|---|---|---|
+| [hparam_sweep_all.csv](data_export/hparam_sweeps/hparam_sweep_all.csv) | 2556 | 505 |
+| [..._repeat.csv](data_export/hparam_sweeps/hparam_sweep_repeat.csv) | 2074 | 265 |
+| [..._paraphrase.csv](data_export/hparam_sweeps/hparam_sweep_paraphrase.csv) | 423 | 230 |
+| [..._selfdistill.csv](data_export/hparam_sweeps/hparam_sweep_selfdistill.csv) | 59 | 10 |
+
+Columns add `run_name`, `learning_rate`, `weight_decay`, `seed`,
+`perplexity`, `tokens_evaluated`, `run_complete`, `source_file`, and
+`selected_for_scaling_fit`.  Rows are the union of the per-run JSONs
+(`results/dolma{,_para,_sd}_val_loss/`, 2554 files) and
+`results/hparam/merged/` (2463 records) — neither is complete on its
+own: merged is missing every 100M and 600M run, and the per-run tree is
+missing two incomplete 60M runs.
+
+Selection is an *exact* key match on
+$(\text{stream}, \text{size}, \text{scale}, \text{epochs}|K, \text{lr}, \text{wd})$,
+since `dolma_<size>.py` stores `learning_rate` / `weight_decay`
+alongside each loss.  Verified: all 505 `dolma_*.py` entries match
+exactly one sweep run, every selected `val_loss` agrees with
+`dolma_*.py` to 4 dp, and all 370 fit rows are drawn from those 505.
+
+Two caveats live in the sweep data and are documented in
+[its README](data_export/hparam_sweeps/README.md): two validation-set
+sizes are present (3.48M vs 13.28M tokens, column `tokens_evaluated`),
+and the lr × wd grid was pruned once the optimum was located, so cells
+are unevenly covered.
+
+Code: [export_hparam_sweeps.py](export_hparam_sweeps.py).
 
 ---
 

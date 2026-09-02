@@ -66,7 +66,7 @@ SCALE_MIN = 0.5  # match fit_eta.py default for the η-fit step
 
 FONT_LABEL, FONT_TICK, FONT_LEGEND, FONT_TITLE = 15, 12, 10, 17
 
-PARA_SIZES = ["14m", "30m", "60m", "190m"]
+PARA_SIZES = ["14m", "30m", "60m", "190m", "370m", "600m"]
 
 
 # ──────────────────────────────────────────────────────────────────────

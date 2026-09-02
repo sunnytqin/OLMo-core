@@ -147,9 +147,9 @@ def panel_30m_vs_DoverN(ax, N, DoN, DpD, eta, fit):
                    label=rf"$r = {v:g}$")
     ax.axhline(1.0, color='gray', linestyle=':', linewidth=1.8, zorder=1)
     ax.set_xscale('log'); ax.set_yscale('log')
-    ax.set_xlabel(r"$\mathrm{TTP} = D/N$")
+    ax.set_xlabel(r"$\mathrm{TPP} = D/N$")
     ax.set_ylabel(r"$\eta$", fontsize=48)
-    ax.set_title(rf"(a) 30M: $\eta$ vs $\mathrm{{TTP}}$")
+    ax.set_title(rf"(a) 30M: $\eta$ vs $\mathrm{{TPP}}$")
     ax.legend(title=r"$r = D'/D$", loc="lower left", ncol=2,
               columnspacing=0.8, handletextpad=0.3)
 
@@ -160,7 +160,7 @@ def panel_30m_vs_DpoverD(ax, N, DoN, DpD, eta, fit):
     for v in DoN_VALUES:
         R = Rstar_30M(v * N, N, log_K_eff, rho)
         y = R * (1.0 - np.exp(-DpD_grid / R)) / DpD_grid
-        lbl = (rf"$\mathrm{{TTP}} = {v:g}$"
+        lbl = (rf"$\mathrm{{TPP}} = {v:g}$"
                if v in DoN_LEGEND_VALUES else None)
         ax.plot(DpD_grid, y, '-', color=DoN_CMAP(DoN_NORM(v)),
                 linewidth=4.0, alpha=0.95, zorder=2, label=lbl)
@@ -177,7 +177,7 @@ def panel_30m_vs_DpoverD(ax, N, DoN, DpD, eta, fit):
     ax.set_xlabel(r"$r = D'/D$")
     ax.set_ylabel(r"$\eta$", fontsize=48)
     ax.set_title(rf"(b) 30M: $\eta$ vs $r$")
-    ax.legend(title=r"$\mathrm{TTP} = D/N$", loc="lower left", ncol=2,
+    ax.legend(title=r"$\mathrm{TPP} = D/N$", loc="lower left", ncol=2,
               columnspacing=0.8, handletextpad=0.3)
 
 
@@ -216,7 +216,7 @@ def panel_multiN_at_2x(ax, scale=SCALE_PANEL3):
     ax.set_xscale('log'); ax.set_yscale('log')
     ax.set_xlabel(r"$r = D'/D$")
     ax.set_ylabel(r"$\eta \cdot D'/D$", fontsize=38)
-    ax.set_title(rf"(c) $\mathrm{{TTP}}={scale:g}$, across $N$ scales")
+    ax.set_title(rf"(c) $\mathrm{{TPP}}={scale:g}$, across $N$ scales")
     ax.legend(loc='lower right', title=r"$N$ (params)")
 
 

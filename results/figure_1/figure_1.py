@@ -495,7 +495,7 @@ def main():
                    label=rf'${ttp_val}$')
         )
     ax_c.legend(handles=size_handles, loc='upper left',
-                fontsize=LEG_FS, title='TTP (D/N)',
+                fontsize=LEG_FS, title='TPP (D/N)',
                 title_fontsize=LEG_FS, frameon=True,
                 labelspacing=0.7, borderpad=0.4, handletextpad=0.4)
 

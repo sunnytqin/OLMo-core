@@ -250,7 +250,7 @@ def create_contour_plot(ax, x_data, y_data, z_data, x_label, x_ticks, x_ticklabe
 
     # Set axis labels and title
     ax.set_xlabel(x_label, fontsize=font_label, fontweight='bold')
-    ax.set_ylabel('Fresh Data D (TTP, D/N)', fontsize=font_label, fontweight='bold')
+    ax.set_ylabel('Fresh Data D (TPP, D/N)', fontsize=font_label, fontweight='bold')
 
     # y axis is internally chinchilla_scale; TTP = 20 · chinchilla_scale.
     y_ticks = [0.05, 0.1, 0.25, 0.5, 1, 2, 4, 8, 16]
@@ -484,7 +484,7 @@ def create_prediction_contour_plot(ax, N, x_lim, x_ticks, x_ticklabels, x_label,
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.set_xlabel(x_label, fontsize=font_label, fontweight='bold')
-    ax.set_ylabel('Fresh Data D (TTP, D/N)',
+    ax.set_ylabel('Fresh Data D (TPP, D/N)',
                   fontsize=font_label, fontweight='bold')
 
     y_ticks = [0.05, 0.1, 0.25, 0.5, 1, 2, 4, 8, 16]
@@ -521,6 +521,8 @@ def _flops_ticks(N_val, flops_decades):
 
 
 _30M_TICKS, _30M_LBLS = _flops_ticks(3.0e7, [1e16, 1e17, 1e18, 1e19])
+_60M_TICKS, _60M_LBLS = _flops_ticks(6.0e7, [1e17, 1e18, 1e19])
+_190M_TICKS, _190M_LBLS = _flops_ticks(1.9e8, [1e18, 1e19, 1e20])
 _370M_TICKS, _370M_LBLS = _flops_ticks(3.7e8, [1e18, 1e19, 1e20])
 
 
@@ -533,6 +535,24 @@ PLOT_CONFIGS = {
         'epochs_x_ticks': [1, 2, 4, 8, 16, 32, 64, 128],
         'epochs_x_ticklabels': ['1', '2', '4', '8', '16', '32', '64', '128'],
         'epochs_x_lim': (1, 128),
+    },
+    '60m': {
+        'module': 'dolma_60m',
+        'flops_x_ticks': _60M_TICKS,
+        'flops_x_ticklabels': _60M_LBLS,
+        'flops_x_lim': (0.05, 128),
+        'epochs_x_ticks': [1, 2, 4, 8, 16, 32, 64],
+        'epochs_x_ticklabels': ['1', '2', '4', '8', '16', '32', '64'],
+        'epochs_x_lim': (1, 64),
+    },
+    '190m': {
+        'module': 'dolma_190m',
+        'flops_x_ticks': _190M_TICKS,
+        'flops_x_ticklabels': _190M_LBLS,
+        'flops_x_lim': (0.05, 32),
+        'epochs_x_ticks': [1, 2, 4, 8, 16, 32, 64],
+        'epochs_x_ticklabels': ['1', '2', '4', '8', '16', '32', '64'],
+        'epochs_x_lim': (1, 64),
     },
     '370m': {
         'module': 'dolma_370m',
@@ -784,7 +804,7 @@ def make_combined_plot_for_size(size):
 
 
 if __name__ == '__main__':
-    for size in ('30m', '370m'):
+    for size in ('30m', '60m', '190m', '370m'):
         make_plots_for_size(size)
         make_prediction_plot_for_size(size)
         make_combined_plot_for_size(size)
