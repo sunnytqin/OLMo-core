@@ -30,6 +30,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from data import SIZES, TTP_RATIO, load_with_extras  # noqa: E402
+from run_data_provenance import PROVENANCE_FIELDS, Resolver  # noqa: E402
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 RESULTS_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
@@ -191,6 +192,7 @@ def main():
 
     recs = collect()
     sel = selected_keys()
+    prov = Resolver()
     print(f"[hparam] {len(recs)} runs collected, "
           f"{len(sel)} (stream, size, scale, epochs/K, lr, wd) keys selected "
           f"by dolma_*.py")
@@ -224,6 +226,13 @@ def main():
             selected_for_scaling_fit=key in sel,
             source_file=r["origin"],
         ))
+        pv = prov.resolve(r["stream"], size, r["scale"],
+                          p["K"] if p["K"] is not None else None)
+        if pv is None:
+            print(f"[warn] no data-provenance entry for "
+                  f"{r['stream']} {size} chin={r['scale']}")
+            pv = {f: "" for f in PROVENANCE_FIELDS}
+        rows[-1].update(pv)
 
     order = {"repeat": 0, "paraphrase": 1, "selfdistill": 2}
     rows.sort(key=lambda r: (order[r["stream"]], r["N_params"] or 0,
@@ -284,6 +293,32 @@ def main():
                                         "dolma_<size>.py records for that "
                                         "(scale, epochs/K) — i.e. the point used in "
                                         "the writeup fits.",
+        },
+        "data_provenance": {
+            "resolved_by": "results/chinchilla_fit_dolma/run_data_provenance.py",
+            "method": "(size, chinchilla_scale) -> _DATASET_LOOKUP in the training "
+                      "script -> DataMix -> src/olmo_core/data/mixes/"
+                      "syn_data_scaling/dolma/*.txt file list. Reconstructed from "
+                      "source, not from the checkpoints, since netscratch's 90-day "
+                      "purge removed most runs' own data_paths.txt records.",
+            "verified": "All 1,151 runs whose data_paths.txt survives reproduce "
+                        "exactly (0 mismatches); run with --verify to re-check.",
+            "D_dir": "relative to the data root; join with the tokenizer id, "
+                     "e.g. <data_root>/preprocessed/dolma2-0625/resharded/"
+                     "allenai/dolma2-tokenizer/train_2.4B.npy",
+            "repeat_stream": "D_files is read `epochs` times; there is no second "
+                             "stream, so D_prime_files is empty.",
+            "paraphrase_stream": "D_prime_files are the K paraphrase seeds of the "
+                                 "*same* documents as D. Paraphrases are not "
+                                 "length-preserving (~0.3x tokens per seed), so "
+                                 "tokens trained is the on-disk sum, not "
+                                 "D_tokens x (1 + K).",
+            "nominal_vs_actual": "D_tokens is the nominal budget "
+                                 "chinchilla_scale x 20 x N. For 190M at scale >= 2 "
+                                 "the runs reused the 370M shard family, so the "
+                                 "actual shard is slightly smaller than nominal "
+                                 "(e.g. scale=2 is nominally 7.6B but read "
+                                 "train_7.4B.npy). Trust D_files over D_tokens.",
         },
         "columns": FIELDS,
     }

@@ -129,6 +129,58 @@ K = 32 would settle it cheaply.
 | `run_complete` | `False` for runs that never reached their final step |
 | `selected_for_scaling_fit` | `True` for the run feeding `dolma_<size>.py` and the writeup fits |
 | `source_file` | path (relative to `results/`) the record was read from |
+| `D_files` | the fresh-data `.npy` file(s) this run read, `;`-separated |
+| `D_dir` | directory of `D_files`, relative to the data root |
+| `D_prime_files` | second-stream files — the K paraphrase seeds (paraphrase only) |
+| `D_prime_dir` | directory of `D_prime_files`, relative to the data root |
+| `D_prime_corpus` | which D′ pool (`sized_smollm2_mixed`) |
+| `paraphrase_seeds` | seed range consumed, e.g. `1-8` |
+| `data_mix` | the `DataMix` name backing `D_files` (repetition runs) |
+
+## Which data each run read
+
+`D_files` and friends resolve every run to the exact files it consumed.
+Full paths are `<data_root>/<D_dir>/<tokenizer_id>/<file>`, with
+`tokenizer_id = allenai/dolma2-tokenizer`:
+
+```
+/n/netscratch/.../preprocessed/dolma2-0625/resharded/allenai/dolma2-tokenizer/train_2.4B.npy
+```
+
+Per stream:
+
+- **repeat** — reads `D_files` and nothing else, `epochs` times over. No
+  second stream, so `D_prime_files` is empty.
+- **paraphrase** — reads `D_files` once plus the K files in
+  `D_prime_files`, which are paraphrases of *the same documents* as `D`.
+- **selfdistill** — `D_files` plus teacher-generated synthetic files;
+  the teacher is pinned in
+  [`experiment_scripts/self-distill/teacher_manifest.json`](../../../../experiment_scripts/self-distill/teacher_manifest.json).
+
+These columns are reconstructed from source, not scraped off the cluster:
+`(size, chinchilla_scale)` → the training script's `_DATASET_LOOKUP` →
+`DataMix` → the file list in
+`src/olmo_core/data/mixes/syn_data_scaling/dolma/*.txt`. That matters
+because netscratch's 90-day purge has already removed most runs' own
+`data_paths.txt` records. Of the 2,556 runs, 1,151 still have theirs on
+disk, and **all 1,151 reproduce exactly** — 0 mismatches:
+
+```
+python ../../run_data_provenance.py --verify
+```
+
+Two things to keep in view when reading these columns:
+
+- **`D_tokens` is nominal, `D_files` is actual.** `D_tokens` is
+  `chinchilla_scale × 20 × N`. At 190M with scale ≥ 2 the runs reused the
+  370M shard family, so the real shard is a little smaller than nominal —
+  scale = 2 is nominally 7.6B but read `train_7.4B.npy` (likewise 15.2B →
+  `train_14.8B.npy`, 30.4B → `train_29.6B`, 60.8B → `train_59.2B`). Where
+  the two disagree, `D_files` is what actually trained.
+- **Paraphrases are not length-preserving** (~0.3× the source token count
+  per seed), so tokens actually trained is the on-disk sum of `D` plus the
+  K seed files — not `D_tokens × (1 + K)`. The training script budgets
+  from `st_size // 4` for exactly this reason.
 
 ## Provenance
 

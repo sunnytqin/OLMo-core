@@ -29,6 +29,7 @@ from data import (OVERFIT_EXCLUDE, SIZES, TTP_RATIO, extract_1epoch,  # noqa: E4
 from fit_joint_triple import (SOURCE_NONE, SOURCE_PARA, SOURCE_REPEAT,  # noqa: E402
                                make_triple_forward)
 from fit_joint_triple_onego import get_data, topk_drop_sweep  # noqa: E402
+from run_data_provenance import PROVENANCE_FIELDS, Resolver  # noqa: E402
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SRC_NAME = {SOURCE_NONE: "1epoch", SOURCE_REPEAT: "repeat",
@@ -57,6 +58,33 @@ def collect_rows(scale_min_para=0.5):
                 rows.append(dict(source=SOURCE_PARA, size=size, N=N, scale=s,
                                  D=d, Dp=dp, L=l, epochs=1, K=int(k)))
     return rows
+
+
+HPARAM_CSV = "data_export/hparam_sweeps/hparam_sweep_all.csv"
+
+
+def selected_run_index():
+    """(stream, size, scale, epochs|K) -> the run dolma_*.py selected.
+
+    Keys are unique across the 505 selected runs, so each fit row maps to
+    exactly one training run.  Run export_hparam_sweeps.py first.
+    """
+    path = os.path.join(SCRIPT_DIR, HPARAM_CSV)
+    if not os.path.exists(path):
+        raise SystemExit(
+            f"{HPARAM_CSV} not found — run `python export_hparam_sweeps.py` first.")
+    idx = {}
+    with open(path) as f:
+        for h in csv.DictReader(f):
+            if h["selected_for_scaling_fit"] != "True":
+                continue
+            level = h["epochs"] if h["stream"] == "repeat" else h["K"]
+            key = (h["stream"], h["size"], float(h["chinchilla_scale"]),
+                   int(float(level)))
+            if key in idx:
+                raise SystemExit(f"non-unique selected-run key: {key}")
+            idx[key] = h
+    return idx
 
 
 def main():
@@ -132,11 +160,29 @@ def main():
     # ---- write ----------------------------------------------------------
     outdir = os.path.join(SCRIPT_DIR, args.outdir)
     os.makedirs(outdir, exist_ok=True)
-    FIELDS = ["source", "size", "N_params", "chinchilla_scale", "D_tokens",
-              "epochs", "K_paraphrase", "D_prime_tokens", "tokens_trained",
-              "Dprime_over_D", "D_over_N", "val_loss", "eta_fit",
-              "R_star_fit", "D_eff_fit", "val_loss_pred", "resid_log",
-              "kept_in_canonical_fit"]
+    FIELDS = (["source", "size", "N_params", "chinchilla_scale", "D_tokens",
+               "epochs", "K_paraphrase", "D_prime_tokens", "tokens_trained",
+               "Dprime_over_D", "D_over_N",
+               "run_name", "learning_rate", "weight_decay"]
+              + PROVENANCE_FIELDS
+              + ["tokens_evaluated", "val_loss", "eta_fit",
+                 "R_star_fit", "D_eff_fit", "val_loss_pred", "resid_log",
+                 "kept_in_canonical_fit"])
+
+    def run_columns(r):
+        """The training run behind this fit point, and the data it read."""
+        stream = "paraphrase" if r["source"] == SOURCE_PARA else "repeat"
+        level = int(r["K"]) if stream == "paraphrase" else int(r["epochs"])
+        h = run_index[(stream, r["size"], float(r["scale"]), level)]
+        pv = prov.resolve(stream, r["size"], r["scale"],
+                          level if stream == "paraphrase" else None)
+        return {
+            "run_name": h["run_name"],
+            "learning_rate": float(h["learning_rate"]),
+            "weight_decay": float(h["weight_decay"]),
+            "tokens_evaluated": h["tokens_evaluated"],
+            **pv,
+        }
 
     def record(r):
         return {
@@ -151,6 +197,7 @@ def main():
             "tokens_trained": int(round(r["D"] + r["Dp"])),
             "Dprime_over_D": round(r["Dp"] / r["D"], 6),
             "D_over_N": round(r["D"] / r["N"], 4),
+            **run_columns(r),
             "val_loss": r["L"],
             "eta_fit": None if np.isnan(r["eta"]) else round(float(r["eta"]), 6),
             "R_star_fit": None if np.isnan(r["Rstar"]) else round(float(r["Rstar"]), 6),
@@ -160,6 +207,8 @@ def main():
             "kept_in_canonical_fit": r["kept"],
         }
 
+    run_index = selected_run_index()
+    prov = Resolver()
     recs = [record(r) for r in rows]
 
     csv_path = os.path.join(outdir, "chinchilla_triple_fit_data.csv")

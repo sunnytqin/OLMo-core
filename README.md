@@ -1,187 +1,303 @@
 <div align="center">
-  <!-- <img src="https://github.com/allenai/OLMo/assets/8812459/774ac485-a535-4768-8f7c-db7be20f5cc3" width="300"/> -->
-  <img src="https://huggingface.co/datasets/allenai/blog-images/resolve/main/olmo2/olmo.png" alt="OLMo Logo" width="280" style="margin-left:'auto' margin-right:'auto' display:'block'"/>
-  <br>
-  <h1>OLMo-core</h1>
-  <h4>Building blocks for OLMo modeling and training</h4>
+  <h1>Bridging Compute- and Data-Optimal Pretraining</h1>
+  <p>
+    <a href="https://arxiv.org/abs/2607.25271">Tian&nbsp;Qin</a><sup>1</sup> ·
+    Kimia&nbsp;Hamidieh<sup>2</sup> ·
+    David&nbsp;Alvarez-Melis<sup>1</sup>
+  </p>
+  <p><sup>1</sup>Harvard University &nbsp;&nbsp; <sup>2</sup>MIT CSAIL</p>
+  <p>
+    <a href="https://arxiv.org/abs/2607.25271"><img alt="arXiv" src="https://img.shields.io/badge/arXiv-2607.25271-b31b1b.svg"></a>
+  </p>
 </div>
-<p align="center">
-  <a href="https://olmo-core.readthedocs.io/en/latest/">
-    <img alt="Docs" src="https://img.shields.io/badge/API-docs-red">
-  </a>
-  <a href="https://github.com/allenai/OLMo-core/tree/main/src/examples">
-    <img alt="Examples" src="https://img.shields.io/badge/API-examples-994B00">
-  </a>
-  <a href="https://github.com/allenai/OLMo-core/releases/tag/v1.9.0">
-    <img alt="Pypi" src="https://img.shields.io/pypi/v/ai2-olmo-core.svg">
-  </a>
-  <a href="https://github.com/allenai/OLMo-core/blob/main/LICENSE">
-    <img alt="GitHub License" src="https://img.shields.io/github/license/allenai/OLMo">
-  </a>
-  <a href="https://arxiv.org/pdf/2501.00656.pdf">
-    <img alt="Paper URL" src="https://img.shields.io/badge/arxiv-2402.00838-orange">
-  </a>
-  <a href="https://playground.allenai.org">
-    <img alt="Playground" src="https://img.shields.io/badge/Ai2-Playground-F0529C">
-  </a>
-  <a href="https://discord.gg/sZq3jTNVNG">
-    <img alt="Discord" src="https://img.shields.io/badge/Discord%20-%20blue?style=flat&logo=discord&label=Ai2&color=%235B65E9">
-  </a>
-</p>
 
-## Installation
+Code and data release for the paper. We introduce **Compute-Data (CD) scaling
+laws**, which unify the compute-optimal and data-optimal regimes through a token
+effectiveness function **η** measuring how derived tokens compare to fresh data.
+The measurements behind the paper are ~2,500 training runs at 14M–600M
+parameters over two ways of deriving tokens — multi-epoch repetition and
+paraphrasing.
 
-First install [PyTorch](https://pytorch.org) according to the instructions specific to your operating system and hardware.
+This repo is a fork of [allenai/OLMo-core](https://github.com/allenai/OLMo-core);
+see the [upstream README](https://github.com/allenai/OLMo-core#readme) for
+installation and the library itself. Everything below covers only what this
+paper adds.
 
-For development, we recommend installing from source:
+---
 
-```bash
-git clone https://github.com/allenai/OLMo-core.git
-cd OLMo-core
-pip install -e .[all]
-```
-Or you can install from PyPI with:
+## Contents
 
-```bash
-pip install ai2-olmo-core
-```
+| what | where |
+|---|---|
+| Every loss we measured, joined to its data and settings | [`results/chinchilla_fit_dolma/data_export/`](results/chinchilla_fit_dolma/data_export/) |
+| Training entry points | [`src/scripts/official/OLMo-scale-train-*.py`](src/scripts/official/) |
+| SLURM submission wrappers | [`experiment_scripts/train_scale*.sh`](experiment_scripts/) |
+| Data download + sharding | [`experiment_scripts/download_data.sh`](experiment_scripts/download_data.sh), [`create_dolma3_splits.py`](experiment_scripts/create_dolma3_splits.py) |
+| Paraphrase generation | [`experiment_scripts/paraphrasing/`](experiment_scripts/paraphrasing/) |
+| Evaluation | [`experiment_scripts/run_eval_batch.py`](experiment_scripts/run_eval_batch.py) |
+| Per-size result tables | [`results/dolma_<size>.py`](results/) |
 
-There are a number of optional dependencies that must be installed to use certain functionality as well, including:
+Throughout, `D` is fresh unique Dolma data and `D'` is **derived** data. `D'`
+comes from one of two mechanisms, and they are stored differently:
 
-- [flash-attn](https://github.com/Dao-AILab/flash-attention), [ring-flash-attn](https://github.com/zhuzilin/ring-flash-attention), and [TransformerEngine](https://github.com/NVIDIA/TransformerEngine) for the corresponding attention backends.
-- [Liger-Kernel](https://github.com/linkedin/Liger-Kernel) for a low-memory "fused-linear" loss implementation.
-- [torchao](https://github.com/pytorch/ao) for float8 training.
-- [grouped_gemm](https://github.com/tgale96/grouped_gemm) for dropless mixture-of-experts (MoE) models. You may need to compile from source until [PR #21](https://github.com/tgale96/grouped_gemm/pull/21) is released (post v0.1.6).
+- **Repetition** — `D'` is simply training on repeated `D`. There are no extra
+  files; the number of passes is the `epochs` column.
+- **Paraphrasing** — `D'` is a separate corpus of model-rewritten versions of
+  `D`'s documents, `K` per document. These are real files, listed per run.
 
-The published [Docker images](https://github.com/orgs/allenai/packages?repo_name=OLMo-core) contain all core and optional dependencies, and are regularly tested on our in-house H100 clusters.
-But there are several things to keep in mind if you intend to use these images:
+---
 
-- They do not come with the OLMo-core package installed, only its dependencies, to accommodate for regular code changes.
-- They may not work on your own cluster if you have different hardware or driver/CUDA versions.
+## 1. Trained models: validation losses and the runs behind the fits
 
-If the published images do not work for your use-case for any of the above reasons, you could adapt our [Dockerfile](https://github.com/allenai/OLMo-core/blob/main/src/Dockerfile) to build your own images.
+Start at [`data_export/`](results/chinchilla_fit_dolma/data_export/). Two tables,
+same schema for the data columns:
 
-## Official training scripts
+- **[`chinchilla_triple_fit_data.csv`](results/chinchilla_fit_dolma/data_export/chinchilla_triple_fit_data.csv)** — the 370 points behind the headline fit, one per `(size, scale, epochs|K)`.
+- **[`hparam_sweeps/hparam_sweep_all.csv`](results/chinchilla_fit_dolma/data_export/hparam_sweeps/hparam_sweep_all.csv)** — all 2,556 runs including the losers of every lr × wd sweep, with `selected_for_scaling_fit` marking the 505 that feed the per-size tables.
 
-Official training scripts for released models can be found in [`src/scripts/official/`](https://github.com/allenai/OLMo-core/tree/main/src/scripts/official).
+Every row names both its settings and its data:
 
-These scripts are meant to be launched with ``torchrun``, or with OLMo-core's Beaker launch CLI if you have access to Beaker.
+| column | meaning |
+|---|---|
+| `run_name` | the run's identifier; joins the two tables |
+| `learning_rate`, `weight_decay` | the swept hyperparameters |
+| `seed` | training seed (42 throughout) |
+| `epochs` / `K_paraphrase` | how `D'` was derived — passes over `D`, or paraphrases per document |
+| `D_files`, `D_dir` | the exact fresh-data `.npy` file(s) trained on |
+| `D_prime_files`, `D_prime_dir` | the K paraphrase seed files (paraphrase rows; empty for repetition, where `epochs` carries it) |
+| `val_loss` | the measurement |
 
-For example:
+Full paths are `<data_root>/<D_dir>/allenai/dolma2-tokenizer/<file>`.
 
-```bash
-torchrun --nproc-per-node=8 src/scripts/official/OLMo2/OLMo-2-0325-32B-train.py \
-  --save-folder=/path/to/save/checkpoints
-```
+Everything else follows deterministically from `(row, training script)`:
+architecture from `size`, global batch fixed at `512 × 4096` = 2.1M tokens,
+sequence length 4096, and total steps from the on-disk token count of the files
+named in the row. There are no free parameters left.
 
-You can override most configuration options from the command-line. For example, to override the learning rate you could launch the script like this:
+Two things to keep in view when reading the tables:
 
-```bash
-torchrun --nproc-per-node=8 src/scripts/official/OLMo2/OLMo-2-0325-32B-train.py \
-  --save-folder=/path/to/save/checkpoints \
-  --train_module.optim.lr=6e-3
-```
+- **`D_tokens` vs `D_files`.** `D_tokens` is the fresh-data budget, computed
+  exactly as `chinchilla_scale × 20 × N`. `D_files` names the shard we actually
+  trained on. The two can differ slightly, since a shard is cut to whole
+  documents and a few rungs reuse a neighbouring size's shard — the largest gap
+  is 190M at scale ≥ 2, which uses the 370M shards (`train_7.4B.npy` against a
+  nominal 7.6B, ~3%). The differences are minor, but `D_files` is the ground
+  truth for what trained.
+- **`D'` tokens for paraphrase runs are measured, not derived.** A paraphrase is
+  not guaranteed to match its source document's length — in practice it is
+  shorter — so the paraphrase token count cannot be inferred from `K`. We
+  compute it empirically from the files on disk, which is why it is *not*
+  `D_tokens × (1 + K)`. See [section 3](#3-the-paraphrase-corpus).
 
-To continue annealing from a checkpoint, we use a separate script which can be launched like this:
+---
 
-```bash
-torchrun --nproc-per-node=8 src/scripts/official/OLMo2/OLMo-2-0325-32B-anneal.py \
-  --save-folder=/path/to/save/checkpoints \
-  --checkpoint=https://olmo-checkpoints.org/ai2-llm/peteish32/step721901
-```
+## 2. Training and validation data
 
-### Available Training Scripts
+All experiments train on a 150B-token sample of the OLMo 0625 mix, tokenized
+with **`allenai/dolma2-tokenizer`** (vocab 100,278; padded 100,352;
+EOS = 100,257). The file list is
+[`OLMo-mix-0625-150Bsample.txt`](src/olmo_core/data/mixes/OLMo-mix-0625-150Bsample.txt)
+— 6,915 files, ~600 GB. (On-disk paths read `dolma2-0625`; this is the same
+corpus the paper refers to as Dolma-3.)
 
-| Model Family | Directory | Description |
-|--------------|-----------|-------------|
-| **OLMo-2** | [`src/scripts/official/OLMo2/`](https://github.com/allenai/OLMo-core/tree/main/src/scripts/official/OLMo2) | Training scripts and model card for OLMo-2 32B models |
-| **OLMo-3** | [`src/scripts/official/OLMo3/`](https://github.com/allenai/OLMo-core/tree/main/src/scripts/official/OLMo3) | Training scripts and model cards for OLMo-3 7B and 32B models |
-
-## Inference
-
-### With Hugging Face Transformers
-
-You can use our Hugging Face [transformers](https://github.com/huggingface/transformers) integration to run inference on the OLMo checkpoints:
+From that corpus we cut one validation set and a ladder of nested training
+shards. **We recommend rebuilding these rather than asking us to send them** —
+it is a download plus one deterministic pass, and moves ~600 GB instead of the
+multi-TB alternative. (If that is awkward on your side, get in touch and we will
+work something out.)
 
 ```bash
-pip install transformers>=4.57.0
+# 1. fetch the source corpus (~600 GB, ~2h at 8-way parallel)
+bash experiment_scripts/download_data.sh
+
+# 2. cut validation + the nested train shards (deterministic given --seed)
+python experiment_scripts/create_dolma3_splits.py \
+    --data-dir  <corpus>/preprocessed/dolma2-0625/v0.1-150b/allenai/dolma2-tokenizer \
+    --output-dir <corpus>/preprocessed/dolma2-0625/resharded/allenai/dolma2-tokenizer \
+    --seed 42
 ```
+
+**How the splits work.** All documents across all 6,915 files are indexed, shuffled
+once globally under `--seed 42`, then assigned greedily: validation first
+(~500M tokens, disjoint from train), then each training shard as a **nested
+prefix** of the same order. So `train_0.03B.npy` is a byte-exact prefix of
+`train_0.06B.npy`, and so on up. Which shard each `(model_size, chinchilla)`
+rung uses is declared in `_PER_MODEL_SHARDS` in the same script. Shards ≥ 20B
+are written as `.partNN` files, which are contiguous slices of that same order.
+
+Output files are flat `uint32` token streams with `EOS = 100257` between
+documents. Despite the `.npy` extension they carry **no numpy header**, so
+`np.load` will not read them — use:
 
 ```python
-from transformers import AutoModelForCausalLM, AutoTokenizer
-olmo = AutoModelForCausalLM.from_pretrained("allenai/Olmo-3-1125-32B")
-tokenizer = AutoTokenizer.from_pretrained("allenai/Olmo-3-1125-32B")
-message = ["Language modeling is "]
-inputs = tokenizer(message, return_tensors='pt', return_token_type_ids=False)
-# inputs = {k: v.to('cuda') for k,v in inputs.items()} # optional verifying cuda
-# olmo = olmo.to('cuda')
-response = olmo.generate(**inputs, max_new_tokens=100, do_sample=True, temperature=1.0, top_p=0.7)
-print(tokenizer.batch_decode(response, skip_special_tokens=True)[0])
+np.memmap(path, dtype=np.uint32, mode="r")
 ```
 
-Alternatively, with the Hugging Face pipeline abstraction:
+### Verifying your rebuild matches ours
 
-```python
-from transformers import pipeline
-olmo_pipe = pipeline("text-generation", model="allenai/Olmo-3-1125-32B")
-print(olmo_pipe("Language modeling is"))
-```
+- `doc_index_meta.json` (written by step 2) carries
+  `file_list_hash: 357446410583ab31` over the 6,915 source files. If yours
+  matches, your corpus is ours.
+- Per-shard `(num_docs, num_tokens)` land in `shard_manifest.json`
+  ([`build_shard_manifest.py`](experiment_scripts/build_shard_manifest.py)).
+- **Check content, not just size.** `write_split` uses `np.memmap`, which
+  preallocates the full file zero-filled and fills it progressively. A write
+  interrupted partway leaves a file with the *correct* byte size and *correct*
+  metadata whose tail is all zeros — it passes a size-and-manifest check and
+  would silently train on garbage. Sample windows across each shard and assert
+  non-zero fraction > 95%, max token ≤ vocab size, EOS present, and last token
+  == EOS.
 
-### With vLLM
+---
 
-[vLLM](https://docs.vllm.ai/en/latest/) provides high-throughput inference for OLMo models. You can use it for offline batched inference:
+## 3. The paraphrase corpus
+
+This section covers the paraphrase mechanism only. For repetition, `D'` needs no
+data of its own — it is simply training on repeated `D`, recorded as `epochs`.
+
+**How we scale up paraphrase tokens.** Every source document is paraphrased
+repeatedly, once per *generation seed*, and a run at `K` trains on seeds
+`1..K`. So `K` is the number of distinct paraphrases held per document, and
+raising it is how the paraphrase corpus grows. These generation seeds are a
+property of the **data**, and are unrelated to the training seed in the results
+tables (which is 42 for every run).
+
+Paraphrases were generated with **SmolLM2-1.7B-Instruct** via vLLM at
+temperature 1.0, over the 4,866,732 documents of `train_7.4B.npy`, for
+**64 independent seeds**. Each document is rewritten under one of four prompt
+styles — `faq`, `math`, `table`, `tutorial`, with a math→wikipedia fallback for
+documents with too few numeric tokens — chosen deterministically by
+`pick_style_for_doc(doc_idx, seed)`, so the style mix differs across seeds too.
+
+**Paraphrases are typically shorter than their sources** (~0.3× the source token
+count per seed), and the ratio is not fixed. This is why paraphrase token counts
+are measured from the files rather than computed from `K`, and why the training
+script budgets from actual on-disk sizes (see [section 4](#4-training-settings)).
+
+[`experiment_scripts/paraphrasing/PARAPHRASE_DATA_README.md`](experiment_scripts/paraphrasing/PARAPHRASE_DATA_README.md)
+documents the layout and the doc-ordering invariant in full. The short version:
+
+> The k-th document of `seed{N}/shard_{i}.npy` is a paraphrase of the same
+> source document for every `N`. So `paraphrase_of(train_X.B)` is the first
+> `num_docs(train_X.B)` documents of any seed's concatenated output — which is
+> what makes `D'` line up with `D` at every rung.
+
+**Critically, raising `K` adds no new source documents** — every document in `D'`
+is a rewrite of one already in `D`. That is what isolates η.
+
+Two forms live on disk:
+
+| | what | size |
+|---|---|---|
+| `paraphrased/train_7.4B_smollm2_mixed_seed{1..64}/` | generator output: 32 shards per seed, each a `.npy` plus a `.jsonl` carrying the **paraphrase text** and its `prompt_style` | ~1.4 TB |
+| `paraphrased/sized_smollm2_mixed/` | `D'` pre-cut to each rung (`train_<X>B_seed<N>.npy`) — what the paraphrase runs train on | ~3.5 TB |
+
+The full `paraphrased/` tree is ~4.9 TB, but most of that is redundant: the
+sized files are larger than the seeds they come from because every rung re-cuts
+the same paraphrases at a different size. They are a deterministic function of
+the raw seeds, rebuilt with
+[`build_sized_paraphrase.py`](experiment_scripts/paraphrasing/build_sized_paraphrase.py).
+
+So the raw seeds are the thing worth having: 1.4 TB rather than 4.9 TB, they
+regenerate the rest, and the `.jsonl` side is human-readable, which the
+tokenized sized files are not.
+
+Generation is the expensive step (tens of thousands of GPU-hours), so unlike the
+original data, regenerating this corpus is not the sensible path — **contact the
+authors and we will arrange a transfer** (see [section 6](#6-obtaining-the-data)).
+
+Relevant code: [`paraphrase_shard.py`](experiment_scripts/paraphrasing/paraphrase_shard.py)
+(generator), [`check_paraphrase_integrity.py`](experiment_scripts/paraphrasing/check_paraphrase_integrity.py),
+[`inspect_paraphrased_data.py`](experiment_scripts/paraphrasing/inspect_paraphrased_data.py).
+
+---
+
+## 4. Training settings
+
+| stream | entry point | submission wrapper |
+|---|---|---|
+| repetition (incl. 1-epoch) | [`OLMo-scale-train-multiepoch-dolma.py`](src/scripts/official/OLMo-scale-train-multiepoch-dolma.py) | [`train_scale.sh`](experiment_scripts/train_scale.sh) |
+| paraphrase (`D + D'×K`) | [`OLMo-scale-train-paraphrase-dolma.py`](src/scripts/official/OLMo-scale-train-paraphrase-dolma.py) | [`train_scale_paraphrase.sh`](experiment_scripts/train_scale_paraphrase.sh) |
+| self-distillation | [`OLMo-scale-train-selfdistill-dolma.py`](src/scripts/official/OLMo-scale-train-selfdistill-dolma.py) | [`train_scale_selfdistill.sh`](experiment_scripts/train_scale_selfdistill.sh) |
+
+A run is fully specified by `MODEL_SIZE`, `CHIN` (chinchilla multiplier), `LR`,
+`WD`, and either `EPOCHS` (repetition) or `NUM_SEEDS` = K (paraphrase):
 
 ```bash
-pip install vllm>=0.11.0
+sbatch --export=ALL,MODEL_SIZE=30M,CHIN=1,NUM_SEEDS=8,LR=3e-3,WD=0.1,MICROBATCH_MULT=16 \
+       experiment_scripts/train_scale_paraphrase.sh
 ```
 
-```python
-from vllm import LLM, SamplingParams
-llm = LLM(model="allenai/Olmo-3-1125-32B")
-sampling_params = SamplingParams(temperature=1.0, top_p=0.7)
-prompts = ["Language modeling is"]
-outputs = llm.generate(prompts, sampling_params)
-for output in outputs:
-    prompt = output.prompt
-    generated_text = output.outputs[0].text
-    print(f"Prompt: {prompt!r}, Generated text: {generated_text!r}")
-```
+Fixed across every run in the paper:
 
-For more details, see the [vLLM documentation](https://docs.vllm.ai/en/latest/getting_started/quickstart/#offline-batched-inference).
+| | |
+|---|---|
+| architecture | `TransformerConfig.olmo3_<size>` for 14M/30M/60M/100M/190M/370M/600M |
+| global batch | `512 × 4096` = 2,097,152 tokens |
+| sequence length | 4096 |
+| init seed | 42 |
+| z-loss | 1e-5 |
+| max grad norm | 1.0 |
+| total steps | `total_training_tokens // global_batch_size` |
 
-### With Olmo-core (beta)
+Swept: learning rate and weight decay (grids differ by stream — see
+[`hparam_sweeps/README.md`](results/chinchilla_fit_dolma/data_export/hparam_sweeps/README.md),
+which also maps how thoroughly each cell was actually explored).
 
-Autoregressive generation is supported directly in Olmo-core. Using this capability, we provide a chat-loop demo that can be used to interact with models in an interactive chat session:
+`MICROBATCH_MULT` is gradient accumulation only (A100 = 8, H100 = 16,
+H200 = 32); it changes throughput and numerics, not the global batch or the
+optimizer math.
 
-```bash
-python -m olmo_core.generate.chat https://olmo-checkpoints.org/ai2-llm/Olmo-3-1025-7B/stage3/step11921/ --max-new-tokens 512
-```
+**One-epoch guarantee.** Because paraphrases are shorter than their sources, the
+naive `params × 20 × chin × (1+K)` budget would over-shoot and start a partial
+second pass. The training script instead sums actual on-disk sizes
+(`st_size // 4`) and sets `max_duration` from that, giving exactly one pass over
+`D + D'`.
 
-## Evaluation
+Every run also wrote a complete `config.json` (model, optimizer, scheduler,
+dataset) and a `data_paths.txt` into its checkpoint directory; 2,884 of these
+survive and can be shared on request as a ~20 MB bundle.
 
-Additional tools for evaluating OLMo models are available at the [OLMo Eval](https://github.com/allenai/OLMo-eval) and [olmes](https://github.com/allenai/olmes) repositories.
+---
 
-## Development
+## 5. Evaluation
 
-The Python library source code is located in `src/olmo_core`. The corresponding tests are located in `src/test`. The library docs are located in `docs`. You can build the docs locally with `make docs`.
+[`run_eval_batch.py`](experiment_scripts/run_eval_batch.py) scores a checkpoint's
+cross-entropy on the held-out `validation.npy` (`DataMix.OLMo_dolma_val`),
+batching at `4 × 4096` tokens and caching eval batches across checkpoints.
+Per-run outputs land in [`results/dolma_val_loss/`](results/dolma_val_loss/),
+[`dolma_para_val_loss/`](results/dolma_para_val_loss/), and
+[`dolma_sd_val_loss/`](results/dolma_sd_val_loss/), all committed here.
 
-Code checks:
+Every run is evaluated on the same held-out `validation.npy`; the default is a
+3,478,624-token prefix of it, recorded per run in `tokens_evaluated`.
 
-- We use `pytest` to run tests. You can run all tests with `pytest -v src/test`. You can also point `pytest` at a specific test file to run it individually.
-- We use `isort` and `black` for code formatting. Ideally you should integrate these into your editor, but you can also run them manually or configure them with a pre-commit hook. To validate that all files are formatted correctly, run `make style-check`.
-- We use `ruff` as our primary linter. You can run it with `make lint-check`.
-- We use `mypy` as our type checker. You can run it with `make type-check`.
+---
 
-## Citing
+## 6. Obtaining the data
+
+| | size | recommendation |
+|---|---|---|
+| source corpus (150B sample) | ~600 GB | download via [`download_data.sh`](experiment_scripts/download_data.sh) |
+| `D` shards + `validation.npy` | ~115 GB | rebuild with `create_dolma3_splits.py --seed 42` |
+| `doc_index.npz` (global doc order) | 551 MB | rebuilt by the same script, or **ask us** for a copy to skip the corpus scan |
+| paraphrase raw seeds (64 × 32 shards, `.npy` + `.jsonl`) | ~1.4 TB | **contact the authors** |
+| paraphrase sized `D'` | ~3.5 TB | rebuild from raw seeds with `build_sized_paraphrase.py` |
+
+**Please get in touch for the paraphrase corpus** — it is the one piece that
+cannot reasonably be regenerated, and we are happy to share it. Globus is the
+practical route at that volume, and we can stage a subset (specific sizes or
+seed ranges) if the full 1.4 TB is more than you need. 
+
+---
+
+## Citation
 
 ```bibtex
-@misc{olmo20242olmo2furious,
-      title={{2 OLMo 2 Furious}},
-      author={{Team OLMo} and Pete Walsh and Luca Soldaini and Dirk Groeneveld and Kyle Lo and Shane Arora and Akshita Bhagia and Yuling Gu and Shengyi Huang and Matt Jordan and Nathan Lambert and Dustin Schwenk and Oyvind Tafjord and Taira Anderson and David Atkinson and Faeze Brahman and Christopher Clark and Pradeep Dasigi and Nouha Dziri and Michal Guerquin and Hamish Ivison and Pang Wei Koh and Jiacheng Liu and Saumya Malik and William Merrill and Lester James V. Miranda and Jacob Morrison and Tyler Murray and Crystal Nam and Valentina Pyatkin and Aman Rangapur and Michael Schmitz and Sam Skjonsberg and David Wadden and Christopher Wilhelm and Michael Wilson and Luke Zettlemoyer and Ali Farhadi and Noah A. Smith and Hannaneh Hajishirzi},
-      year={2024},
-      eprint={2501.00656},
-      archivePrefix={arXiv},
-      primaryClass={cs.CL},
-      url={https://arxiv.org/abs/2501.00656},
+@article{qin2026bridging,
+  title  = {Bridging Compute- and Data-Optimal Pretraining},
+  author = {Qin, Tian and Hamidieh, Kimia and Alvarez-Melis, David},
+  journal = {arXiv preprint arXiv:2607.25271},
+  year   = {2026}
 }
 ```

@@ -38,6 +38,16 @@ functional form, and the exact filters applied.
 | `D_prime_tokens` | second-stream tokens: `(epochs−1)·D` for repeat, `tokens_trained − D` for paraphrase, `0` for 1-epoch |
 | `tokens_trained` | `D + D'` |
 | `Dprime_over_D`, `D_over_N` | the two ratios the η surface is a function of |
+| `run_name` | the training run behind this point; joins to [`hparam_sweeps/`](hparam_sweeps/) |
+| `learning_rate`, `weight_decay` | the (lr, wd) that won this cell's sweep |
+| `D_files` | the fresh-data `.npy` file(s) the run read, `;`-separated |
+| `D_dir` | directory of `D_files`, relative to the data root |
+| `D_prime_files` | the K paraphrase seed files (paraphrase rows only) |
+| `D_prime_dir` | directory of `D_prime_files`, relative to the data root |
+| `D_prime_corpus` | which D′ pool (`sized_smollm2_mixed`) |
+| `paraphrase_seeds` | seed range consumed, e.g. `1-8` |
+| `data_mix` | the `DataMix` name backing `D_files` (repetition rows) |
+| `tokens_evaluated` | size of the validation prefix this loss was measured over |
 | `val_loss` | **the measurement** — Dolma held-out validation cross-entropy |
 | `eta_fit`, `R_star_fit` | η and R\* predicted by the canonical fit at this row (blank for 1-epoch) |
 | `D_eff_fit` | `D + η·D'` |
@@ -47,6 +57,39 @@ functional form, and the exact filters applied.
 
 Only `val_loss` and the columns left of it are data; everything from
 `eta_fit` rightwards is derived from the fit and can be recomputed.
+
+## Which data and settings each point came from
+
+`run_name` identifies the training run, and `D_files` / `D_prime_files`
+name the exact `.npy` files it read. Full paths are
+`<data_root>/<D_dir>/<tokenizer_id>/<file>` with
+`tokenizer_id = allenai/dolma2-tokenizer`. Repetition rows read `D_files`
+`epochs` times and have no second stream; paraphrase rows read `D_files`
+once plus the K seed files, which paraphrase *the same documents* as `D`.
+
+These are reconstructed from source — `(size, chinchilla_scale)` → the
+training script's `_DATASET_LOOKUP` → `DataMix` → the file list in
+`src/olmo_core/data/mixes/syn_data_scaling/dolma/*.txt` — rather than
+scraped off the cluster, because netscratch's 90-day purge has removed
+most runs' own `data_paths.txt`. Of the 2,556 runs in `hparam_sweeps/`,
+1,151 still have theirs, and all 1,151 reproduce exactly:
+
+```
+python ../run_data_provenance.py --verify
+```
+
+Two things to keep in view:
+
+- **`D_tokens` is nominal, `D_files` is actual.** At 190M with scale ≥ 2
+  the runs reused the 370M shard family, so scale = 2 is nominally 7.6B
+  but read `train_7.4B.npy`. Where they disagree, `D_files` is what
+  trained.
+- **`tokens_evaluated` is not constant.** Every run evaluates on the same
+  `validation.npy`, but over a different-length prefix of it: 3.48M
+  tokens is the default, while an earlier round of the hyperparameter grid
+  (30M and 370M repetition runs, April 2026) used 13.28M. Losses are
+  directly comparable within a group; check the column before comparing
+  across.
 
 ## Full hyperparameter sweeps
 
